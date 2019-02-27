@@ -72,6 +72,7 @@ class JsonFormatBase(unittest.TestCase):
     message.bytes_value = b'bar'
     message.message_value.value = 10
     message.enum_value = json_format_proto3_pb2.BAR
+    message.PascalCaseNaming = 's'
     # Repeated
     message.repeated_int32_value.append(0x7FFFFFFF)
     message.repeated_int32_value.append(-2147483648)
@@ -142,6 +143,7 @@ class JsonFormatTest(JsonFormatBase):
             '"bytesValue": "YmFy",'
             '"messageValue": {"value": 10},'
             '"enumValue": "BAR",'
+            '"PascalCaseNaming": "s",'
             '"repeatedInt32Value": [2147483647, -2147483648],'
             '"repeatedInt64Value": ["9007199254740992", "-9007199254740992"],'
             '"repeatedUint32Value": [268435455, 134217727],'
@@ -304,6 +306,7 @@ class JsonFormatTest(JsonFormatBase):
                    '"repeatedUint32Value": [],'
                    '"repeatedInt32Value": [],'
                    '"enumValue": "FOO",'
+                   '"PascalCaseNaming": "",'
                    '"int32Value": 0,'
                    '"floatValue": 0,'
                    '"int64Value": "0",'
@@ -748,6 +751,7 @@ class JsonFormatTest(JsonFormatBase):
                       '"bytesValue": null,'
                       '"messageValue": null,'
                       '"enumValue": null,'
+                      '"PascalCaseNaming": null,'
                       '"repeatedInt32Value": null,'
                       '"repeatedInt64Value": null,'
                       '"repeatedUint32Value": null,'

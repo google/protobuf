@@ -69,6 +69,7 @@ ProtoWriter::ProtoWriter(TypeResolver* type_resolver,
       ignore_unknown_fields_(false),
       ignore_unknown_enum_values_(false),
       use_lower_camel_for_enums_(false),
+      try_lower_camel_for_unknown_fields_(false),
       case_insensitive_enum_parsing_(true),
       element_(nullptr),
       size_insert_(),
@@ -90,6 +91,7 @@ ProtoWriter::ProtoWriter(const TypeInfo* typeinfo,
       ignore_unknown_fields_(false),
       ignore_unknown_enum_values_(false),
       use_lower_camel_for_enums_(false),
+      try_lower_camel_for_unknown_fields_(false),
       case_insensitive_enum_parsing_(true),
       element_(nullptr),
       size_insert_(),
@@ -759,6 +761,11 @@ const google::protobuf::Field* ProtoWriter::Lookup(
   }
   const google::protobuf::Field* field =
       typeinfo_->FindField(&e->type(), unnormalized_name);
+
+  if (field == nullptr && try_lower_camel_for_unknown_fields_) {
+    field = FindLowerCamelFieldInTypeOrNull(&e->type(), unnormalized_name);
+  }
+
   if (field == nullptr && !ignore_unknown_fields_) {
     InvalidName(unnormalized_name, "Cannot find field.");
   }
