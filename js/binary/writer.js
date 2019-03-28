@@ -73,6 +73,7 @@ goog.require('jspb.utils');
  *
  * @constructor
  * @struct
+ * @export
  */
 jspb.BinaryWriter = function() {
   /**
@@ -167,6 +168,7 @@ jspb.BinaryWriter.prototype.endDelimited_ = function(bookmark) {
  * @param {!Uint8Array} bytes The array of bytes to write.
  * @param {number} start The start of the range to write.
  * @param {number} end The end of the range to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSerializedMessage = function(
     bytes, start, end) {
@@ -180,6 +182,7 @@ jspb.BinaryWriter.prototype.writeSerializedMessage = function(
  * @param {?Uint8Array} bytes The array of bytes to write.
  * @param {?number} start The start of the range to write.
  * @param {?number} end The end of the range to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.maybeWriteSerializedMessage = function(
     bytes, start, end) {
@@ -191,6 +194,7 @@ jspb.BinaryWriter.prototype.maybeWriteSerializedMessage = function(
 
 /**
  * Resets the writer, throwing away any accumulated buffers.
+ * @export
  */
 jspb.BinaryWriter.prototype.reset = function() {
   this.blocks_ = [];
@@ -203,6 +207,7 @@ jspb.BinaryWriter.prototype.reset = function() {
 /**
  * Converts the encoded data into a Uint8Array.
  * @return {!Uint8Array}
+ * @export
  */
 jspb.BinaryWriter.prototype.getResultBuffer = function() {
   goog.asserts.assert(this.bookmarks_.length == 0);
@@ -239,6 +244,7 @@ jspb.BinaryWriter.prototype.getResultBuffer = function() {
  * @param {boolean=} opt_webSafe True indicates we should use a websafe
  *     alphabet, which does not require escaping for use in URLs.
  * @return {string}
+ * @export
  */
 jspb.BinaryWriter.prototype.getResultBase64String = function(opt_webSafe) {
   return goog.crypt.base64.encodeByteArray(this.getResultBuffer(), opt_webSafe);
@@ -250,6 +256,7 @@ jspb.BinaryWriter.prototype.getResultBase64String = function(opt_webSafe) {
  * done.
  * TODO(aappleby): Deprecated. Move callers to writeMessage().
  * @param {number} field The field number of the sub-message.
+ * @export
  */
 jspb.BinaryWriter.prototype.beginSubMessage = function(field) {
   this.bookmarks_.push(this.beginDelimited_(field));
@@ -259,6 +266,7 @@ jspb.BinaryWriter.prototype.beginSubMessage = function(field) {
 /**
  * Finishes a sub-message and packs it into the parent messages' buffer.
  * TODO(aappleby): Deprecated. Move callers to writeMessage().
+ * @export
  */
 jspb.BinaryWriter.prototype.endSubMessage = function() {
   goog.asserts.assert(this.bookmarks_.length >= 0);
@@ -287,6 +295,7 @@ jspb.BinaryWriter.prototype.writeFieldHeader_ =
  * @param {jspb.BinaryConstants.FieldType} fieldType
  * @param {number} field
  * @param {jspb.AnyFieldType} value
+ * @export
  */
 jspb.BinaryWriter.prototype.writeAny = function(fieldType, field, value) {
   var fieldTypes = jspb.BinaryConstants.FieldType;
@@ -455,6 +464,7 @@ jspb.BinaryWriter.prototype.writeZigzagVarint64String_ = function(
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeInt32 = function(field, value) {
   if (value == null) return;
@@ -469,6 +479,7 @@ jspb.BinaryWriter.prototype.writeInt32 = function(field, value) {
  * the range [-2^31,2^31) will be truncated.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeInt32String = function(field, value) {
   if (value == null) return;
@@ -484,6 +495,7 @@ jspb.BinaryWriter.prototype.writeInt32String = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeInt64 = function(field, value) {
   if (value == null) return;
@@ -497,6 +509,7 @@ jspb.BinaryWriter.prototype.writeInt64 = function(field, value) {
  * Writes a int64 field (with value as a string) to the buffer.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeInt64String = function(field, value) {
   if (value == null) return;
@@ -511,6 +524,7 @@ jspb.BinaryWriter.prototype.writeInt64String = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeUint32 = function(field, value) {
   if (value == null) return;
@@ -525,6 +539,7 @@ jspb.BinaryWriter.prototype.writeUint32 = function(field, value) {
  * the range [0,2^32) will be truncated.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeUint32String = function(field, value) {
   if (value == null) return;
@@ -540,6 +555,7 @@ jspb.BinaryWriter.prototype.writeUint32String = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeUint64 = function(field, value) {
   if (value == null) return;
@@ -553,6 +569,7 @@ jspb.BinaryWriter.prototype.writeUint64 = function(field, value) {
  * Writes a uint64 field (with value as a string) to the buffer.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeUint64String = function(field, value) {
   if (value == null) return;
@@ -567,6 +584,7 @@ jspb.BinaryWriter.prototype.writeUint64String = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSint32 = function(field, value) {
   if (value == null) return;
@@ -581,6 +599,7 @@ jspb.BinaryWriter.prototype.writeSint32 = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSint64 = function(field, value) {
   if (value == null) return;
@@ -595,6 +614,7 @@ jspb.BinaryWriter.prototype.writeSint64 = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {string?} value The decimal string to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSint64String = function(field, value) {
   if (value == null) return;
@@ -609,6 +629,7 @@ jspb.BinaryWriter.prototype.writeSint64String = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeFixed32 = function(field, value) {
   if (value == null) return;
@@ -624,6 +645,7 @@ jspb.BinaryWriter.prototype.writeFixed32 = function(field, value) {
  * will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeFixed64 = function(field, value) {
   if (value == null) return;
@@ -638,6 +660,7 @@ jspb.BinaryWriter.prototype.writeFixed64 = function(field, value) {
  * Writes a fixed64 field (with value as a string) to the buffer.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeFixed64String = function(field, value) {
   if (value == null) return;
@@ -652,6 +675,7 @@ jspb.BinaryWriter.prototype.writeFixed64String = function(field, value) {
  * [-2^31,2^31) will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSfixed32 = function(field, value) {
   if (value == null) return;
@@ -667,6 +691,7 @@ jspb.BinaryWriter.prototype.writeSfixed32 = function(field, value) {
  * [-2^63,2^63) will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSfixed64 = function(field, value) {
   if (value == null) return;
@@ -682,6 +707,7 @@ jspb.BinaryWriter.prototype.writeSfixed64 = function(field, value) {
  * [-2^63,2^63) will be truncated.
  * @param {number} field The field number.
  * @param {string?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeSfixed64String = function(field, value) {
   if (value == null) return;
@@ -696,6 +722,7 @@ jspb.BinaryWriter.prototype.writeSfixed64String = function(field, value) {
  * requiring more than 32 bits of precision will be truncated.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeFloat = function(field, value) {
   if (value == null) return;
@@ -709,6 +736,7 @@ jspb.BinaryWriter.prototype.writeFloat = function(field, value) {
  * native format used by JavaScript, no precision will be lost.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeDouble = function(field, value) {
   if (value == null) return;
@@ -723,6 +751,7 @@ jspb.BinaryWriter.prototype.writeDouble = function(field, value) {
  * in the string representation of the proto.
  * @param {number} field The field number.
  * @param {boolean?|number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeBool = function(field, value) {
   if (value == null) return;
@@ -736,6 +765,7 @@ jspb.BinaryWriter.prototype.writeBool = function(field, value) {
  * Writes an enum field to the buffer.
  * @param {number} field The field number.
  * @param {number?} value The value to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeEnum = function(field, value) {
   if (value == null) return;
@@ -750,6 +780,7 @@ jspb.BinaryWriter.prototype.writeEnum = function(field, value) {
  * Writes a string field to the buffer.
  * @param {number} field The field number.
  * @param {string?} value The string to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeString = function(field, value) {
   if (value == null) return;
@@ -764,6 +795,7 @@ jspb.BinaryWriter.prototype.writeString = function(field, value) {
  * of the C++ implementation, empty byte arrays _are_ serialized.
  * @param {number} field The field number.
  * @param {?jspb.ByteSource} value The array of bytes to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeBytes = function(field, value) {
   if (value == null) return;
@@ -789,6 +821,7 @@ jspb.BinaryWriter.prototype.writeBytes = function(field, value) {
  *       mapunion(MessageType, (X) =>
  *         cond(eq(X, 'null'), none(), X)))
  * =:
+ * @export
  */
 jspb.BinaryWriter.prototype.writeMessage = function(
     field, value, writerCallback) {
@@ -848,6 +881,7 @@ jspb.BinaryWriter.prototype.writeMessageSet = function(
  *       mapunion(MessageType, (X) =>
  *         cond(eq(X, 'null'), none(), X)))
  * =:
+ * @export
  */
 jspb.BinaryWriter.prototype.writeGroup = function(
     field, value, writerCallback) {
@@ -863,6 +897,7 @@ jspb.BinaryWriter.prototype.writeGroup = function(
  * the buffer.
  * @param {number} field The field number.
  * @param {string?} value The hash string.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeFixedHash64 = function(field, value) {
   if (value == null) return;
@@ -877,6 +912,7 @@ jspb.BinaryWriter.prototype.writeFixedHash64 = function(field, value) {
  * the buffer.
  * @param {number} field The field number.
  * @param {string?} value The hash string.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeVarintHash64 = function(field, value) {
   if (value == null) return;
@@ -890,6 +926,7 @@ jspb.BinaryWriter.prototype.writeVarintHash64 = function(field, value) {
  * Writes an array of numbers to the buffer as a repeated 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedInt32 = function(field, value) {
   if (value == null) return;
@@ -904,6 +941,7 @@ jspb.BinaryWriter.prototype.writeRepeatedInt32 = function(field, value) {
  * 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedInt32String = function(field, value) {
   if (value == null) return;
@@ -917,6 +955,7 @@ jspb.BinaryWriter.prototype.writeRepeatedInt32String = function(field, value) {
  * Writes an array of numbers to the buffer as a repeated 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedInt64 = function(field, value) {
   if (value == null) return;
@@ -931,6 +970,7 @@ jspb.BinaryWriter.prototype.writeRepeatedInt64 = function(field, value) {
  * 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedInt64String = function(field, value) {
   if (value == null) return;
@@ -945,6 +985,7 @@ jspb.BinaryWriter.prototype.writeRepeatedInt64String = function(field, value) {
  *     field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedUint32 = function(field, value) {
   if (value == null) return;
@@ -959,6 +1000,7 @@ jspb.BinaryWriter.prototype.writeRepeatedUint32 = function(field, value) {
  * unsigned 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedUint32String = function(field, value) {
   if (value == null) return;
@@ -973,6 +1015,7 @@ jspb.BinaryWriter.prototype.writeRepeatedUint32String = function(field, value) {
  *     field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedUint64 = function(field, value) {
   if (value == null) return;
@@ -987,6 +1030,7 @@ jspb.BinaryWriter.prototype.writeRepeatedUint64 = function(field, value) {
  * unsigned 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedUint64String = function(field, value) {
   if (value == null) return;
@@ -1000,6 +1044,7 @@ jspb.BinaryWriter.prototype.writeRepeatedUint64String = function(field, value) {
  * Writes an array numbers to the buffer as a repeated signed 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSint32 = function(field, value) {
   if (value == null) return;
@@ -1013,6 +1058,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSint32 = function(field, value) {
  * Writes an array numbers to the buffer as a repeated signed 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSint64 = function(field, value) {
   if (value == null) return;
@@ -1026,6 +1072,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSint64 = function(field, value) {
  * Writes an array numbers to the buffer as a repeated signed 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSint64String = function(field, value) {
   if (value == null) return;
@@ -1040,6 +1087,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSint64String = function(field, value) {
  * works for both signed and unsigned fixed32s.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedFixed32 = function(field, value) {
   if (value == null) return;
@@ -1054,6 +1102,7 @@ jspb.BinaryWriter.prototype.writeRepeatedFixed32 = function(field, value) {
  * works for both signed and unsigned fixed64s.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedFixed64 = function(field, value) {
   if (value == null) return;
@@ -1068,6 +1117,7 @@ jspb.BinaryWriter.prototype.writeRepeatedFixed64 = function(field, value) {
  * works for both signed and unsigned fixed64s.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of decimal strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedFixed64String = function(
     field, value) {
@@ -1082,6 +1132,7 @@ jspb.BinaryWriter.prototype.writeRepeatedFixed64String = function(
  * Writes an array of numbers to the buffer as a repeated sfixed32 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSfixed32 = function(field, value) {
   if (value == null) return;
@@ -1095,6 +1146,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSfixed32 = function(field, value) {
  * Writes an array of numbers to the buffer as a repeated sfixed64 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSfixed64 = function(field, value) {
   if (value == null) return;
@@ -1109,6 +1161,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSfixed64 = function(field, value) {
  * field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of decimal strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedSfixed64String = function(field, value) {
   if (value == null) return;
@@ -1122,6 +1175,7 @@ jspb.BinaryWriter.prototype.writeRepeatedSfixed64String = function(field, value)
  * Writes an array of numbers to the buffer as a repeated float field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedFloat = function(field, value) {
   if (value == null) return;
@@ -1135,6 +1189,7 @@ jspb.BinaryWriter.prototype.writeRepeatedFloat = function(field, value) {
  * Writes an array of numbers to the buffer as a repeated double field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedDouble = function(field, value) {
   if (value == null) return;
@@ -1148,6 +1203,7 @@ jspb.BinaryWriter.prototype.writeRepeatedDouble = function(field, value) {
  * Writes an array of booleans to the buffer as a repeated bool field.
  * @param {number} field The field number.
  * @param {?Array<boolean>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedBool = function(field, value) {
   if (value == null) return;
@@ -1161,6 +1217,7 @@ jspb.BinaryWriter.prototype.writeRepeatedBool = function(field, value) {
  * Writes an array of enums to the buffer as a repeated enum field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedEnum = function(field, value) {
   if (value == null) return;
@@ -1174,6 +1231,7 @@ jspb.BinaryWriter.prototype.writeRepeatedEnum = function(field, value) {
  * Writes an array of strings to the buffer as a repeated string field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedString = function(field, value) {
   if (value == null) return;
@@ -1188,6 +1246,7 @@ jspb.BinaryWriter.prototype.writeRepeatedString = function(field, value) {
  * @param {number} field The field number.
  * @param {?Array<!jspb.ByteSource>} value The arrays of arrays of bytes to
  *     write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedBytes = function(field, value) {
   if (value == null) return;
@@ -1205,6 +1264,7 @@ jspb.BinaryWriter.prototype.writeRepeatedBytes = function(field, value) {
  *    write.
  * @param {function(MessageType, !jspb.BinaryWriter)} writerCallback
  *     Will be invoked with the value to write and the writer to write it with.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedMessage = function(
     field, value, writerCallback) {
@@ -1225,6 +1285,7 @@ jspb.BinaryWriter.prototype.writeRepeatedMessage = function(
  *    write.
  * @param {function(MessageType, !jspb.BinaryWriter)} writerCallback
  *     Will be invoked with the value to write and the writer to write it with.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedGroup = function(
     field, value, writerCallback) {
@@ -1242,6 +1303,7 @@ jspb.BinaryWriter.prototype.writeRepeatedGroup = function(
  * the buffer.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of hashes to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedFixedHash64 =
     function(field, value) {
@@ -1257,6 +1319,7 @@ jspb.BinaryWriter.prototype.writeRepeatedFixedHash64 =
  * each) to the buffer.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of hashes to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writeRepeatedVarintHash64 =
     function(field, value) {
@@ -1271,6 +1334,7 @@ jspb.BinaryWriter.prototype.writeRepeatedVarintHash64 =
  * Writes an array of numbers to the buffer as a packed 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedInt32 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1287,6 +1351,7 @@ jspb.BinaryWriter.prototype.writePackedInt32 = function(field, value) {
  * 32-bit int field.
  * @param {number} field
  * @param {?Array<string>} value
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedInt32String = function(field, value) {
   if (value == null || !value.length) return;
@@ -1302,6 +1367,7 @@ jspb.BinaryWriter.prototype.writePackedInt32String = function(field, value) {
  * Writes an array of numbers to the buffer as a packed 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedInt64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1318,6 +1384,7 @@ jspb.BinaryWriter.prototype.writePackedInt64 = function(field, value) {
  * 64-bit int field.
  * @param {number} field
  * @param {?Array<string>} value
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedInt64String = function(field, value) {
   if (value == null || !value.length) return;
@@ -1334,6 +1401,7 @@ jspb.BinaryWriter.prototype.writePackedInt64String = function(field, value) {
  * Writes an array numbers to the buffer as a packed unsigned 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedUint32 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1350,6 +1418,7 @@ jspb.BinaryWriter.prototype.writePackedUint32 = function(field, value) {
  * unsigned 32-bit int field.
  * @param {number} field
  * @param {?Array<string>} value
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedUint32String =
     function(field, value) {
@@ -1366,6 +1435,7 @@ jspb.BinaryWriter.prototype.writePackedUint32String =
  * Writes an array numbers to the buffer as a packed unsigned 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedUint64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1382,6 +1452,7 @@ jspb.BinaryWriter.prototype.writePackedUint64 = function(field, value) {
  * unsigned 64-bit int field.
  * @param {number} field
  * @param {?Array<string>} value
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedUint64String =
     function(field, value) {
@@ -1399,6 +1470,7 @@ jspb.BinaryWriter.prototype.writePackedUint64String =
  * Writes an array numbers to the buffer as a packed signed 32-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSint32 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1414,6 +1486,7 @@ jspb.BinaryWriter.prototype.writePackedSint32 = function(field, value) {
  * Writes an array of numbers to the buffer as a packed signed 64-bit int field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSint64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1430,6 +1503,7 @@ jspb.BinaryWriter.prototype.writePackedSint64 = function(field, value) {
  * int field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of decimal strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSint64String = function(field, value) {
   if (value == null || !value.length) return;
@@ -1446,6 +1520,7 @@ jspb.BinaryWriter.prototype.writePackedSint64String = function(field, value) {
  * Writes an array of numbers to the buffer as a packed fixed32 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedFixed32 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1461,6 +1536,7 @@ jspb.BinaryWriter.prototype.writePackedFixed32 = function(field, value) {
  * Writes an array of numbers to the buffer as a packed fixed64 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedFixed64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1477,6 +1553,7 @@ jspb.BinaryWriter.prototype.writePackedFixed64 = function(field, value) {
  * fixed64 field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedFixed64String = function(field, value) {
   if (value == null || !value.length) return;
@@ -1493,6 +1570,7 @@ jspb.BinaryWriter.prototype.writePackedFixed64String = function(field, value) {
  * Writes an array of numbers to the buffer as a packed sfixed32 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSfixed32 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1508,6 +1586,7 @@ jspb.BinaryWriter.prototype.writePackedSfixed32 = function(field, value) {
  * Writes an array of numbers to the buffer as a packed sfixed64 field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSfixed64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1523,6 +1602,7 @@ jspb.BinaryWriter.prototype.writePackedSfixed64 = function(field, value) {
  * Writes an array of numbers to the buffer as a packed sfixed64 field.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of decimal strings to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedSfixed64String = function(field, value) {
   if (value == null || !value.length) return;
@@ -1538,6 +1618,7 @@ jspb.BinaryWriter.prototype.writePackedSfixed64String = function(field, value) {
  * Writes an array of numbers to the buffer as a packed float field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedFloat = function(field, value) {
   if (value == null || !value.length) return;
@@ -1553,6 +1634,7 @@ jspb.BinaryWriter.prototype.writePackedFloat = function(field, value) {
  * Writes an array of numbers to the buffer as a packed double field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedDouble = function(field, value) {
   if (value == null || !value.length) return;
@@ -1568,6 +1650,7 @@ jspb.BinaryWriter.prototype.writePackedDouble = function(field, value) {
  * Writes an array of booleans to the buffer as a packed bool field.
  * @param {number} field The field number.
  * @param {?Array<boolean>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedBool = function(field, value) {
   if (value == null || !value.length) return;
@@ -1583,6 +1666,7 @@ jspb.BinaryWriter.prototype.writePackedBool = function(field, value) {
  * Writes an array of enums to the buffer as a packed enum field.
  * @param {number} field The field number.
  * @param {?Array<number>} value The array of ints to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedEnum = function(field, value) {
   if (value == null || !value.length) return;
@@ -1599,6 +1683,7 @@ jspb.BinaryWriter.prototype.writePackedEnum = function(field, value) {
  * the buffer.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of hashes to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedFixedHash64 = function(field, value) {
   if (value == null || !value.length) return;
@@ -1615,6 +1700,7 @@ jspb.BinaryWriter.prototype.writePackedFixedHash64 = function(field, value) {
  * the buffer.
  * @param {number} field The field number.
  * @param {?Array<string>} value The array of hashes to write.
+ * @export
  */
 jspb.BinaryWriter.prototype.writePackedVarintHash64 = function(field, value) {
   if (value == null || !value.length) return;
