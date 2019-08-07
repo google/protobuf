@@ -87,9 +87,15 @@ void RepeatedMessageFieldGenerator::GenerateMembers(io::Printer* printer) {
 }
 
 void RepeatedMessageFieldGenerator::GenerateMergingCode(io::Printer* printer) {
-  printer->Print(
+  if(IsWrapperType(descriptor_)){
+    printer->Print(
     variables_,
     "$name$_.Add(other.$name$_);\n");
+  } else {
+    printer->Print(
+      variables_,
+      "$name$_.MergeFrom(other.$name$_);\n");
+    }
 }
 
 void RepeatedMessageFieldGenerator::GenerateParsingCode(io::Printer* printer) {

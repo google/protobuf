@@ -531,7 +531,7 @@ namespace Google.Protobuf.TestProtos {
       mapStringString_.Add(other.mapStringString_);
       mapInt32Bytes_.Add(other.mapInt32Bytes_);
       mapInt32Enum_.Add(other.mapInt32Enum_);
-      mapInt32ForeignMessage_.Add(other.mapInt32ForeignMessage_);
+      mapInt32ForeignMessage_.MergeFrom(other.mapInt32ForeignMessage_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -851,7 +851,7 @@ namespace Google.Protobuf.TestProtos {
       if (other == null) {
         return;
       }
-      mapInt32Message_.Add(other.mapInt32Message_);
+      mapInt32Message_.MergeFrom(other.mapInt32Message_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -1340,7 +1340,7 @@ namespace Google.Protobuf.TestProtos {
       mapInt32Double_.Add(other.mapInt32Double_);
       mapBoolBool_.Add(other.mapBoolBool_);
       mapInt32Enum_.Add(other.mapInt32Enum_);
-      mapInt32ForeignMessage_.Add(other.mapInt32ForeignMessage_);
+      mapInt32ForeignMessage_.MergeFrom(other.mapInt32ForeignMessage_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -1521,7 +1521,7 @@ namespace Google.Protobuf.TestProtos {
       if (other == null) {
         return;
       }
-      type_.Add(other.type_);
+      type_.MergeFrom(other.type_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 

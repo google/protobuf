@@ -1289,15 +1289,15 @@ namespace Google.Protobuf.TestProtos {
       if (other == null) {
         return;
       }
-      anyField_.Add(other.anyField_);
-      apiField_.Add(other.apiField_);
-      durationField_.Add(other.durationField_);
-      emptyField_.Add(other.emptyField_);
-      fieldMaskField_.Add(other.fieldMaskField_);
-      sourceContextField_.Add(other.sourceContextField_);
-      structField_.Add(other.structField_);
-      timestampField_.Add(other.timestampField_);
-      typeField_.Add(other.typeField_);
+      anyField_.MergeFrom(other.anyField_);
+      apiField_.MergeFrom(other.apiField_);
+      durationField_.MergeFrom(other.durationField_);
+      emptyField_.MergeFrom(other.emptyField_);
+      fieldMaskField_.MergeFrom(other.fieldMaskField_);
+      sourceContextField_.MergeFrom(other.sourceContextField_);
+      structField_.MergeFrom(other.structField_);
+      timestampField_.MergeFrom(other.timestampField_);
+      typeField_.MergeFrom(other.typeField_);
       doubleField_.Add(other.doubleField_);
       floatField_.Add(other.floatField_);
       int64Field_.Add(other.int64Field_);
@@ -2511,15 +2511,15 @@ namespace Google.Protobuf.TestProtos {
       if (other == null) {
         return;
       }
-      anyField_.Add(other.anyField_);
-      apiField_.Add(other.apiField_);
-      durationField_.Add(other.durationField_);
-      emptyField_.Add(other.emptyField_);
-      fieldMaskField_.Add(other.fieldMaskField_);
-      sourceContextField_.Add(other.sourceContextField_);
-      structField_.Add(other.structField_);
-      timestampField_.Add(other.timestampField_);
-      typeField_.Add(other.typeField_);
+      anyField_.MergeFrom(other.anyField_);
+      apiField_.MergeFrom(other.apiField_);
+      durationField_.MergeFrom(other.durationField_);
+      emptyField_.MergeFrom(other.emptyField_);
+      fieldMaskField_.MergeFrom(other.fieldMaskField_);
+      sourceContextField_.MergeFrom(other.sourceContextField_);
+      structField_.MergeFrom(other.structField_);
+      timestampField_.MergeFrom(other.timestampField_);
+      typeField_.MergeFrom(other.typeField_);
       doubleField_.Add(other.doubleField_);
       floatField_.Add(other.floatField_);
       int64Field_.Add(other.int64Field_);
