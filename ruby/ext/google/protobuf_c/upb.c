@@ -16388,6 +16388,7 @@ TYPE_HANDLERS_MAPKEY(uint64_t, fmt_uint64_as_number)
 typedef struct {
   void *keyname;
   const upb_enumdef *enumdef;
+  bool always_print_enums_as_ints;
 } EnumHandlerData;
 
 static bool scalar_enum(void *closure, const void *handler_data,
@@ -16399,7 +16400,7 @@ static bool scalar_enum(void *closure, const void *handler_data,
   CHK(putkey(closure, hd->keyname));
 
   symbolic_name = upb_enumdef_iton(hd->enumdef, val);
-  if (symbolic_name) {
+  if (symbolic_name && !hd->always_print_enums_as_ints) {
     print_data(p, "\"", 1);
     putstring(p, symbolic_name, strlen(symbolic_name));
     print_data(p, "\"", 1);
@@ -16412,9 +16413,10 @@ static bool scalar_enum(void *closure, const void *handler_data,
 
 static void print_enum_symbolic_name(upb_json_printer *p,
                                      const upb_enumdef *def,
+                                     bool always_print_enums_as_ints,
                                      int32_t val) {
   const char *symbolic_name = upb_enumdef_iton(def, val);
-  if (symbolic_name) {
+  if (symbolic_name && !always_print_enums_as_ints) {
     print_data(p, "\"", 1);
     putstring(p, symbolic_name, strlen(symbolic_name));
     print_data(p, "\"", 1);
@@ -16429,7 +16431,7 @@ static bool repeated_enum(void *closure, const void *handler_data,
   upb_json_printer *p = closure;
   print_comma(p);
 
-  print_enum_symbolic_name(p, hd->enumdef, val);
+  print_enum_symbolic_name(p, hd->enumdef, hd->always_print_enums_as_ints, val);
 
   return true;
 }
@@ -16439,7 +16441,7 @@ static bool mapvalue_enum(void *closure, const void *handler_data,
   const EnumHandlerData *hd = handler_data;
   upb_json_printer *p = closure;
 
-  print_enum_symbolic_name(p, hd->enumdef, val);
+  print_enum_symbolic_name(p, hd->enumdef, hd->always_print_enums_as_ints, val);
 
   return true;
 }
@@ -16701,10 +16703,12 @@ static size_t mapkey_bytes(void *closure, const void *handler_data,
 static void set_enum_hd(upb_handlers *h,
                         const upb_fielddef *f,
                         bool preserve_fieldnames,
+                        bool always_print_enums_as_ints,
                         upb_handlerattr *attr) {
   EnumHandlerData *hd = upb_gmalloc(sizeof(EnumHandlerData));
   hd->enumdef = (const upb_enumdef *)upb_fielddef_subdef(f);
   hd->keyname = newstrpc(h, f, preserve_fieldnames);
+  hd->always_print_enums_as_ints = always_print_enums_as_ints;
   upb_handlers_addcleanup(h, hd, upb_gfree);
   upb_handlerattr_sethandlerdata(attr, hd);
 }
@@ -16722,7 +16726,7 @@ static void set_enum_hd(upb_handlers *h,
  * field, and then one value field), so this is not a pressing concern at the
  * moment. */
 void printer_sethandlers_mapentry(const void *closure, bool preserve_fieldnames,
-                                  upb_handlers *h) {
+                                  bool always_print_enums_as_ints, upb_handlers *h) {
   const upb_msgdef *md = upb_handlers_msgdef(h);
 
   /* A mapentry message is printed simply as '"key": value'. Rather than
@@ -16796,7 +16800,7 @@ void printer_sethandlers_mapentry(const void *closure, bool preserve_fieldnames,
       break;
     case UPB_TYPE_ENUM: {
       upb_handlerattr enum_attr = UPB_HANDLERATTR_INITIALIZER;
-      set_enum_hd(h, value_field, preserve_fieldnames, &enum_attr);
+      set_enum_hd(h, value_field, preserve_fieldnames, always_print_enums_as_ints, &enum_attr);
       upb_handlers_setint32(h, value_field, mapvalue_enum, &enum_attr);
       upb_handlerattr_uninit(&enum_attr);
       break;
@@ -17312,13 +17316,15 @@ void printer_sethandlers(const void *closure, upb_handlers *h) {
   bool is_mapentry = upb_msgdef_mapentry(md);
   upb_handlerattr empty_attr = UPB_HANDLERATTR_INITIALIZER;
   upb_msg_field_iter i;
-  const bool *preserve_fieldnames_ptr = closure;
-  const bool preserve_fieldnames = *preserve_fieldnames_ptr;
+  const bool **printer_options_ptr = closure;
+  const bool *printer_options = *printer_options_ptr;
+  const bool preserve_fieldnames = printer_options[0];
+  const bool always_print_enums_as_ints = printer_options[1];
 
   if (is_mapentry) {
     /* mapentry messages are sufficiently different that we handle them
      * separately. */
-    printer_sethandlers_mapentry(closure, preserve_fieldnames, h);
+    printer_sethandlers_mapentry(closure, preserve_fieldnames, always_print_enums_as_ints, h);
     return;
   }
 
@@ -17401,11 +17407,10 @@ void printer_sethandlers(const void *closure, upb_handlers *h) {
       TYPE(UPB_TYPE_INT64,  int64,  int64_t);
       TYPE(UPB_TYPE_UINT64, uint64, uint64_t);
       case UPB_TYPE_ENUM: {
-        /* For now, we always emit symbolic names for enums. We may want an
-         * option later to control this behavior, but we will wait for a real
-         * need first. */
+        /* By default, we always emit symbolic names for enums. The option
+         * 'enums-as-ints' can override this behaviour. */
         upb_handlerattr enum_attr = UPB_HANDLERATTR_INITIALIZER;
-        set_enum_hd(h, f, preserve_fieldnames, &enum_attr);
+        set_enum_hd(h, f, preserve_fieldnames, always_print_enums_as_ints, &enum_attr);
 
         if (upb_fielddef_isseq(f)) {
           upb_handlers_setint32(h, f, repeated_enum, &enum_attr);
@@ -17486,9 +17491,17 @@ upb_sink *upb_json_printer_input(upb_json_printer *p) {
 
 const upb_handlers *upb_json_printer_newhandlers(const upb_msgdef *md,
                                                  bool preserve_fieldnames,
+                                                 bool always_print_enums_as_ints,
                                                  const void *owner) {
+  /* Allow for multiple json printing options by passing a pointer to an array 
+   * of options. */
+  bool json_options[2];
+  json_options[0] = preserve_fieldnames;
+  json_options[1] = always_print_enums_as_ints;
+  bool *json_ptr = json_options;
+
   return upb_handlers_newfrozen(
-      md, owner, printer_sethandlers, &preserve_fieldnames);
+      md, owner, printer_sethandlers, &json_ptr);
 }
 
 #undef UPB_SIZE
