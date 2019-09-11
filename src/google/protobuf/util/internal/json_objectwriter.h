@@ -92,6 +92,7 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
         stream_(out),
         sink_(out),
         indent_string_(indent_string),
+        done_(false),
         use_websafe_base64_for_bytes_(false) {}
   virtual ~JsonObjectWriter();
 
@@ -116,6 +117,10 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
   void set_use_websafe_base64_for_bytes(bool value) {
     use_websafe_base64_for_bytes_ = value;
   }
+
+  // We report as done if we're not in the middle of an element and we
+  // have emitted at least one object
+  bool done() override { return element()->is_root() && done_; }
 
  protected:
   class PROTOBUF_EXPORT Element : public BaseElement {
@@ -215,6 +220,8 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
   io::CodedOutputStream* stream_;
   ByteSinkWrapper sink_;
   const std::string indent_string_;
+  // True if we have emitted at least one object
+  bool done_;
 
   // Whether to use regular or websafe base64 encoding for byte fields. Defaults
   // to regular base64 encoding.
