@@ -31,6 +31,8 @@
 // Implements the DescriptorPool, which collects all descriptors.
 
 #include <unordered_map>
+#include <numeric>
+#include <sstream>
 
 #include <Python.h>
 
@@ -60,10 +62,102 @@ namespace google {
 namespace protobuf {
 namespace python {
 
+using ::google::protobuf::compiler::DiskSourceTree;
+using ::google::protobuf::compiler::SourceTreeDescriptorDatabase;
+using ::google::protobuf::DescriptorDatabase;
+
 // A map to cache Python Pools per C++ pointer.
 // Pointers are not owned here, and belong to the PyDescriptorPool.
 static std::unordered_map<const DescriptorPool*, PyDescriptorPool*>*
     descriptor_pool_map;
+
+ParseError::ParseError() {}
+
+ParseError::ParseError(std::string filename, int line, int column, std::string message)
+    : filename(filename), line(line), column(column), message(message) {}
+
+std::string ParseError::msg() const {
+    std::stringstream ss;
+    ss << filename << ":" << line << ":" << column << ": " << message;
+    return ss.str();
+}
+
+void PyErrorCollector::AddError(const std::string& filename, int line, int column,
+              const std::string& message) {
+  MutexLock(&this->mutex_);
+  errors_.emplace_back(filename, line, column, message);
+}
+
+void PyErrorCollector::AddWarning(const std::string& filename, int line, int column,
+                const std::string& message) {
+  MutexLock(&this->mutex_);
+  warnings_.emplace_back(filename, line, column, message);
+}
+
+std::string PyErrorCollector::Errors() const {
+  MutexLock(&this->mutex_);
+  return std::accumulate(errors_.cbegin(), errors_.cend(), std::string(),
+   [](std::string a, const ParseError& b) {
+     return std::move(a) + "\n" + b.msg();
+   });
+}
+
+std::string PyErrorCollector::Warnings() const {
+  MutexLock(&this->mutex_);
+  return std::accumulate(warnings_.cbegin(), warnings_.cend(), std::string(),
+   [](std::string a, const ParseError& b) {
+     return std::move(a) + "\n" + b.msg();
+   });
+}
+
+size_t PyErrorCollector::WarningCount() const {
+  MutexLock(&this->mutex_);
+  return warnings_.size();
+}
+
+void PyErrorCollector::Clear() {
+  MutexLock(&this->mutex_);
+  errors_.clear();
+  warnings_.clear();
+}
+
+
+InProcessDescriptorDatabase::InProcessDescriptorDatabase(
+    DescriptorDatabase* fallback_db) : fallback_db_(fallback_db){}
+
+void InProcessDescriptorDatabase::Register(FileDescriptorProto&& proto) {
+  GOOGLE_CHECK(proto.has_name()) << "Cannot call Register on a FileDescriptorProto without a name.";
+  MutexLock(&this->mutex_);
+  fd_protos_[proto.name()] = std::move(proto);
+}
+
+bool InProcessDescriptorDatabase::FindFileByName(
+    const std::string& filename,
+    FileDescriptorProto* output)
+{
+  using iterator = decltype(fd_protos_)::iterator;
+  iterator iter = fd_protos_.find(filename);
+  if (iter != fd_protos_.end()) {
+    *output = iter->second;
+    return true;
+  }
+  if (fallback_db_ != nullptr && fallback_db_->FindFileByName(filename, output)) {
+    return true;
+  }
+  return false;
+}
+
+bool InProcessDescriptorDatabase::FindFileContainingSymbol(const std::string& symbol_name,
+                              FileDescriptorProto* output) {
+  return false;
+}
+
+// Note: Always returns false to indicate that the operation is not supported.
+bool InProcessDescriptorDatabase::FindFileContainingExtension(const std::string& containing_type,
+                                 int field_number,
+                                 FileDescriptorProto* output) {
+  return false;
+}
 
 namespace cdescriptor_pool {
 
@@ -121,24 +215,43 @@ static PyDescriptorPool* _CreateDescriptorPool() {
     return NULL;
   }
 
+  cpool->in_process_database = nullptr;
+  cpool->file_error_collector = nullptr;
+  cpool->disk_source_tree = nullptr;
+  cpool->disk_database = nullptr;
+
   PyObject_GC_Track(cpool);
 
   return cpool;
 }
 
-// Create a Python DescriptorPool, using the given pool as an underlay:
-// new messages will be added to a custom pool, not to the underlay.
-//
-// Ownership of the underlay is not transferred, its pointer should
-// stay alive.
-static PyDescriptorPool* PyDescriptorPool_NewWithUnderlay(
-    const DescriptorPool* underlay) {
+/* Initializes a PyDescriptorPool like the default descriptor pool.
+ *
+ * This method returns a PyDescriptorPool able to cross-link protos
+ * originating from the C++ generated pool, from Python space as
+ * FileDescriptorProtos in memory (like for generated pb2 files) or from the
+ * filesystem as .proto files.
+ *
+ * This method adds a database to enable the latter two cases and an underlay
+ * DescriptorPool to handle the former case. BuildFile must not be called on the
+ * a this object's underlying DescriptorPool object. Instead, objects should be
+ * registered into its in-process database using the Register method. Then,
+ * FileDescriptor objects may be obtained by calling FindFileByName.
+ */
+static PyDescriptorPool* PyDescriptorPool_NewDefault() {
   PyDescriptorPool* cpool = _CreateDescriptorPool();
   if (cpool == NULL) {
     return NULL;
   }
-  cpool->pool = new DescriptorPool(underlay);
-  cpool->underlay = underlay;
+  cpool->underlay = DescriptorPool::generated_pool();
+  cpool->file_error_collector = new PyErrorCollector;
+  cpool->disk_source_tree = new DiskSourceTree;
+  cpool->disk_database = new SourceTreeDescriptorDatabase(cpool->disk_source_tree);
+  cpool->disk_database->RecordErrorsTo(cpool->file_error_collector);
+  cpool->in_process_database = new InProcessDescriptorDatabase(cpool->disk_database);
+  cpool->error_collector = new BuildFileErrorCollector();
+  cpool->pool = new DescriptorPool(cpool->in_process_database, cpool->error_collector);
+  cpool->pool->internal_set_underlay(cpool->underlay);
 
   if (!descriptor_pool_map->insert(
       std::make_pair(cpool->pool, cpool)).second) {
@@ -163,7 +276,6 @@ static PyDescriptorPool* PyDescriptorPool_NewWithDatabase(
   } else {
     cpool->pool = new DescriptorPool();
   }
-
   if (!descriptor_pool_map->insert(std::make_pair(cpool->pool, cpool)).second) {
     // Should never happen -- would indicate an internal error / bug.
     PyErr_SetString(PyExc_ValueError, "DescriptorPool already registered");
@@ -202,6 +314,10 @@ static void Dealloc(PyObject* pself) {
   delete self->database;
   delete self->pool;
   delete self->error_collector;
+  delete self->in_process_database;
+  delete self->file_error_collector;
+  delete self->disk_source_tree;
+  delete self->disk_database;
   Py_TYPE(self)->tp_free(pself);
 }
 
@@ -603,10 +719,22 @@ static PyObject* AddSerializedFile(PyObject* pself, PyObject* serialized_pb) {
         generated_file, serialized_pb);
   }
 
+  GOOGLE_CHECK(file_proto.has_name()) << "Cannot build protos without a name.";
+  std::string file_name = file_proto.name();
+  const FileDescriptor* descriptor;
   BuildFileErrorCollector error_collector;
-  const FileDescriptor* descriptor =
-      self->pool->BuildFileCollectingErrors(file_proto,
-                                            &error_collector);
+
+  Py_BEGIN_ALLOW_THREADS;
+  if (self->in_process_database != nullptr) {
+    self->in_process_database->Register(std::move(file_proto));
+    descriptor = self->pool->FindFileByName(file_name);
+  } else {
+    descriptor =
+        self->pool->BuildFileCollectingErrors(file_proto,
+                                              &error_collector);
+  }
+  Py_END_ALLOW_THREADS;
+
   if (descriptor == NULL) {
     PyErr_Format(PyExc_TypeError,
                  "Couldn't build proto file into descriptor pool!\n%s",
@@ -729,8 +857,7 @@ bool InitDescriptorPool() {
   // is used as underlay.
   descriptor_pool_map =
       new std::unordered_map<const DescriptorPool*, PyDescriptorPool*>;
-  python_generated_pool = cdescriptor_pool::PyDescriptorPool_NewWithUnderlay(
-      DescriptorPool::generated_pool());
+  python_generated_pool = cdescriptor_pool::PyDescriptorPool_NewDefault();
   if (python_generated_pool == NULL) {
     delete descriptor_pool_map;
     return false;

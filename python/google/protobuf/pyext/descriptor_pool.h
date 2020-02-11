@@ -34,11 +34,99 @@
 #include <Python.h>
 
 #include <unordered_map>
+#include <string>
+#include <vector>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/stubs/mutex.h>
 
 namespace google {
 namespace protobuf {
 namespace python {
+
+struct ParseError {
+  std::string filename;
+  int line;
+  int column;
+  std::string message;
+
+  ParseError();
+  ParseError(std::string filename, int line, int column, std::string message);
+
+  std::string msg() const;
+};
+
+typedef ParseError ParseWarning;
+
+class PyErrorCollector
+    : public ::google::protobuf::compiler::MultiFileErrorCollector {
+ public:
+  void AddError(const std::string& filename, int line, int column,
+                const std::string& message);
+
+  void AddWarning(const std::string& filename, int line, int column,
+                  const std::string& message);
+
+  std::string Errors() const;
+  std::string Warnings() const;
+  size_t WarningCount() const;
+
+  void Clear();
+
+ private:
+  std::vector<ParseError> errors_;
+  std::vector<ParseWarning> warnings_;
+  mutable Mutex mutex_;
+};
+
+// An implementation of DescriptorDatabase which returns FileDescriptorProtos
+// already present in the process.
+//
+// NOTE: This class circumvents the inability to call DescriptorPool::BuildFile
+// on a DescriptorPool with an associated DescriptorDatabase. As it recommends,
+// this class enables "get(ting) your file into the DescriptorDatabase", while
+// still allowing pre-serialized protos to be cross-linked with protos loaded
+// from disk.
+//
+// This DescriptorDatabase is meant to be used with a DiskSourceTreeDatabase
+// used as the fallback_database though, in theory, any DescriptorDatabase
+// should work.
+//
+// All methods of this class are thread-safe besides the constructor.
+class InProcessDescriptorDatabase
+  : public ::google::protobuf::DescriptorDatabase {
+
+public:
+  InProcessDescriptorDatabase() = default;
+
+  // If non-NULL, fallback_db will be checked if a FileDescriptorProto hasn't
+  // already been registered in the DB.
+  InProcessDescriptorDatabase(::google::protobuf::DescriptorDatabase* fallback_db);
+
+  // Registers a FileDescriptorProto in the database. If the same entry is
+  // present in the fallback_db, this will take precedence. Takes ownership of
+  // the FileDescriptorProto.
+  void Register(FileDescriptorProto&& proto);
+
+  // The next three methods implement DescriptorDatabase.
+  bool FindFileByName(const std::string& filename,
+                      FileDescriptorProto* output) override;
+
+  // Note: Always returns false to indicate that the operation is not supported.
+  bool FindFileContainingSymbol(const std::string& symbol_name,
+                                FileDescriptorProto* output) override;
+
+  // Note: Always returns false to indicate that the operation is not supported.
+  bool FindFileContainingExtension(const std::string& containing_type,
+                                   int field_number,
+                                   FileDescriptorProto* output) override;
+
+private:
+  std::unordered_map<std::string, FileDescriptorProto> fd_protos_;
+  ::google::protobuf::DescriptorDatabase* fallback_db_;
+  mutable ::google::protobuf::internal::Mutex mutex_;
+};
+
 
 struct PyMessageFactory;
 
@@ -76,6 +164,28 @@ typedef struct PyDescriptorPool {
   // use the one passed while creating message classes. And remove this member.
   PyMessageFactory* py_message_factory;
 
+  // A DescriptorDatabase instance that allows both instantiation of descriptors
+  // from in-process strings (as in generated code) and from files on disk (as
+  // with runtime imports of ".proto" files). This database is always set on the
+  // default descriptor pool. Can be NULL. This member is mutually
+  // exclusive with database. If this attribute is set, file_error_collector,
+  // source_tree, and disk_database must also be set. This poiner is owned.
+  InProcessDescriptorDatabase* in_process_database;
+
+  // The error collector to be used when parsing files. Can be NULL. Will always
+  // be set on the default descriptor pool. This pointer is owned.
+  PyErrorCollector* file_error_collector;
+
+  // The disk source tree used to search for ".proto" files. Can be NULL. Will
+  // always be set on the default descriptor pool. This pointer is owned.
+  ::google::protobuf::compiler::DiskSourceTree* disk_source_tree;
+
+  // The DiskSourceTree to be used to find protos on the filesystem. Can be
+  // NULL. Will always be set on the default descriptor pool. This pointer is
+  // owned.
+  ::google::protobuf::compiler::SourceTreeDescriptorDatabase* disk_database;
+
+
   // Cache the options for any kind of descriptor.
   // Descriptor pointers are owned by the DescriptorPool above.
   // Python objects are owned by the map.
@@ -86,7 +196,6 @@ typedef struct PyDescriptorPool {
 extern PyTypeObject PyDescriptorPool_Type;
 
 namespace cdescriptor_pool {
-
 
 // The functions below are also exposed as methods of the DescriptorPool type.
 

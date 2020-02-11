@@ -34,6 +34,8 @@
 #include <frameobject.h>
 #include <string>
 #include <unordered_map>
+#include <sstream>
+#include <numeric>
 
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -1421,6 +1423,71 @@ static PyObject* CopyToProto(PyFileDescriptor *self, PyObject *target) {
   return CopyToPythonProto<FileDescriptorProto>(_GetDescriptor(self), target);
 }
 
+static PyObject* CopySourceCodeInfoToProto(PyFileDescriptor *self, PyObject *target) {
+  const Descriptor* self_descriptor = FileDescriptorProto::default_instance().GetDescriptor();
+  CMessage* message = reinterpret_cast<CMessage*>(target);
+  if (!PyObject_TypeCheck(target, CMessage_Type) ||
+      message->message->GetDescriptor() != self_descriptor) {
+    PyErr_Format(PyExc_TypeError, "Not a %s message",
+                 self_descriptor->full_name().c_str());
+    return NULL;
+  }
+  cmessage::AssureWritable(message);
+  FileDescriptorProto* descriptor_message =
+      static_cast<FileDescriptorProto*>(message->message);
+  Py_BEGIN_ALLOW_THREADS;
+  _GetDescriptor(self)->CopySourceCodeInfoTo(descriptor_message);
+  Py_END_ALLOW_THREADS;
+  Py_RETURN_NONE;
+}
+
+static int ParseBytesSequence(PyObject* py_sequence, std::vector<std::string>* sequence) {
+  if (!PySequence_Check(py_sequence)) {
+    PyErr_SetString(PyExc_ValueError, "Expected object supporting the Sequence protocol.");
+    return 0;
+  }
+  sequence->reserve(PySequence_Length(py_sequence));
+  for (Py_ssize_t i = 0; i < PySequence_Length(py_sequence); ++i) {
+    PyObject* elem = PySequence_GetItem(py_sequence, i);
+    if (!elem) {
+      PyErr_SetString(PyExc_LookupError, "Was unable to extract elements from sequence.");
+      return 0;
+    }
+    if (!PyBytes_Check(elem)) {
+      PyErr_SetString(PyExc_ValueError, "Expected element of bytes type in sequence.");
+      return 0;
+    }
+    std::string c_elem(PyBytes_AsString(elem));
+    sequence->push_back(c_elem);
+  }
+  return 1;
+}
+
+static PyObject* FromFile(PyBaseDescriptor *self, PyObject *filename) {
+  PyDescriptorPool* default_pool = GetDefaultDescriptorPool();
+  char* filepath;
+  std::vector<std::string> include_paths;
+  PyArg_ParseTuple(filename, "yO&|", &filepath, &ParseBytesSequence, &include_paths);
+
+  const FileDescriptor* parsed_file;
+  Py_BEGIN_ALLOW_THREADS;
+  for (const auto& include_path : include_paths) {
+    default_pool->disk_source_tree->MapPath("", include_path);
+  }
+  parsed_file = default_pool->pool->FindFileByName(filepath);
+  Py_END_ALLOW_THREADS;
+  if (parsed_file == nullptr) {
+    std::string error_msg = std::string("Failed to parse ") + filepath + default_pool->file_error_collector->Errors();
+    PyErr_SetString(PyExc_SyntaxError, error_msg.c_str());
+    return NULL;
+  }
+  if (default_pool->file_error_collector->WarningCount() > 0) {
+    PyErr_WarnEx(PyExc_SyntaxWarning, default_pool->file_error_collector->Warnings().c_str(), 1);
+  }
+  default_pool->file_error_collector->Clear();
+  return PyFileDescriptor_FromDescriptor(parsed_file);
+}
+
 static PyGetSetDef Getters[] = {
   { "pool", (getter)GetPool, NULL, "pool"},
   { "name", (getter)GetName, NULL, "name"},
@@ -1446,6 +1513,8 @@ static PyGetSetDef Getters[] = {
 static PyMethodDef Methods[] = {
   { "GetOptions", (PyCFunction)GetOptions, METH_NOARGS, },
   { "CopyToProto", (PyCFunction)CopyToProto, METH_O, },
+  { "CopySourceCodeInfoToProto", (PyCFunction)CopySourceCodeInfoToProto, METH_O, },
+  { "FromFile", (PyCFunction)FromFile, METH_STATIC | METH_VARARGS },
   {NULL}
 };
 

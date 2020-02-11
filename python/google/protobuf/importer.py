@@ -1,5 +1,7 @@
+# Lint as: python3
+
 # Protocol Buffers - Google's data interchange format
-# Copyright 2008 Google Inc.  All rights reserved.
+# Copyright 2020 Google Inc.  All rights reserved.
 # https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,17 +29,32 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""Enables instantiation of Messages directly from a ".proto" file."""
 
-# Copyright 2007 Google Inc. All Rights Reserved.
+__author__ = 'rbellevi@google.com (Richard Belleville)'
 
-__version__ = '3.11.2'
+import sys
 
-if __name__ != '__main__':
+from google.protobuf.internal import api_implementation as _api_implementation
+
+
+def protos(*args, **kwargs):
+  del args
+  del kwargs
+  raise NotImplementedError(
+      'The protos function is only available on a 3.X interpreter.')
+
+
+if sys.version_info[0] > 2:
   try:
-    __import__('pkg_resources').declare_namespace(__name__)
-  except ImportError:
-    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    from google.protobuf.pyext import _message as _pyext_message  # pylint: disable=g-import-not-at-top
+  except ImportError as e:
 
-from google.protobuf.importer import protos
-
-__all__ = ('protos',)
+    def protos(*args, **kwargs):  # pylint: disable=g-function-redefined, function-redefined
+      del args
+      del kwargs
+      raise NotImplementedError(
+          'The protos function is only available when using the cpp implementation'
+      )
+  else:
+    from google.protobuf._importer_impl import protos
