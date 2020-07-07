@@ -375,7 +375,20 @@ class GeneratedClassTest extends TestBase
         // Set bool.
         $m->setOptionalString(true);
         $this->assertSame('1', $m->getOptionalString());
+
     }
+
+    /* TODO(haberman): find a way to enable this test that works across
+     * PHP/PHPUnit versions. This test as written throws the following error for
+     * some versions of PHP:
+     *   ReflectionException: Class PHPUnit\Framework\Error\Error does not exist
+     * expectedException PHPUnit\Framework\Error\Error
+     *
+    public function testInvalidUTF8() {
+        $m = new TestMessage();
+        $m->setOptionalString("\xff");
+    }
+    */
 
     #########################################################
     # Test bytes field.
@@ -400,6 +413,10 @@ class GeneratedClassTest extends TestBase
         // Set bool.
         $m->setOptionalBytes(true);
         $this->assertSame('1', $m->getOptionalBytes());
+
+        // Set invalid UTF-8.
+        $m->setOptionalBytes("\xff");
+        $this->assertSame("\xff", $m->getOptionalBytes());
     }
 
       public function testBytesFieldInvalidUTF8Success()
