@@ -87,18 +87,18 @@ class RepeatedFieldTest extends \PHPUnit\Framework\TestCase
 
         // Test append.
         $arr[] = MAX_UINT32;
-        $this->assertSame(-1, $arr[0]);
+        $this->assertSame(MAX_UINT32, $arr[0]);
         $arr[] = -1;
-        $this->assertSame(-1, $arr[1]);
+        $this->assertSame(MAX_UINT32, $arr[1]);
         $arr[] = MIN_UINT32;
         $this->assertSame(MIN_UINT32, $arr[2]);
 
         $arr[] = 1.1;
         $this->assertSame(1, $arr[3]);
         $arr[] = MAX_UINT32_FLOAT;
-        $this->assertSame(-1, $arr[4]);
+        $this->assertSame(MAX_UINT32, $arr[4]);
         $arr[] = -1.0;
-        $this->assertSame(-1, $arr[5]);
+        $this->assertSame(MAX_UINT32, $arr[5]);
         $arr[] = MIN_UINT32_FLOAT;
         $this->assertSame(MIN_UINT32, $arr[6]);
 
@@ -107,9 +107,9 @@ class RepeatedFieldTest extends \PHPUnit\Framework\TestCase
         $arr[] = '3.1';
         $this->assertSame(3, $arr[8]);
         $arr[] = MAX_UINT32_STRING;
-        $this->assertSame(-1, $arr[9]);
+        $this->assertSame(MAX_UINT32, $arr[9]);
         $arr[] = '-1.0';
-        $this->assertSame(-1, $arr[10]);
+        $this->assertSame(MAX_UINT32, $arr[10]);
         $arr[] = MIN_UINT32_STRING;
         $this->assertSame(MIN_UINT32, $arr[11]);
 
@@ -122,18 +122,18 @@ class RepeatedFieldTest extends \PHPUnit\Framework\TestCase
 
         // Test set.
         $arr[0] = MAX_UINT32;
-        $this->assertSame(-1, $arr[0]);
+        $this->assertSame(MAX_UINT32, $arr[0]);
         $arr[1] = -1;
-        $this->assertSame(-1, $arr[1]);
+        $this->assertSame(MAX_UINT32, $arr[1]);
         $arr[2] = MIN_UINT32;
         $this->assertSame(MIN_UINT32, $arr[2]);
 
         $arr[3] = 1.1;
         $this->assertSame(1, $arr[3]);
         $arr[4] = MAX_UINT32_FLOAT;
-        $this->assertSame(-1, $arr[4]);
+        $this->assertSame(MAX_UINT32, $arr[4]);
         $arr[5] = -1.0;
-        $this->assertSame(-1, $arr[5]);
+        $this->assertSame(MAX_UINT32, $arr[5]);
         $arr[6] = MIN_UINT32_FLOAT;
         $this->assertSame(MIN_UINT32, $arr[6]);
 
@@ -142,9 +142,9 @@ class RepeatedFieldTest extends \PHPUnit\Framework\TestCase
         $arr[8] = '3.1';
         $this->assertSame(3, $arr[8]);
         $arr[9] = MAX_UINT32_STRING;
-        $this->assertSame(-1, $arr[9]);
+        $this->assertSame(MAX_UINT32, $arr[9]);
         $arr[10] = '-1.0';
-        $this->assertSame(-1, $arr[10]);
+        $this->assertSame(MAX_UINT32, $arr[10]);
         $arr[11] = MIN_UINT32_STRING;
         $this->assertSame(MIN_UINT32, $arr[11]);
     }
