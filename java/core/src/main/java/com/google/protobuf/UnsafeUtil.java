@@ -374,7 +374,7 @@ final class UnsafeUtil {
   }
 
   private static boolean supportsUnsafeByteBufferOperations() {
-    if (UNSAFE == null) {
+    if (Android.isOnAndroidDevice() || UNSAFE == null) {
       return false;
     }
     try {
@@ -387,9 +387,6 @@ final class UnsafeUtil {
         return false;
       }
 
-      if (Android.isOnAndroidDevice()) {
-        return true;
-      }
       clazz.getMethod("getByte", long.class);
       clazz.getMethod("putByte", long.class, byte.class);
       clazz.getMethod("getInt", long.class);
