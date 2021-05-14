@@ -1798,4 +1798,15 @@ class GeneratedClassTest extends TestBase
 
         $this->assertTrue(true);
     }
+
+    /**
+     * @expectedException Exception
+     */
+    public function testNoSegfaultWhenPhpSerialize()
+    {
+        $m = new TestMessage();
+        $m->setOptionalString('abc');
+
+	serialize($m);
+    }
 }
