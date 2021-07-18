@@ -9,7 +9,7 @@ This directory contains the JavaScript Protocol Buffers runtime library.
 
 The library is currently compatible with:
 
-1. CommonJS-style imports (eg. `var protos = require('my-protos');`)
+1. CommonJS-style imports (eg. `var protos = require('my-protos');`), which is the default
 2. Closure-style imports (eg. `goog.require('my.package.MyProto');`)
 
 Support for ES6-style imports is not implemented yet.  Browsers can
@@ -19,14 +19,12 @@ resolve imports at compile time.
 To use Protocol Buffers with JavaScript, you need two main components:
 
 1. The protobuf runtime library.  You can install this with
-   `npm install google-protobuf`, or use the files in this directory.
-    If npm is not being used, as of 3.3.0, the files needed are located in binary subdirectory;
-    arith.js, constants.js, decoder.js, encoder.js, map.js, message.js, reader.js, utils.js, writer.js
+   `npm install google-protobuf`.
 2. The Protocol Compiler `protoc`.  This translates `.proto` files
    into `.js` files.  The compiler is not currently available via
    npm, but you can download a pre-built binary
    [on GitHub](https://github.com/protocolbuffers/protobuf/releases)
-   (look for the `protoc-*.zip` files under **Downloads**).
+   (look for the `protoc-{version}-{arch}.zip` files under **Downloads**).
 
 
 Setup
