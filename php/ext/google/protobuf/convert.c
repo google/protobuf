@@ -451,8 +451,7 @@ void Convert_UpbToPhp(upb_msgval upb_val, zval *php_val, TypeInfo type,
       ZVAL_LONG(php_val, upb_val.int32_val);
       break;
     case UPB_TYPE_UINT32: {
-      // Sign-extend for consistency between 32/64-bit builds.
-      zend_long val = (int32_t)upb_val.uint32_val;
+      zend_long val = upb_val.uint32_val;
       ZVAL_LONG(php_val, val);
       break;
     }
