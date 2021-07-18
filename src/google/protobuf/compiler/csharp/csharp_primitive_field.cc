@@ -51,6 +51,8 @@ PrimitiveFieldGenerator::PrimitiveFieldGenerator(
     const FieldDescriptor* descriptor, int presenceIndex, const Options *options)
     : FieldGeneratorBase(descriptor, presenceIndex, options) {
   // TODO(jonskeet): Make this cleaner...
+  is_allow_null_strings = options->allow_null_strings;
+  is_string_type = descriptor->type() == FieldDescriptor::TYPE_STRING;
   is_value_type = descriptor->type() != FieldDescriptor::TYPE_STRING
       && descriptor->type() != FieldDescriptor::TYPE_BYTES;
   if (!is_value_type && !SupportsPresenceApi(descriptor_)) {
@@ -131,6 +133,10 @@ void PrimitiveFieldGenerator::GenerateMembers(io::Printer* printer) {
     printer->Print(
       variables_,
       "    $name$_ = value;\n");
+  } else if (is_string_type && is_allow_null_strings) {
+    printer->Print(
+          variables_,
+          "    $name$_ = value == null ? \"\" : value;\n");
   } else {
     printer->Print(
       variables_,
