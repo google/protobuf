@@ -806,6 +806,343 @@ static GPBUnknownFieldSet *GetOrMakeUnknownFields(GPBMessage *self) {
   return self->unknownFields_;
 }
 
+static id<NSObject> FieldToJson(GPBMessage* msg, GPBFieldDescriptor *field, size_t index);
+static id<NSObject> MessageToJson(GPBMessage* msg);
+static void JsonToMessage(GPBMessage* msg, id<NSObject> root);
+static void JsonToField(GPBMessage* msg, GPBFieldDescriptor* field, id<NSObject> jf);
+
+static id<NSObject> FieldToJson(GPBMessage* msg, GPBFieldDescriptor *field, size_t index) {
+  BOOL repeated = ([field fieldType] == GPBFieldTypeRepeated);
+  id<NSObject> jf = nil;
+  
+  switch ([field dataType]) {
+#define CASE_NUMBER_TYPE(type, ctype, arraytype, sfunc)                \
+case type: {                                                           \
+  ctype value;                                                         \
+  if (repeated) {                                                      \
+    arraytype *array = GPBGetMessageRepeatedField(msg, field);         \
+    value = [array valueAtIndex:index];                                \
+  } else {                                                             \
+    value = sfunc(msg, field);                                         \
+  }                                                                    \
+  jf = @(value);                                                       \
+  break;                                                               \
+}
+      
+      CASE_NUMBER_TYPE( GPBDataTypeDouble, double, GPBDoubleArray, GPBGetMessageDoubleField );
+      CASE_NUMBER_TYPE( GPBDataTypeFloat, double, GPBFloatArray, GPBGetMessageFloatField );
+      CASE_NUMBER_TYPE( GPBDataTypeInt64, uint64_t, GPBInt64Array, GPBGetMessageInt64Field );
+      CASE_NUMBER_TYPE( GPBDataTypeSFixed64, uint64_t, GPBInt64Array, GPBGetMessageInt64Field );
+      CASE_NUMBER_TYPE( GPBDataTypeSInt64, uint64_t, GPBInt64Array, GPBGetMessageInt64Field );
+      CASE_NUMBER_TYPE( GPBDataTypeUInt64, uint64_t, GPBUInt64Array, GPBGetMessageUInt64Field );
+      CASE_NUMBER_TYPE( GPBDataTypeFixed64, uint64_t, GPBUInt64Array, GPBGetMessageUInt64Field );
+      CASE_NUMBER_TYPE( GPBDataTypeInt32, uint64_t, GPBInt32Array, GPBGetMessageInt32Field );
+      CASE_NUMBER_TYPE( GPBDataTypeSInt32, uint64_t, GPBInt32Array, GPBGetMessageInt32Field );
+      CASE_NUMBER_TYPE( GPBDataTypeSFixed32, uint64_t, GPBInt32Array, GPBGetMessageInt32Field );
+      CASE_NUMBER_TYPE( GPBDataTypeUInt32, uint64_t, GPBUInt32Array, GPBGetMessageUInt32Field );
+      CASE_NUMBER_TYPE( GPBDataTypeFixed32, uint64_t, GPBUInt32Array, GPBGetMessageUInt32Field );
+      CASE_NUMBER_TYPE( GPBDataTypeBool, bool, GPBBoolArray, GPBGetMessageBoolField );
+#undef CASE_NUMBER_TYPE
+    case GPBDataTypeString:
+    {
+      NSString* value = nil;
+      if (repeated) {
+        NSArray<NSString*>* array = GPBGetMessageRepeatedField(msg,field);
+        value = array[index];
+      } else {
+        value = GPBGetMessageStringField(msg, field);
+      }
+      
+      jf = [NSString stringWithString:value];
+    }
+      break;
+    case GPBDataTypeBytes:
+    {
+      NSData* data = nil;
+      if (repeated) {
+        NSArray<NSData*>* array = GPBGetMessageRepeatedField(msg,field);
+        data = array[index];
+      } else {
+        data = GPBGetMessageBytesField(msg,field);
+      }
+      data = [data base64EncodedDataWithOptions:NSDataBase64Encoding64CharacterLineLength];
+      jf =  [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    }
+      break;
+    case GPBDataTypeGroup:
+    case GPBDataTypeMessage:
+    {
+      GPBMessage* mesg = nil;
+      if (repeated) {
+        NSArray<GPBMessage*>* array = GPBGetMessageRepeatedField(msg, field);
+        mesg = array[index];
+      } else {
+        mesg = GPBGetMessageMessageField(msg, field);
+      }
+      
+      jf = MessageToJson(mesg);
+    }
+      break;
+    case GPBDataTypeEnum:
+    {
+      int32_t value = 0;
+      if (repeated) {
+        GPBEnumArray* array = GPBGetMessageRepeatedField(msg, field);
+        value = [array valueAtIndex:index];
+      } else {
+        value = GPBGetMessageEnumField(msg, field);
+      }
+      jf = @(value);
+    }
+      break;
+    default:
+      break;
+  }
+  
+  return jf;
+}
+
+static id<NSObject> MessageToJson(GPBMessage* msg) {
+  GPBDescriptor* d = [msg descriptor];
+  NSMutableDictionary* root = [NSMutableDictionary dictionaryWithCapacity:10];
+  
+  for (GPBFieldDescriptor* field in [d fields]) {
+    id<NSObject> jf = nil;
+    if ([field fieldType] == GPBFieldTypeRepeated) {
+      NSArray* array = GPBGetMessageRepeatedField(msg, field);
+      if ([array respondsToSelector:@selector(count)]&& [array count]!=0) {
+        NSMutableArray* list = [NSMutableArray arrayWithCapacity:[array count]];
+        for (NSUInteger i = 0; i<[array count]; ++i) {
+          id<NSObject> res = FieldToJson(msg, field, i);
+          if (nil!=res) {
+            [list addObject:res];
+          }
+        }
+        jf = list;
+      }
+    } else if (GPBGetHasIvarField(msg, field)) {
+      jf = FieldToJson(msg, field, 0);
+    } else {
+      continue;
+    }
+    NSString* name = [field textFormatName];
+    if (nil==jf)
+      continue;
+    [root setObject:jf forKey:name];
+  }
+  
+  return root;
+}
+
+
+static void JsonToField(GPBMessage* msg, GPBFieldDescriptor* field, id<NSObject> jf) {
+  BOOL repeated = ([field fieldType] == GPBFieldTypeRepeated);
+  switch ([field dataType]) {
+      
+#define SET_OR_ADD_FIELD(sfunc, value, arraytype)                         \
+do {                                                                      \
+  if (repeated) {                                                         \
+    arraytype *array = GPBGetMessageRepeatedField(msg, field);            \
+    if ([array respondsToSelector:@selector(addValue:)]) {                \
+      [array addValue:value];                                             \
+    } else {                                                              \
+      assert(0);                                                          \
+    }                                                                     \
+  } else {                                                                \
+    sfunc(msg, field, value);                                             \
+  }                                                                       \
+} while (0);
+#define CASE_NUMBER_TYPE(type, ctype, fmt, arraytype, sfunc)              \
+case type: {                                                              \
+  NSNumber* js = (NSNumber*)jf;                                           \
+  ctype value = [js fmt];                                                 \
+  SET_OR_ADD_FIELD(sfunc, value, arraytype);                              \
+  break;                                                                  \
+}
+      
+      CASE_NUMBER_TYPE(GPBDataTypeDouble,
+                       double,
+                       doubleValue,
+                       GPBDoubleArray,
+                       GPBSetMessageDoubleField);
+      CASE_NUMBER_TYPE(GPBDataTypeFloat,
+                       float,
+                       floatValue,
+                       GPBFloatArray,
+                       GPBSetMessageFloatField);
+      CASE_NUMBER_TYPE(GPBDataTypeInt64,
+                       int64_t,
+                       longLongValue,
+                       GPBInt64Array,
+                       GPBSetMessageInt64Field);
+      CASE_NUMBER_TYPE(GPBDataTypeSFixed64,
+                       int64_t,
+                       longLongValue,
+                       GPBInt64Array,
+                       GPBSetMessageInt64Field);
+      CASE_NUMBER_TYPE(GPBDataTypeSInt64,
+                       int64_t,
+                       longLongValue,
+                       GPBInt64Array,
+                       GPBSetMessageInt64Field);
+      CASE_NUMBER_TYPE(GPBDataTypeUInt64,
+                       int64_t,
+                       longLongValue,
+                       GPBUInt64Array,GPBSetMessageUInt64Field);
+      CASE_NUMBER_TYPE(GPBDataTypeFixed64,
+                       int64_t,
+                       longLongValue,
+                       GPBUInt64Array,
+                       GPBSetMessageUInt64Field);
+      CASE_NUMBER_TYPE(GPBDataTypeInt32,
+                       int32_t,
+                       intValue,
+                       GPBInt32Array,
+                       GPBSetMessageInt32Field);
+      CASE_NUMBER_TYPE(GPBDataTypeSInt32,
+                       int32_t,
+                       intValue,
+                       GPBInt32Array,
+                       GPBSetMessageInt32Field);
+      CASE_NUMBER_TYPE(GPBDataTypeSFixed32,
+                       int32_t,
+                       intValue,
+                       GPBInt32Array,
+                       GPBSetMessageInt32Field);
+      CASE_NUMBER_TYPE(GPBDataTypeUInt32,
+                       uint32_t,
+                       unsignedIntValue,
+                       GPBUInt32Array,
+                       GPBSetMessageUInt32Field);
+      CASE_NUMBER_TYPE(GPBDataTypeFixed32,
+                       uint32_t,
+                       unsignedIntValue,
+                       GPBUInt32Array,
+                       GPBSetMessageUInt32Field);
+      CASE_NUMBER_TYPE(GPBDataTypeBool,
+                       BOOL,
+                       boolValue,
+                       GPBBoolArray,
+                       GPBSetMessageBoolField);
+#undef SET_OR_ADD_FIELD
+#undef CASE_NUMBER_TYPE
+
+#define SET_OR_ADD_FIELD(sfunc, value, arraytype)                     \
+do {                                                                  \
+  if (repeated) {                                                     \
+    arraytype *array = GPBGetMessageRepeatedField(msg, field);        \
+    if ([array respondsToSelector:@selector(addObject:)]) {           \
+      [array addObject:value];                                        \
+    } else {                                                          \
+      assert(0);                                                      \
+    }                                                                 \
+  } else {                                                            \
+    sfunc(msg, field, value);                                         \
+  }                                                                   \
+} while (0);
+
+    case GPBDataTypeString:
+    {
+      if (![jf isKindOfClass:[NSString class]]) {
+        NSCAssert(NO,@"Not a string");
+      }
+      NSString* string = (NSString*)jf;
+      SET_OR_ADD_FIELD(GPBSetMessageStringField, string, NSMutableArray);
+    }
+      break;
+    case GPBDataTypeBytes:
+    {
+      if (![jf isKindOfClass:[NSString class]]) {
+        NSCAssert(NO,@"Not a string");
+      }
+      NSString* string = (NSString*)jf;
+      NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:string options:0];
+      SET_OR_ADD_FIELD(GPBSetMessageBytesField, decodedData, NSMutableArray);
+      [decodedData release];
+    }
+      break;
+    case GPBDataTypeGroup:
+    case GPBDataTypeMessage:
+    {
+      GPBMessage* mf = nil;
+      if (repeated) {
+        mf = [[[field.msgClass alloc] init] autorelease];
+      } else {
+        mf = GPBGetMessageMessageField(msg, field);
+      }
+      JsonToMessage(mf, jf);
+      if (repeated) {
+        NSMutableArray* array = GPBGetMessageRepeatedField(msg, field);
+        [array addObject:mf];
+      }
+    }
+      break;
+    case GPBDataTypeEnum:
+    {
+      GPBEnumDescriptor* ed = field.enumDescriptor;
+      int32_t value = 0;
+      if ([jf isKindOfClass:[NSNumber class]]) {
+        NSNumber* js = (NSNumber*)jf;
+        value = [js intValue];
+      } else if ([jf isKindOfClass:[NSString class]]) {
+        BOOL ret = [ed getValue:&value
+          forEnumTextFormatName:(NSString*)jf];
+        if (!ret) {
+          NSCAssert(NO,@"string convert to enum fail");
+        }
+      } else {
+        NSCAssert(NO,@"Not an integer or string");
+      }
+      if (repeated) {
+        GPBEnumArray* array = GPBGetMessageRepeatedField(msg, field);
+        [array addRawValue:value];
+      } else {
+        GPBSetMessageEnumField(msg, field,value);
+      }
+    }
+      break;
+    default:
+      break;
+  }
+}
+
+static void JsonToMessage(GPBMessage* msg, id<NSObject> root) {
+  GPBDescriptor* d = [msg descriptor];
+  
+  if (nil==d) {
+    NSCAssert(NO,@"No descriptor or reflection");
+  }
+  
+  for (NSString* name in [(NSDictionary*)root allKeys]) {
+    id<NSObject> jf = [(NSDictionary*)root objectForKey:name];
+    
+    GPBFieldDescriptor* field = [d fieldWithName:name];
+    if (!field) {
+      for (GPBFieldDescriptor* f in [d fields]) {
+        if ([[f textFormatName] isEqualToString:name]) {
+          field = f;
+          break;
+        }
+      }
+    }
+    
+    if (!field) {
+      NSCAssert(NO,@"No descriptor or reflection");
+    }
+    
+    if ([field fieldType] == GPBFieldTypeRepeated) {
+      if (![jf isKindOfClass:[NSArray class]])
+        [NSException exceptionWithName:@"Not array" reason:@"Not array" userInfo:nil];
+      for (NSUInteger j = 0; j<[(NSArray*)jf count]; ++j) {
+        JsonToField(msg, field, [(NSArray*)jf objectAtIndex:j]);
+      }
+    } else {
+      JsonToField(msg, field, jf);
+    }
+  }
+}
+
+
 @implementation GPBMessage
 
 + (void)initialize {
@@ -907,6 +1244,23 @@ static GPBUnknownFieldSet *GetOrMakeUnknownFields(GPBMessage *self) {
     }
 #endif
   }
+  return self;
+}
+
+- (nullable instancetype)initWithJSONData:(NSData *)data {
+  if ((self = [self init])) {
+    NSError* error = nil;
+    id<NSObject> root = [NSJSONSerialization JSONObjectWithData:data
+                                                        options:kNilOptions
+                                                          error:&error];
+    
+    if (nil!=error) {
+      NSAssert(NO,@"Load failed");
+    }
+
+    JsonToMessage(self, root);
+  }
+
   return self;
 }
 
@@ -1282,6 +1636,18 @@ static GPBUnknownFieldSet *GetOrMakeUnknownFields(GPBMessage *self) {
     data.length = 0;
   }
   [stream release];
+  return data;
+}
+
+- (nullable id<NSObject>)jsonObject {
+  id<NSObject> obj = MessageToJson(self);
+  NSAssert([NSJSONSerialization isValidJSONObject:obj], @"Not Json");
+  return obj;
+}
+
+- (nullable NSData*)json {
+  id<NSObject> obj = [self jsonObject];
+  NSData* data = [NSJSONSerialization dataWithJSONObject:obj options:kNilOptions error:nil];
   return data;
 }
 
