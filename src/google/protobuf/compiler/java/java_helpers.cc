@@ -66,15 +66,24 @@ namespace {
 
 const char* kDefaultPackage = "";
 
-// Names that should be avoided as field names.
+// Names that should be avoided (in UpperCamelCase format).
 // Using them will cause the compiler to generate accessors whose names are
 // colliding with methods defined in base classes.
 const char* kForbiddenWordList[] = {
-    // message base class:
-    "cached_size",
-    "serialized_size",
     // java.lang.Object:
-    "class",
+    "Class",
+    // com.google.protobuf.MessageLiteOrBuilder:
+    "DefaultInstanceForType",
+    // com.google.protobuf.MessageLite:
+    "ParserForType",
+    "SerializedSize",
+    // com.google.protobuf.MessageOrBuilder:
+    "AllFields",
+    "DescriptorForType",
+    "InitializationErrorString",
+    "UnknownFields",
+    // obsolete. kept for backwards compatibility of generated code
+    "CachedSize",
 };
 
 const std::unordered_set<std::string>* kReservedNames =
@@ -93,7 +102,7 @@ const std::unordered_set<std::string>* kReservedNames =
 
 bool IsForbidden(const std::string& field_name) {
   for (int i = 0; i < GOOGLE_ARRAYSIZE(kForbiddenWordList); ++i) {
-    if (field_name == kForbiddenWordList[i]) {
+    if (UnderscoresToCamelCase(field_name, true) == kForbiddenWordList[i]) {
       return true;
     }
   }
