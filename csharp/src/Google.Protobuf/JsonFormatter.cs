@@ -61,7 +61,6 @@ namespace Google.Protobuf
         internal const string AnyTypeUrlField = "@type";
         internal const string AnyDiagnosticValueField = "@value";
         internal const string AnyWellKnownTypeValueField = "value";
-        private const string TypeUrlPrefix = "type.googleapis.com";
         private const string NameValueSeparator = ": ";
         private const string PropertySeparator = ", ";
 
@@ -112,6 +111,44 @@ namespace Google.Protobuf
           "\\u009c", "\\u009d", "\\u009e", "\\u009f"
         };
 
+        private readonly Dictionary<string, Action<JsonFormatter, TextWriter, MessageDescriptor, object>>
+            WellKnownTypeHandlers = new Dictionary<string, Action<JsonFormatter, TextWriter, MessageDescriptor, object>>
+            {
+                { Timestamp.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteTimestamp(writer, (IMessage)value) },
+                { Duration.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteDuration(writer, (IMessage)value) },
+                { Value.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteStructFieldValue(writer, (IMessage)value) },
+                { ListValue.Descriptor.FullName, (formatter, writer, descriptor, value) =>
+                    formatter.WriteList(writer, (IList)descriptor.Fields[ListValue.ValuesFieldNumber].Accessor.GetValue((IMessage)value)) },
+                { Struct.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteStruct(writer, (IMessage)value) },
+                { Any.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteAny(writer, (IMessage)value) },
+                { FieldMask.Descriptor.FullName, (formatter, writer, descriptor, value) => formatter.WriteFieldMask(writer, (IMessage)value) },
+                { Int32Value.Descriptor.FullName, WriteWrapperField },
+                { Int64Value.Descriptor.FullName, WriteWrapperField },
+                { UInt32Value.Descriptor.FullName, WriteWrapperField },
+                { UInt64Value.Descriptor.FullName, WriteWrapperField },
+                { FloatValue.Descriptor.FullName, WriteWrapperField },
+                { DoubleValue.Descriptor.FullName, WriteWrapperField },
+                { BytesValue.Descriptor.FullName, WriteWrapperField },
+                { StringValue.Descriptor.FullName, WriteWrapperField },
+                { BoolValue.Descriptor.FullName, WriteWrapperField }
+            };
+
+        // Convenience method to avoid having to repeat the same code multiple times in the above
+        // dictionary initialization.
+        // For wrapper types, the value will either be the (possibly boxed) "native" value,
+        // or the message itself if we're formatting it at the top level (e.g. just calling ToString on the object itself).
+        // If it's the message form, we can extract the value first, which *will* be the (possibly boxed) native value,
+        // and then proceed, writing it as if we were definitely in a field. (We never need to wrap it in an extra string...
+        // WriteValue will do the right thing.)
+        private static void WriteWrapperField(JsonFormatter formatter, TextWriter writer, MessageDescriptor descriptor, object value)
+        {
+            if (value is IMessage message)
+            {
+                value = message.Descriptor.Fields[WrappersReflection.WrapperValueFieldNumber].Accessor.GetValue(message);
+            }
+            formatter.WriteValue(writer, value);
+        }
+
         static JsonFormatter()
         {
             for (int i = 0; i < CommonRepresentations.Length; i++)
@@ -159,7 +196,7 @@ namespace Google.Protobuf
             ProtoPreconditions.CheckNotNull(message, nameof(message));
             ProtoPreconditions.CheckNotNull(writer, nameof(writer));
 
-            if (message.Descriptor.IsWellKnownType)
+            if (IsWellKnownType(message.Descriptor))
             {
                 WriteWellKnownTypeValue(writer, message.Descriptor, message);
             }
@@ -167,6 +204,37 @@ namespace Google.Protobuf
             {
                 WriteMessage(writer, message);
             }
+        }
+
+        /// <summary>
+        /// Adds a new well-known type with it's handler to the formatter.
+        /// </summary>
+        /// <param name="handler">Handler to execute for parsing messages of the well-known type.</param>
+        /// <typeparam name="T">The well-known type of message.</typeparam>
+        public void AddWellKnownTypeHandlers<T>(Action<JsonFormatter, TextWriter, MessageDescriptor, object> handler) where T : IMessage, new()
+        {
+            T message = new T();
+            AddWellKnownTypeHandlers(message.Descriptor, handler);
+        }
+
+        /// <summary>
+        /// Adds a new well-known type with it's handler to the formatter.
+        /// </summary>
+        /// <param name="descriptor">Descriptor of the well-known type.</param>
+        /// <param name="handler">Handler to execute for parsing messages of the well-known type.</param>
+        /// <exception cref="ArgumentException">An handler for the same well-known type is already registered.</exception>
+        public void AddWellKnownTypeHandlers(MessageDescriptor descriptor, Action<JsonFormatter, TextWriter, MessageDescriptor, object> handler)
+        {
+            WellKnownTypeHandlers.Add(descriptor.FullName, handler);
+        }
+
+        /// <summary>
+        /// Checks if the given message descriptor has a special well-known type handler.
+        /// </summary>
+        /// <param name="descriptor">Descriptor of message type to check.</param>
+        private bool IsWellKnownType(MessageDescriptor descriptor)
+        {
+            return WellKnownTypeHandlers.ContainsKey(descriptor.FullName);
         }
 
         /// <summary>
@@ -454,57 +522,14 @@ namespace Google.Protobuf
                 WriteNull(writer);
                 return;
             }
-            // For wrapper types, the value will either be the (possibly boxed) "native" value,
-            // or the message itself if we're formatting it at the top level (e.g. just calling ToString on the object itself).
-            // If it's the message form, we can extract the value first, which *will* be the (possibly boxed) native value,
-            // and then proceed, writing it as if we were definitely in a field. (We never need to wrap it in an extra string...
-            // WriteValue will do the right thing.)
-            if (descriptor.IsWrapperType)
+
+            if (WellKnownTypeHandlers.TryGetValue(descriptor.FullName, out var handler))
             {
-                if (value is IMessage)
-                {
-                    var message = (IMessage) value;
-                    value = message.Descriptor.Fields[WrappersReflection.WrapperValueFieldNumber].Accessor.GetValue(message);
-                }
-                WriteValue(writer, value);
+                handler(this, writer, descriptor, value);
                 return;
             }
-            if (descriptor.FullName == Timestamp.Descriptor.FullName)
-            {
-                WriteTimestamp(writer, (IMessage)value);
-                return;
-            }
-            if (descriptor.FullName == Duration.Descriptor.FullName)
-            {
-                WriteDuration(writer, (IMessage)value);
-                return;
-            }
-            if (descriptor.FullName == FieldMask.Descriptor.FullName)
-            {
-                WriteFieldMask(writer, (IMessage)value);
-                return;
-            }
-            if (descriptor.FullName == Struct.Descriptor.FullName)
-            {
-                WriteStruct(writer, (IMessage)value);
-                return;
-            }
-            if (descriptor.FullName == ListValue.Descriptor.FullName)
-            {
-                var fieldAccessor = descriptor.Fields[ListValue.ValuesFieldNumber].Accessor;
-                WriteList(writer, (IList)fieldAccessor.GetValue((IMessage)value));
-                return;
-            }
-            if (descriptor.FullName == Value.Descriptor.FullName)
-            {
-                WriteStructFieldValue(writer, (IMessage)value);
-                return;
-            }
-            if (descriptor.FullName == Any.Descriptor.FullName)
-            {
-                WriteAny(writer, (IMessage)value);
-                return;
-            }
+
+            // Well-known types with no special handling continue in the normal way.
             WriteMessage(writer, (IMessage)value);
         }
 
@@ -555,7 +580,7 @@ namespace Google.Protobuf
             writer.Write(NameValueSeparator);
             WriteString(writer, typeUrl);
 
-            if (descriptor.IsWellKnownType)
+            if (IsWellKnownType(descriptor))
             {
                 writer.Write(PropertySeparator);
                 WriteString(writer, AnyWellKnownTypeValueField);

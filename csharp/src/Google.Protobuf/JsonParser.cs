@@ -70,7 +70,7 @@ namespace Google.Protobuf
 
         // TODO: Consider introducing a class containing parse state of the parser, tokenizer and depth. That would simplify these handlers
         // and the signatures of various methods.
-        private static readonly Dictionary<string, Action<JsonParser, IMessage, JsonTokenizer>>
+        private readonly Dictionary<string, Action<JsonParser, IMessage, JsonTokenizer>>
             WellKnownTypeHandlers = new Dictionary<string, Action<JsonParser, IMessage, JsonTokenizer>>
         {
             { Timestamp.Descriptor.FullName, (parser, message, tokenizer) => MergeTimestamp(message, tokenizer.Next()) },
@@ -142,6 +142,15 @@ namespace Google.Protobuf
         }
 
         /// <summary>
+        /// Checks if the given message descriptor has a special well-known type handler.
+        /// </summary>
+        /// <param name="descriptor">Descriptor of message type to check.</param>
+        private bool IsWellKnownType(MessageDescriptor descriptor)
+        {
+            return WellKnownTypeHandlers.ContainsKey(descriptor.FullName);
+        }
+
+        /// <summary>
         /// Merges the given message using data from the given tokenizer. In most cases, the next
         /// token should be a "start object" token, but wrapper types and nullity can invalidate
         /// that assumption. This is implemented as an LL(1) recursive descent parser over the stream
@@ -154,10 +163,9 @@ namespace Google.Protobuf
             {
                 throw InvalidProtocolBufferException.JsonRecursionLimitExceeded();
             }
-            if (message.Descriptor.IsWellKnownType)
+            if (IsWellKnownType(message.Descriptor))
             {
-                Action<JsonParser, IMessage, JsonTokenizer> handler;
-                if (WellKnownTypeHandlers.TryGetValue(message.Descriptor.FullName, out handler))
+                if (WellKnownTypeHandlers.TryGetValue(message.Descriptor.FullName, out var handler))
                 {
                     handler(this, message, tokenizer);
                     return;
@@ -442,6 +450,28 @@ namespace Google.Protobuf
             return message;
         }
 
+        /// <summary>
+        /// Adds a new well-known type with it's handler to the parser.
+        /// </summary>
+        /// <param name="handler">Handler to execute for parsing messages of the well-known type.</param>
+        /// <typeparam name="T">The well-known type of message.</typeparam>
+        public void AddWellKnownTypeHandlers<T>(Action<JsonParser, IMessage, JsonTokenizer> handler) where T : IMessage, new()
+        {
+            T message = new T();
+            AddWellKnownTypeHandlers(message.Descriptor, handler);
+        }
+
+        /// <summary>
+        /// Adds a new well-known type with it's handler to the parser.
+        /// </summary>
+        /// <param name="descriptor">Descriptor of the well-known type.</param>
+        /// <param name="handler">Handler to execute for parsing messages of the well-known type.</param>
+        /// <exception cref="ArgumentException">An handler for the same well-known type is already registered.</exception>
+        public void AddWellKnownTypeHandlers(MessageDescriptor descriptor, Action<JsonParser, IMessage, JsonTokenizer> handler)
+        {
+            WellKnownTypeHandlers.Add(descriptor.FullName, handler);
+        }
+
         private void MergeStructValue(IMessage message, JsonTokenizer tokenizer)
         {
             var firstToken = tokenizer.Next();
@@ -544,7 +574,7 @@ namespace Google.Protobuf
             // as normal. Our original tokenizer should end up at the end of the object.
             var replay = JsonTokenizer.FromReplayedTokens(tokens, tokenizer);
             var body = descriptor.Parser.CreateTemplate();
-            if (descriptor.IsWellKnownType)
+            if (IsWellKnownType(descriptor))
             {
                 MergeWellKnownTypeAnyBody(body, replay);
             }
