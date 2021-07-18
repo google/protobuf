@@ -61,6 +61,7 @@ import com.google.protobuf.FieldMask;
 import com.google.protobuf.FloatValue;
 import com.google.protobuf.Int32Value;
 import com.google.protobuf.Int64Value;
+import com.google.protobuf.InvalidAnyProtocolBufferException;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Message;
@@ -881,7 +882,7 @@ public class JsonFormat {
       if (type == null) {
         type = oldRegistry.getDescriptorForTypeUrl(typeUrl);
         if (type == null) {
-          throw new InvalidProtocolBufferException("Cannot find type for url: " + typeUrl);
+          throw new InvalidAnyProtocolBufferException("Cannot find type for url: " + typeUrl, typeUrl);
         }
       }
       ByteString content = (ByteString) message.getField(valueField);
@@ -1529,7 +1530,7 @@ public class JsonFormat {
       if (contentType == null) {
         contentType = oldRegistry.getDescriptorForTypeUrl(typeUrl);
         if (contentType == null) {
-          throw new InvalidProtocolBufferException("Cannot resolve type: " + typeUrl);
+          throw new InvalidAnyProtocolBufferException("Cannot resolve type: " + typeUrl, typeUrl);
         }
       }
       builder.setField(typeUrlField, typeUrl);
