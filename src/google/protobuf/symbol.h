@@ -64,6 +64,9 @@ class Symbol {
   explicit Symbol(TYPE* value) : ptr_(value) {                                 \
     value->symbol_type_ = TYPE_CONSTANT;                                       \
   }                                                                            \
+  explicit Symbol(const TYPE* value) : ptr_(value) {                           \
+    ABSL_DCHECK_EQ(value->symbol_type_, TYPE_CONSTANT);                        \
+  }                                                                            \
   const TYPE* FIELD() const {                                                  \
     return type() == TYPE_CONSTANT ? static_cast<const TYPE*>(ptr_) : nullptr; \
   }

@@ -105,7 +105,7 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
         // ::google::protobuf::GeneratedCodeInfo
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
-};
+    };
 }  // namespace
 namespace google {
 namespace protobuf {
@@ -6188,7 +6188,7 @@ const ::uint32_t
         4, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::google::protobuf::GeneratedCodeInfo, _impl_.annotation_),
         0,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
@@ -6227,7 +6227,7 @@ static const ::_pbi::MigrationSchema
         {443, sizeof(::google::protobuf::SourceCodeInfo)},
         {449, sizeof(::google::protobuf::GeneratedCodeInfo_Annotation)},
         {462, sizeof(::google::protobuf::GeneratedCodeInfo)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::google::protobuf::FileDescriptorSet_globals_,
@@ -6265,7 +6265,7 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::google::protobuf::SourceCodeInfo_globals_,
         &::google::protobuf::GeneratedCodeInfo_Annotation_globals_,
         &::google::protobuf::GeneratedCodeInfo_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fdescriptor_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n google/protobuf/descriptor.proto\022\017goog"

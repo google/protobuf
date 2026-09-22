@@ -33,6 +33,7 @@
 #include "google/protobuf/compiler/code_generator.h"
 #include "google/protobuf/compiler/cpp/enum.h"
 #include "google/protobuf/compiler/cpp/extension.h"
+#include "google/protobuf/compiler/cpp/generator.h"
 #include "google/protobuf/compiler/cpp/helpers.h"
 #include "google/protobuf/compiler/cpp/message.h"
 #include "google/protobuf/compiler/cpp/names.h"
@@ -91,6 +92,62 @@ void UnmuteWuninitialized(io::Printer* p) {
     #pragma clang diagnostic pop
     #endif  // __llvm__
   )");
+}
+
+void GenerateForwardIncludes(const FileDescriptor& file, const Options& options,
+                             io::Printer& p) {
+  std::vector<const FieldDescriptor*> fields;
+  ListAllFields(&file, &fields);
+  std::vector<const Descriptor*> service_classes;
+  ListAllTypesForServices(&file, &service_classes);
+
+  absl::flat_hash_set<const FileDescriptor*> needed_deps;
+  for (const auto* field : fields) {
+    if (field->containing_type()) {
+      needed_deps.insert(field->containing_type()->file());
+    }
+    if (field->message_type()) {
+      needed_deps.insert(field->message_type()->file());
+    }
+    if (field->enum_type()) {
+      needed_deps.insert(field->enum_type()->file());
+    }
+  }
+  for (const auto* cls : service_classes) {
+    if (cls) needed_deps.insert(cls->file());
+  }
+
+  absl::flat_hash_set<const FileDescriptor*> public_deps;
+  for (int i = 0; i < file.public_dependency_count(); ++i) {
+    public_deps.insert(file.public_dependency(i));
+  }
+
+  std::function<bool(const FileDescriptor*)> is_dep_needed =
+      [&](const FileDescriptor* d) {
+        if (needed_deps.contains(d)) return true;
+        for (int i = 0; i < d->public_dependency_count(); ++i) {
+          if (is_dep_needed(d->public_dependency(i))) return true;
+        }
+        return false;
+      };
+
+  auto emit_fwd_include = [&](const FileDescriptor* target) {
+    std::string target_basename = StripProto(target->name());
+    if (!options.opensource_runtime) {
+      GetBootstrapBasename(options, target_basename, &target_basename);
+    }
+    p.Emit({{"name", target_basename}}, R"(
+      #include "$name$.proto.fwd_internal.h"
+    )");
+  };
+
+  for (int i = 0; i < file.dependency_count(); ++i) {
+    const auto* dep = file.dependency(i);
+    if (public_deps.contains(dep)) continue;
+    if (!is_dep_needed(dep)) continue;
+    emit_fwd_include(dep);
+  }
+  emit_fwd_include(&file);
 }
 }  // namespace
 
@@ -176,6 +233,21 @@ void FileGenerator::GenerateFile(io::Printer* p, GeneratedFileType file_type,
              "protobuf_cpp_version", PROTOBUF_CPP_VERSION_STRING);
   }
   p->Print("\n");
+  if (file_type == GeneratedFileType::kProtoFwdH) {
+    p->Emit({{"cb", cb}, {"guard", guard}}, R"(
+      #ifndef $guard$
+      #define $guard$
+
+      // NOLINTBEGIN(whitespace/line_length)
+      // clang-format off
+      $cb$;
+      // clang-format on
+      // NOLINTEND(whitespace/line_length)
+
+      #endif  // $guard$
+    )");
+    return;
+  }
   p->Emit({{"cb", cb}, {"guard", guard}}, R"(
     #ifndef $guard$
     #define $guard$
@@ -227,15 +299,10 @@ void FileGenerator::GenerateMacroUndefs(io::Printer* p) {
 void FileGenerator::GenerateSharedHeaderCode(io::Printer* p) {
   p->Emit(
       {
-          {"port_def",
-           [&] { IncludeFile("third_party/protobuf/port_def.inc", p); }},
-          {"port_undef",
-           [&] { IncludeFile("third_party/protobuf/port_undef.inc", p); }},
           {"dllexport_macro", FileDllExport(file_, options_)},
           {"undefs", [&] { GenerateMacroUndefs(p); }},
           {"global_state_decls",
            [&] { GenerateGlobalStateFunctionDeclarations(p); }},
-          {"fwd_decls", [&] { GenerateForwardDeclarations(p); }},
           {"proto2_ns_enums",
            [&] { GenerateProto2NamespaceEnumSpecializations(p); }},
           {"main_decls",
@@ -274,30 +341,22 @@ void FileGenerator::GenerateSharedHeaderCode(io::Printer* p) {
            }},
       },
       R"(
-          // Must be included last.
-          $port_def$
-
           #define $dllexport_macro$$ dllexport_decl$
           $undefs$
 
           $global_state_decls$;
-          $fwd_decls$
 
           $main_decls$
 
           $proto2_ns_enums$
 
           // @@protoc_insertion_point(global_scope)
-
-          $port_undef$
       )");
 }
 
 void FileGenerator::GenerateProtoHeader(io::Printer* p,
                                         absl::string_view info_path) {
-  if (!options_.proto_h) {
-    return;
-  }
+  ABSL_CHECK(options_.proto_h);
 
   GenerateFile(p, GeneratedFileType::kProtoH, [&] {
     if (!options_.opensource_runtime) {
@@ -315,6 +374,10 @@ void FileGenerator::GenerateProtoHeader(io::Printer* p,
 
     p->Emit(
         {
+            {"port_def",
+             [&] { IncludeFile("third_party/protobuf/port_def.inc", p); }},
+            {"port_undef",
+             [&] { IncludeFile("third_party/protobuf/port_undef.inc", p); }},
             {"library_includes", [&] { GenerateLibraryIncludes(p); }},
             {"proto_includes",
              [&] {
@@ -325,6 +388,12 @@ void FileGenerator::GenerateProtoHeader(io::Printer* p,
                  )");
                }
              }},
+            {"fwd_includes",
+             [&] { GenerateForwardIncludes(*file_, options_, *p); }},
+            {"local_fwd_decls",
+             [&] {
+               GenerateForwardDeclarations(p, ForwardDeclScope::kLocalOnly);
+             }},
             {"metadata_pragma", [&] { GenerateMetadataPragma(p, info_path); }},
             {"header_main", [&] { GenerateSharedHeaderCode(p); }},
         },
@@ -333,8 +402,16 @@ void FileGenerator::GenerateProtoHeader(io::Printer* p,
           $proto_includes$;
           // @@protoc_insertion_point(includes)
 
+          // Must be included last.
+          $port_def$;
+
+          $fwd_includes$;
+          $local_fwd_decls$;
+
           $metadata_pragma$;
           $header_main$;
+
+          $port_undef$;
         )cc");
   });
 }
@@ -344,6 +421,18 @@ void FileGenerator::GeneratePBHeader(io::Printer* p,
   GenerateFile(p, GeneratedFileType::kPbH, [&] {
     p->Emit(
         {
+            {"port_def",
+             [&] {
+               if (!options_.proto_h) {
+                 IncludeFile("third_party/protobuf/port_def.inc", p);
+               }
+             }},
+            {"port_undef",
+             [&] {
+               if (!options_.proto_h) {
+                 IncludeFile("third_party/protobuf/port_undef.inc", p);
+               }
+             }},
             {"library_includes",
              [&] {
                if (options_.proto_h) {
@@ -366,6 +455,12 @@ void FileGenerator::GeneratePBHeader(io::Printer* p,
                }
              }},
             {"metadata_pragma", [&] { GenerateMetadataPragma(p, info_path); }},
+            {"fwd_decls",
+             [&] {
+               if (!options_.proto_h) {
+                 GenerateForwardDeclarations(p);
+               }
+             }},
             {"header_main",
              [&] {
                if (!options_.proto_h) {
@@ -391,8 +486,15 @@ void FileGenerator::GeneratePBHeader(io::Printer* p,
           $proto_includes$;
           // @@protoc_insertion_point(includes)
 
+          // Must be included last.
+          $port_def$;
+
+          $fwd_decls$;
+
           $metadata_pragma$;
           $header_main$;
+
+          $port_undef$;
         )cc");
   });
 }
@@ -801,7 +903,7 @@ void FileGenerator::GenerateSource(io::Printer* p) {
           PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
               file_reflection_data[] = {
                   $reflection_data$,
-          };
+              };
           }  // namespace
         )cc");
   }
@@ -1111,18 +1213,18 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
               $tablename$::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
                   protodesc_cold) = {
                   $offsets$,
-          };
+              };
 
           static const ::_pbi::MigrationSchema
               schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
                   $schemas$,
-          };
+              };
         )cc");
     constexpr absl::string_view file_default_instances_code = R"cc(
       static const ::_pbi::MessageGlobalsBase* $nonnull$ const
           file_message_globals[] = {
               $globals$,
-      };
+          };
     )cc";
     if (!UsingImplicitWeakDescriptor(file_, options_)) {
       std::vector<Sub> subs = {
@@ -1242,7 +1344,7 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
           static const ::_pbi::DescriptorTable* $nonnull$ const
               $desc_table$_deps[$len$] = {
                   $deps$,
-          };
+              };
         )cc");
   }
 
@@ -1447,58 +1549,62 @@ class FileGenerator::ForwardDeclarations {
   absl::btree_map<std::string, const Descriptor*> splits_;
 };
 
-static void PublicImportDFS(
-    const FileDescriptor* fd,
-    absl::flat_hash_set<const FileDescriptor*>& fd_set) {
-  for (int i = 0; i < fd->public_dependency_count(); ++i) {
-    const FileDescriptor* dep = fd->public_dependency(i);
-    if (fd_set.insert(dep).second) {
-      PublicImportDFS(dep, fd_set);
-    }
-  }
+void FileGenerator::GenerateProtoFwdHeader(io::Printer* p) {
+  ABSL_CHECK(options_.proto_h);
+  GenerateFile(p, GeneratedFileType::kProtoFwdH, [&] {
+    p->Emit(
+        {
+            {"public_imports",
+             [&] {
+               for (int i = 0; i < file_->public_dependency_count(); ++i) {
+                 const auto* dep = file_->public_dependency(i);
+                 p->Emit({{"name", StripProto(dep->name())}},
+                         "#include \"$name$.proto.fwd_internal.h\"\n");
+               }
+             }},
+            {"fwd_decl",
+             [&] {
+               GenerateForwardDeclarations(p, ForwardDeclScope::kExportedOnly);
+             }},
+        },
+        "$public_imports$"
+        "$fwd_decl$");
+  });
 }
 
-void FileGenerator::GenerateForwardDeclarations(io::Printer* p) {
+void FileGenerator::GenerateForwardDeclarations(io::Printer* p,
+                                                ForwardDeclScope scope) {
+  const auto matches_scope = [scope](const auto* d) {
+    if (scope == ForwardDeclScope::kAll) return true;
+    bool is_exported = CppGenerator::GetResolvedSymbolVisibility(*d) ==
+                       SymbolVisibility::VISIBILITY_EXPORT;
+    return scope == ForwardDeclScope::kExportedOnly ? is_exported
+                                                    : !is_exported;
+  };
+
   std::vector<const Descriptor*> classes;
   FlattenMessagesInFile(file_, &classes);  // All messages need forward decls.
-
-  std::vector<const EnumDescriptor*> enums;
-  if (options_.proto_h) {  // proto.h needs extra forward declarations.
-    // All classes / enums referred to as field members
-    std::vector<const FieldDescriptor*> fields;
-    ListAllFields(file_, &fields);
-    for (const auto* field : fields) {
-      classes.push_back(field->containing_type());
-      classes.push_back(field->message_type());
-      enums.push_back(field->enum_type());
-    }
-
+  if (scope != ForwardDeclScope::kExportedOnly) {
     ListAllTypesForServices(file_, &classes);
   }
 
+  std::vector<const EnumDescriptor*> enums;
   // List all enums in this file, to declare the traits.
   google::protobuf::internal::VisitDescriptors(
       *file_, [&](const EnumDescriptor& e) { enums.push_back(&e); });
 
-  // Calculate the set of files whose definitions we get through include.
-  // No need to forward declare types that are defined in these.
-  absl::flat_hash_set<const FileDescriptor*> public_set;
-  PublicImportDFS(file_, public_set);
-
   absl::btree_map<std::string, ForwardDeclarations> decls;
   for (const auto* d : classes) {
-    if (d != nullptr && !public_set.contains(d->file()) &&
-        ShouldGenerateClass(d, options_))
+    if (d != nullptr && ShouldGenerateClass(d, options_) && matches_scope(d))
       decls[Namespace(d)].AddMessage(d);
   }
   for (const auto* e : enums) {
-    if (e != nullptr && !public_set.contains(e->file()))
-      decls[Namespace(e)].AddEnum(e);
+    if (e != nullptr && matches_scope(e)) decls[Namespace(e)].AddEnum(e);
   }
   for (const auto& mg : message_generators_) {
     const Descriptor* d = mg->descriptor();
-    if (d != nullptr && public_set.count(d->file()) == 0u &&
-        ShouldSplit(mg->descriptor(), options_))
+    if (d != nullptr && ShouldSplit(mg->descriptor(), options_) &&
+        matches_scope(d))
       decls[Namespace(d)].AddSplit(d);
   }
 
@@ -1508,23 +1614,27 @@ void FileGenerator::GenerateForwardDeclarations(io::Printer* p) {
     decl.second.Print(p, options_);
   }
 
-  ns.ChangeTo(ProtobufNamespace(options_));
-  for (const auto& decl : decls) {
-    decl.second.PrintTopLevelDecl(p, options_);
+  if (!decls.empty()) {
+    ns.ChangeTo(ProtobufNamespace(options_));
+    for (const auto& decl : decls) {
+      decl.second.PrintTopLevelDecl(p, options_);
+    }
   }
 
-  for (auto& extension_generator : extension_generators_) {
-    extension_generator->GenerateFeatureDefaults(p);
-  }
+  if (scope != ForwardDeclScope::kLocalOnly) {
+    for (auto& extension_generator : extension_generators_) {
+      extension_generator->GenerateFeatureDefaults(p);
+    }
 
-  if (IsFileDescriptorProto(file_, options_)) {
-    ns.ChangeTo(absl::StrCat(ProtobufNamespace(options_), "::internal"));
-    p->Emit(R"cc(
-      //~ Emit wants an indented line, so give it a comment to strip.
+    if (IsFileDescriptorProto(file_, options_)) {
+      ns.ChangeTo(absl::StrCat(ProtobufNamespace(options_), "::internal"));
+      p->Emit(R"cc(
+        //~ Emit wants an indented line, so give it a comment to strip.
 #if !defined(PROTOBUF_CONSTINIT_DEFAULT_INSTANCES)
-      PROTOBUF_EXPORT void InitializeFileDescriptorDefaultInstancesSlow();
+        PROTOBUF_EXPORT void InitializeFileDescriptorDefaultInstancesSlow();
 #endif  // !defined(PROTOBUF_CONSTINIT_DEFAULT_INSTANCES)
-    )cc");
+      )cc");
+    }
   }
 }
 

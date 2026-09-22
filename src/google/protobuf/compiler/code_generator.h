@@ -179,6 +179,13 @@ class PROTOC_EXPORT CodeGenerator {
   static Edition GetEdition(const FileDescriptor& file) {
     return ::google::protobuf::internal::InternalFeatureHelper::GetEdition(file);
   }
+
+  // Retrieves the resolved symbol visibility of a descriptor.
+  template <typename DescriptorT>
+  static SymbolVisibility GetResolvedSymbolVisibility(const DescriptorT& desc) {
+    return ::google::protobuf::internal::InternalFeatureHelper::
+        GetResolvedSymbolVisibility(desc);
+  }
 };
 
 // The minimum edition supported by protoc.

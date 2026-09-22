@@ -36,15 +36,6 @@
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 
-#define PROTOBUF_INTERNAL_EXPORT_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto PROTOBUF_EXPORT
-
-// Internal implementation detail -- do not use these members.
-struct PROTOBUF_EXPORT TableStruct_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto {
-  static const ::uint32_t offsets[];
-};
-extern "C" {
-PROTOBUF_EXPORT extern const ::google::protobuf::internal::DescriptorTable descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto;
-}  // extern "C"
 namespace pb {
 namespace enumvalue {
 class JsonEnumValueOptions;
@@ -60,6 +51,16 @@ internal::GeneratedMessageTraitsT<&::pb::enumvalue::JsonEnumValueOptions_globals
     internal::MessageTraitsImpl::value<::pb::enumvalue::JsonEnumValueOptions>;
 }  // namespace protobuf
 }  // namespace google
+
+#define PROTOBUF_INTERNAL_EXPORT_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto PROTOBUF_EXPORT
+
+// Internal implementation detail -- do not use these members.
+struct PROTOBUF_EXPORT TableStruct_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto {
+  static const ::uint32_t offsets[];
+};
+extern "C" {
+PROTOBUF_EXPORT extern const ::google::protobuf::internal::DescriptorTable descriptor_table_google_2fprotobuf_2fjson_5fenumvalue_5foptions_2eproto;
+}  // extern "C"
 
 namespace pb {
 namespace enumvalue {

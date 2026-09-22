@@ -51,6 +51,7 @@ class PROTOC_EXPORT FileGenerator {
   // info_path, if non-empty, should be the path (relative to printer's
   // output) to the metadata file describing this proto header.
   void GenerateProtoHeader(io::Printer* p, absl::string_view info_path);
+  void GenerateProtoFwdHeader(io::Printer* p);
   // info_path, if non-empty, should be the path (relative to printer's
   // output) to the metadata file describing this PB header.
   void GeneratePBHeader(io::Printer* p, absl::string_view info_path);
@@ -117,8 +118,15 @@ class PROTOC_EXPORT FileGenerator {
                           io::Printer* p);
   void GenerateReflectionInitializationCode(io::Printer* p);
 
+  enum class ForwardDeclScope {
+    kAll,
+    kExportedOnly,
+    kLocalOnly,
+  };
+
   // For other imports, generates their forward-declarations.
-  void GenerateForwardDeclarations(io::Printer* p);
+  void GenerateForwardDeclarations(
+      io::Printer* p, ForwardDeclScope scope = ForwardDeclScope::kAll);
 
   // Generates top or bottom of a header file.
   void GenerateTopHeaderGuard(io::Printer* p, GeneratedFileType file_type);
