@@ -171,34 +171,36 @@ void PartialTestRegistry::DedupNames(std::vector<std::string>& names) {
   }
 }
 
-size_t PartialTestRegistry::GetValueIndex(CounterT id, const void*,
-                                          Location loc) {
+size_t PartialTestRegistry::GetValueIndex(const void* fixture_key, const void*,
+                                          SourceInfo info) {
   if (current_test_ == nullptr) {
-    ADD_FAILURE_AT(loc.file, loc.line) << "Must use PB_TEST or PB_TEST_F";
+    ADD_FAILURE_AT(std::string(info.file).c_str(), info.line)
+        << "Must use PB_TEST or PB_TEST_F";
     return 0;
   }
-
-  {
-    absl::MutexLock lock(used_values_mu_);
-    if (!used_values_.insert(id).second) {
-      ADD_FAILURE_AT(loc.file, loc.line)
-          << "Attempted to call PB_TEST_CHOOSE_VALUE(...) twice in a single "
-             "test run. Running it twice will not give a new value, so the "
-             "system prevents that to avoid accidental misuse.";
-    }
-  }
+  info.owner = fixture_key;
 
   size_t index = current_test_index_;
-  for (const auto& [i, dim] : current_test_->dimensions) {
+  for (const auto& [key, dim] : current_test_->dimensions) {
     if (dim.kind != DimensionKind::kValue) continue;
-    if (i == id) {
+    if (dim.info == info) {
+      bool inserted;
+      {
+        absl::MutexLock lock(used_values_mu_);
+        inserted = used_values_.insert(info).second;
+      }
+      if (!inserted) {
+        ADD_FAILURE_AT(std::string(info.file).c_str(), info.line)
+            << "Attempted to call PB_TEST_CHOOSE_VALUE(...) twice in a single "
+               "test run. Running it twice will not give a new value, so the "
+               "system prevents that to avoid accidental misuse.";
+      }
       return index % dim.names.size();
-    } else {
-      index /= dim.names.size();
     }
+    index /= dim.names.size();
   }
 
-  ADD_FAILURE_AT(loc.file, loc.line)
+  ADD_FAILURE_AT(std::string(info.file).c_str(), info.line)
       << "PB_TEST_CHOOSE_VALUE(...) called from a class that is neither the "
          "current PB_TEST, nor its PB_TEST_F fixture, nor a base of that "
          "fixture declaring PB_TEST_FIXTURE_BASE.";
@@ -208,16 +210,15 @@ size_t PartialTestRegistry::GetValueIndex(CounterT id, const void*,
 void PartialTestRegistry::UnsetCurrentTest() {
   absl::MutexLock lock(used_values_mu_);
   if (!::testing::Test::HasFatalFailure() && !::testing::Test::IsSkipped()) {
-    for (const auto& [id, dim] : current_test_->dimensions) {
-      if (dim.kind == DimensionKind::kValue && !used_values_.contains(id)) {
-        const Location loc = current_fixture_->locations.at(id);
-        ADD_FAILURE_AT(loc.file, loc.line)
+    for (const auto& [key, dim] : current_test_->dimensions) {
+      if (dim.kind == DimensionKind::kValue &&
+          !used_values_.contains(dim.info)) {
+        ADD_FAILURE_AT(std::string(dim.info.file).c_str(), dim.info.line)
             << "PB_TEST_CHOOSE_VALUE(...) dimension was registered for this "
                "test but never evaluated during the test run.";
       }
     }
   }
-  current_fixture_ = nullptr;
   current_test_ = nullptr;
   current_test_index_ = ~size_t{};
   used_values_.clear();
@@ -331,6 +332,34 @@ std::vector<std::string> PartialTestRegistry::ParseNamesFromLiteral(
   return names;
 }
 
+PartialTestRegistry::Dimension* PartialTestRegistry::NewValueDimension(
+    const void* fixture_key, const void* instantiation_key, SourceInfo info) {
+  info.owner = fixture_key;
+  auto& dims =
+      fixtures_[fixture_key].per_instantiation[instantiation_key].dimensions;
+  for (const auto& [key, dim] : dims) {
+    if (dim.kind == DimensionKind::kValue && dim.info == info) return nullptr;
+  }
+  Dimension& d = dims[DimensionKey{0, info.line, 0, next_seq_++}];
+  d.kind = DimensionKind::kValue;
+  d.info = info;
+  return &d;
+}
+
+PartialTestRegistry::Dimension* PartialTestRegistry::NewCompileTimeDimension(
+    const void* fixture_key, const void* instantiation_key, DimensionKind kind,
+    CounterT id, int line) {
+  auto& dims =
+      fixtures_[fixture_key].per_instantiation[instantiation_key].dimensions;
+  for (const auto& [key, dim] : dims) {
+    if (dim.kind != DimensionKind::kValue && dim.counter == id) return nullptr;
+  }
+  Dimension& d = dims[DimensionKey{0, line, static_cast<size_t>(id) + 1, 0}];
+  d.kind = kind;
+  d.counter = id;
+  return &d;
+}
+
 PartialTestRegistry::PerFixture::PerInstantiation::TestNames
 PartialTestRegistry::PerFixture::PerInstantiation::GetNames(
     absl::string_view base_test_name, size_t i) const {
@@ -341,16 +370,16 @@ PartialTestRegistry::PerFixture::PerInstantiation::GetNames(
     }
     return size_t{};
   };
-  for (const auto& [l, dim] : dimensions) {
+  for (const auto& [key, dim] : dimensions) {
     absl::string_view name;
     std::string* target = nullptr;
     switch (dim.kind) {
       case DimensionKind::kType:
-        name = dim.names[get_id(l)];
+        name = dim.names[get_id(dim.counter)];
         target = &out.type_name;
         break;
       case DimensionKind::kConstexprValue:
-        name = dim.names[get_id(l)];
+        name = dim.names[get_id(dim.counter)];
         target = &out.value_name;
         break;
       case DimensionKind::kValue:
@@ -377,18 +406,21 @@ static auto Sort(const Map& map, F func) {
 
 void PartialTestRegistry::RegisterAll() {
   // Push the dimensions of each test's fixture, and of the fixture's
-  // `PB_TEST_FIXTURE_BASE` classes, to the test.
+  // `PB_TEST_FIXTURE_BASE` classes, to the test. `parent_keys` lists the
+  // fixture first and the outermost base last, so lower the level with each.
   for (auto& [k, fixture] : fixtures_) {
-    for (const void* key : fixture.parent_keys) {
-      auto it = fixtures_.find(key);
+    for (size_t i = 0; i < fixture.parent_keys.size(); ++i) {
+      auto it = fixtures_.find(fixture.parent_keys[i]);
       if (it == fixtures_.end()) continue;
       const PerFixture& base = it->second;
 
-      fixture.locations.insert(base.locations.begin(), base.locations.end());
       for (const auto& [bk, base_inst] : base.per_instantiation) {
         for (auto& [ik, inst] : fixture.per_instantiation) {
-          inst.dimensions.insert(base_inst.dimensions.begin(),
-                                 base_inst.dimensions.end());
+          for (const auto& [key, dim] : base_inst.dimensions) {
+            DimensionKey lowered = key;
+            lowered.level = -static_cast<int>(i) - 1;
+            inst.dimensions.emplace(lowered, dim);
+          }
         }
       }
     }
@@ -404,13 +436,13 @@ void PartialTestRegistry::RegisterAll() {
   for (auto& [k, fixture] : fixtures_) {
     if (fixture.parent_keys.empty()) continue;
     for (auto& [ik, inst] : fixture.per_instantiation) {
-      for (const auto& [id, dim] : inst.dimensions) {
+      for (const auto& [key, dim] : inst.dimensions) {
         if (dim.kind == DimensionKind::kValue) continue;
         auto it = std::lower_bound(inst.instantiation_key.begin(),
                                    inst.instantiation_key.end(),
-                                   PerCounterIndex{id, 0});
-        if (it == inst.instantiation_key.end() || it->counter != id) {
-          inst.instantiation_key.insert(it, PerCounterIndex{id, 0});
+                                   PerCounterIndex{dim.counter, 0});
+        if (it == inst.instantiation_key.end() || it->counter != dim.counter) {
+          inst.instantiation_key.insert(it, PerCounterIndex{dim.counter, 0});
         }
       }
     }
