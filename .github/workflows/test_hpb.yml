@@ -17,15 +17,24 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        # Runs on both profiles of the composite Linux image (`latest`: Clang 23 /
+        # Bazel 9.2.0, `floor`: Clang 14 / Bazel 8.7.0).
+        profile: [latest, floor]
         config:
           - { name: Optimized, flags: --config=opt }
 
         include:
           - targets: "//hpb/... //hpb_generator/..."
-          - image: "us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8"
           - bazel_cmd: "test"
+          # Image per profile, pinned by digest. The digests are those of
+          # composite:latest-v6 and composite:floor-v6, built from
+          # protocolbuffers/build-support@383004c (test/linux/composite).
+          - profile: latest
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:6618e74988a9aac8efc533bcfce1b9467f3c9e82be4d021e1facb82b2e0e6c1a"
+          - profile: floor
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:43bab836dd0a48be73c230f6db352c15cc399f45ba429d569f52c985987ef620"
 
-    name: Linux ${{ matrix.config.name }}
+    name: Linux ${{ matrix.config.name }}${{ matrix.profile == 'floor' && ' (floor)' || '' }}
     runs-on: ubuntu-22-4core
     steps:
       - name: Checkout pending changes
@@ -38,6 +47,6 @@ jobs:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: hpb_linux
-          bazel: >-
-            ${{ matrix.bazel_cmd }}
-            ${{ matrix.targets }} ${{ matrix.config.flags }}
+          bash: >-
+            bazel ${{ matrix.bazel_cmd }}
+            ${{ matrix.targets }} ${{ matrix.config.flags }} $BAZEL_FLAGS
