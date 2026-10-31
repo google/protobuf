@@ -174,6 +174,9 @@ class Printer;
 }  // namespace io
 
 namespace internal {
+#ifndef SWIG
+class FieldRangeImpl;
+#endif  // !SWIG
 class InternalFeatureHelper;
 class Symbol;
 }  // namespace internal
@@ -778,6 +781,9 @@ class PROTOBUF_EXPORT Descriptor : private internal::SymbolBase {
 
   // Allows access to `fields_`.
   friend class Reflection;
+#ifndef SWIG
+  friend class internal::FieldRangeImpl;
+#endif  // !SWIG
 
   // Get the merged features that apply to this message type.  These are
   // specified in the .proto file through the feature options in the message
@@ -1477,6 +1483,9 @@ class PROTOBUF_EXPORT OneofDescriptor : private internal::SymbolBase {
   friend class Descriptor;
   friend class FieldDescriptor;
   friend class Reflection;
+#ifndef SWIG
+  friend class internal::FieldRangeImpl;
+#endif  // !SWIG
 };
 
 PROTOBUF_INTERNAL_CHECK_CLASS_SIZE(OneofDescriptor, 40);
@@ -3269,34 +3278,26 @@ inline bool IsEnumFullySequential(const EnumDescriptor* enum_desc) {
   return enum_desc->sequential_value_limit_ == enum_desc->value_count() - 1;
 }
 
-// FieldRange(desc) provides an iterable range for the fields of a
-// descriptor type, appropriate for range-for loops.
-
-template <typename T>
-struct FieldRangeImpl;
-
-template <typename T>
-FieldRangeImpl<T> FieldRange(const T* desc) {
-  return {desc};
-}
-
-template <typename T>
-struct PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldRangeImpl {
+// FieldRange(desc) provides an iterable, indexable range over the contiguous
+// FieldDescriptor array of a Descriptor or OneofDescriptor, resolving the
+// internal offset pointer once rather than per element.
+#ifndef SWIG
+class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldRangeImpl {
+ public:
   struct Iterator {
     using iterator_category = std::forward_iterator_tag;
     using value_type = const FieldDescriptor*;
-    using difference_type = int;
+    using difference_type = ptrdiff_t;
     using pointer = const FieldDescriptor* const*;
-    using reference = const FieldDescriptor* const&;
+    using reference = const FieldDescriptor*;
 
-    PROTOBUF_FUTURE_ADD_EARLY_NODISCARD value_type operator*() {
-      return descriptor->field(idx);
+    PROTOBUF_FUTURE_ADD_EARLY_NODISCARD value_type operator*() const {
+      return field;
     }
 
     PROTOBUF_FUTURE_ADD_EARLY_NODISCARD friend bool operator==(
         const Iterator& a, const Iterator& b) {
-      ABSL_DCHECK(a.descriptor == b.descriptor);
-      return a.idx == b.idx;
+      return a.field == b.field;
     }
     PROTOBUF_FUTURE_ADD_EARLY_NODISCARD friend bool operator!=(
         const Iterator& a, const Iterator& b) {
@@ -3304,23 +3305,60 @@ struct PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldRangeImpl {
     }
 
     Iterator& operator++() {
-      idx++;
+      ++field;
       return *this;
     }
+    Iterator operator++(int) {
+      Iterator tmp = *this;
+      ++field;
+      return tmp;
+    }
 
-    int idx;
-    const T* descriptor;
+    const FieldDescriptor* field = nullptr;
   };
 
+  using value_type = const FieldDescriptor*;
+  using iterator = Iterator;
+  using const_iterator = Iterator;
+
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD Iterator begin() const {
-    return {0, descriptor};
+    return {begin_};
   }
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD Iterator end() const {
-    return {descriptor->field_count(), descriptor};
+    return {begin_ + count_};
+  }
+  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD int size() const { return count_; }
+  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD bool empty() const { return count_ == 0; }
+  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD const FieldDescriptor* operator[](
+      int index) const {
+    ABSL_DCHECK_LE(0, index);
+    ABSL_DCHECK_LT(index, count_);
+    return begin_ + index;
   }
 
-  const T* descriptor;
+ private:
+  friend FieldRangeImpl FieldRange(const Descriptor* desc);
+  friend FieldRangeImpl FieldRange(const OneofDescriptor* desc);
+
+  template <typename T>
+  explicit FieldRangeImpl(const T* desc) {
+    ABSL_DCHECK(desc != nullptr);
+    count_ = desc->field_count();
+    begin_ = count_ > 0 ? desc->fields_.get() : nullptr;
+  }
+
+  const FieldDescriptor* begin_;
+  int count_;
 };
+
+inline FieldRangeImpl FieldRange(const Descriptor* desc) {
+  return FieldRangeImpl(desc);
+}
+
+inline FieldRangeImpl FieldRange(const OneofDescriptor* desc) {
+  return FieldRangeImpl(desc);
+}
+#endif  // !SWIG
 
 // While building descriptors, we need to avoid using MergeFrom()/CopyFrom() to
 // be -fno-rtti friendly. Without RTTI, MergeFrom() and CopyFrom() will fallback

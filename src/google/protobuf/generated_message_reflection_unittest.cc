@@ -36,6 +36,7 @@
 #include "google/protobuf/arena.h"
 #include "google/protobuf/compiler/cpp/cpp_file_options_test.pb.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/map_test_util.h"
 #include "google/protobuf/map_unittest.pb.h"
 #include "google/protobuf/message.h"
@@ -79,6 +80,9 @@ class GeneratedMessageReflectionTestHelper {
   }
   static bool IsLazyField(const Message& msg, const FieldDescriptor* field) {
     return msg.GetReflection()->IsLazyField(field);
+  }
+  static bool HasHasbits(const Message& msg) {
+    return msg.GetReflection()->Schema().HasHasbits();
   }
   static bool IsEagerlyVerifiedLazyField(const Message& msg,
                                          const FieldDescriptor* field) {
@@ -2069,6 +2073,160 @@ TEST(GeneratedMessageReflection, IsEmptyWithUnknownFields) {
   EXPECT_TRUE(reflection->IsEmptyIgnoringUnknownFields(msg));
   // IsEmpty() sees there are unknown fields, and returns false.
   EXPECT_FALSE(reflection->IsEmpty(msg));
+}
+
+TEST(GeneratedMessageReflection, ListFieldsAndIsEmptyZeroFieldMessage) {
+  proto3_unittest::TestEmptyMessage msg;
+  ASSERT_EQ(msg.GetDescriptor()->field_count(), 0);
+  ASSERT_FALSE(GeneratedMessageReflectionTestHelper::HasHasbits(msg));
+  const Reflection* reflection = msg.GetReflection();
+  std::vector<const FieldDescriptor*> fields = {
+      unittest::TestAllTypes::descriptor()->field(0)};
+  reflection->ListFields(msg, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+  EXPECT_TRUE(reflection->IsEmpty(msg));
+  EXPECT_TRUE(reflection->IsEmptyIgnoringUnknownFields(msg));
+
+  DynamicMessageFactory factory;
+  std::unique_ptr<Message> dyn_msg(
+      factory.GetPrototype(proto3_unittest::TestEmptyMessage::descriptor())
+          ->New());
+  ASSERT_FALSE(GeneratedMessageReflectionTestHelper::HasHasbits(*dyn_msg));
+  fields = {unittest::TestAllTypes::descriptor()->field(0)};
+  dyn_msg->GetReflection()->ListFields(*dyn_msg, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+  EXPECT_TRUE(dyn_msg->GetReflection()->IsEmpty(*dyn_msg));
+}
+
+TEST(GeneratedMessageReflection,
+     ListFieldsAndIsEmptyWithoutHasbitsGeneratedAndDynamic) {
+  // Generated and dynamic proto3 message with only a real oneof:
+  // field_count > 0 and HasHasbits() == false.
+  proto3_unittest::TestOneof2 oneof_msg;
+  ASSERT_GT(oneof_msg.GetDescriptor()->field_count(), 0);
+  ASSERT_FALSE(GeneratedMessageReflectionTestHelper::HasHasbits(oneof_msg));
+  const Reflection* oneof_ref = oneof_msg.GetReflection();
+  std::vector<const FieldDescriptor*> fields;
+  oneof_ref->ListFields(oneof_msg, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+  EXPECT_TRUE(oneof_ref->IsEmpty(oneof_msg));
+
+  oneof_msg.set_foo_enum(proto3_unittest::TestOneof2::UNKNOWN);
+  EXPECT_FALSE(oneof_ref->IsEmpty(oneof_msg));
+  oneof_ref->ListFields(oneof_msg, &fields);
+  EXPECT_THAT(fields,
+              ElementsAre(Pointee(Property(&FieldDescriptor::number, 6))));
+
+  DynamicMessageFactory factory;
+  std::unique_ptr<Message> dyn_oneof(
+      factory.GetPrototype(proto3_unittest::TestOneof2::descriptor())->New());
+  ASSERT_FALSE(GeneratedMessageReflectionTestHelper::HasHasbits(*dyn_oneof));
+  const Reflection* dyn_oneof_ref = dyn_oneof->GetReflection();
+  const FieldDescriptor* foo_enum =
+      dyn_oneof->GetDescriptor()->FindFieldByName("foo_enum");
+  ASSERT_NE(foo_enum, nullptr);
+  EXPECT_TRUE(dyn_oneof_ref->IsEmpty(*dyn_oneof));
+  dyn_oneof_ref->SetEnumValue(dyn_oneof.get(), foo_enum, 0);
+  EXPECT_FALSE(dyn_oneof_ref->IsEmpty(*dyn_oneof));
+  dyn_oneof_ref->ListFields(*dyn_oneof, &fields);
+  EXPECT_THAT(fields, ElementsAre(foo_enum));
+  dyn_oneof_ref->ClearField(dyn_oneof.get(), foo_enum);
+  EXPECT_TRUE(dyn_oneof_ref->IsEmpty(*dyn_oneof));
+  dyn_oneof_ref->ListFields(*dyn_oneof, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+
+  // Dynamic proto3 map-entry messages omit hasbits on implicit-presence key and
+  // value fields (dynamic_message.cc), exercising the non-oneof fallback branch
+  // when has_bit_indices == nullptr and field_count == 2.
+  const Descriptor* map_entry_desc = proto2_unittest::TestMap::descriptor()
+                                         ->FindFieldByName("map_int32_int32")
+                                         ->message_type();
+  ASSERT_NE(map_entry_desc, nullptr);
+  std::unique_ptr<Message> dyn_entry(
+      factory.GetPrototype(map_entry_desc)->New());
+  ASSERT_EQ(dyn_entry->GetDescriptor()->field_count(), 2);
+  ASSERT_FALSE(GeneratedMessageReflectionTestHelper::HasHasbits(*dyn_entry));
+  const Reflection* entry_ref = dyn_entry->GetReflection();
+  const FieldDescriptor* key_field = map_entry_desc->FindFieldByName("key");
+  const FieldDescriptor* val_field = map_entry_desc->FindFieldByName("value");
+  ASSERT_NE(key_field, nullptr);
+  ASSERT_NE(val_field, nullptr);
+  EXPECT_TRUE(entry_ref->IsEmpty(*dyn_entry));
+  entry_ref->SetInt32(dyn_entry.get(), val_field, 42);
+  EXPECT_FALSE(entry_ref->IsEmpty(*dyn_entry));
+  entry_ref->ListFields(*dyn_entry, &fields);
+  EXPECT_THAT(fields, ElementsAre(val_field));
+  entry_ref->SetInt32(dyn_entry.get(), val_field, 0);
+  EXPECT_TRUE(entry_ref->IsEmpty(*dyn_entry));
+  entry_ref->ListFields(*dyn_entry, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+
+  // Dynamic proto3 messages with hint hasbits (implicit-presence scalars and
+  // repeated fields) must clear presence when reset to default or emptied.
+  std::unique_ptr<Message> dyn_rep(
+      factory.GetPrototype(proto3_unittest::TestUnpackedTypes::descriptor())
+          ->New());
+  ASSERT_TRUE(GeneratedMessageReflectionTestHelper::HasHasbits(*dyn_rep));
+  const Reflection* rep_ref = dyn_rep->GetReflection();
+  const FieldDescriptor* rep_int32 =
+      dyn_rep->GetDescriptor()->FindFieldByName("repeated_int32");
+  ASSERT_NE(rep_int32, nullptr);
+  rep_ref->AddInt32(dyn_rep.get(), rep_int32, 7);
+  EXPECT_FALSE(rep_ref->IsEmpty(*dyn_rep));
+  rep_ref->ListFields(*dyn_rep, &fields);
+  EXPECT_THAT(fields, ElementsAre(rep_int32));
+  rep_ref->RemoveLast(dyn_rep.get(), rep_int32);
+  EXPECT_TRUE(rep_ref->IsEmpty(*dyn_rep));
+  rep_ref->ListFields(*dyn_rep, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+}
+
+TEST(GeneratedMessageReflection, ListFieldsAndIsEmptyProto3HintHasbits) {
+  proto3_unittest::TestHasbits msg;
+  ASSERT_TRUE(GeneratedMessageReflectionTestHelper::HasHasbits(msg));
+  const Descriptor* descriptor = msg.GetDescriptor();
+  const Reflection* reflection = msg.GetReflection();
+  std::vector<const FieldDescriptor*> fields;
+
+  for (int i = 0; i < 69; ++i) {
+    reflection->SetBool(&msg, descriptor->field(i), true);
+  }
+  reflection->ListFields(msg, &fields);
+  ASSERT_EQ(fields.size(), 69u);
+  for (int i = 0; i < 69; ++i) {
+    EXPECT_EQ(fields[i], descriptor->field(i));
+  }
+  EXPECT_FALSE(reflection->IsEmpty(msg));
+
+  // Resetting implicit-presence fields to false leaves hint hasbits set in
+  // TestHasbits; IsEmpty and ListFields must still report the message as empty.
+  for (int i = 0; i < 69; ++i) {
+    reflection->SetBool(&msg, descriptor->field(i), false);
+  }
+  reflection->ListFields(msg, &fields);
+  EXPECT_THAT(fields, IsEmpty());
+  EXPECT_TRUE(reflection->IsEmpty(msg));
+}
+
+TEST(GeneratedMessageReflection,
+     ListFieldsAndIsEmptyOneofSkipAlignmentAndOutOfOrderTags) {
+  unittest::TestOneof2 msg;
+  ASSERT_TRUE(GeneratedMessageReflectionTestHelper::HasHasbits(msg));
+  const Reflection* reflection = msg.GetReflection();
+  std::vector<const FieldDescriptor*> fields;
+
+  // Set members in two multi-field oneofs (tags 30 and 23) plus a trailing
+  // hasbit field (tag 18) declared after both oneofs in index order, verifying
+  // both index alignment after skipping oneof members and tag-number sorting.
+  msg.set_foo_bytes_cord("x");
+  msg.set_bar_bytes_with_empty_default("");
+  msg.set_baz_int(0);
+  EXPECT_FALSE(reflection->IsEmpty(msg));
+  reflection->ListFields(msg, &fields);
+  EXPECT_THAT(fields,
+              ElementsAre(Pointee(Property(&FieldDescriptor::number, 18)),
+                          Pointee(Property(&FieldDescriptor::number, 23)),
+                          Pointee(Property(&FieldDescriptor::number, 30))));
 }
 
 TEST(GeneratedMessageReflection, SwapImplicitPresenceShouldWork) {

@@ -188,6 +188,13 @@ class ReflectionSchema {
     return HasBitIndex(field, field->index());
   }
 
+  // Raw array of per-field hasbit indices. Requires HasHasbits().
+  const uint32_t* HasBitIndices() const {
+    ABSL_DCHECK(HasHasbits());
+    ABSL_DCHECK(has_bit_indices_ != nullptr);
+    return has_bit_indices_;
+  }
+
   // Byte offset of the hasbits array.
   uint32_t HasBitsOffset() const {
     ABSL_DCHECK(HasHasbits());
