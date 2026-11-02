@@ -572,22 +572,33 @@ PyObject* PyUpb_RepeatedContainer_Extend(PyObject* _self, PyObject* value) {
   if (!arr) return NULL;
   upb_Arena* arena = PyUpb_Arena_Get(self->arena);
 
+  // Materialize self-references to avoid infinite loop.
+  PyObject* materialized = NULL;
+  if (value == _self) {
+    materialized = PySequence_List(value);
+    if (!materialized) return NULL;
+    value = materialized;
+  }
+
   if (upb_FieldDef_IsSubMessage(f)) {
-    // Composite fields: iterate and append via MergeFrom.
-    // Buffer views don't apply to sub-messages.
     PyObject* iter = PyObject_GetIter(value);
-    if (!iter) return NULL;
+    if (!iter) {
+      Py_XDECREF(materialized);
+      return NULL;
+    }
     PyObject* item;
     while ((item = PyIter_Next(iter)) != NULL) {
       PyObject* ret = PyUpb_RepeatedCompositeContainer_Append(_self, item);
       Py_DECREF(item);
       if (!ret) {
         Py_DECREF(iter);
+        Py_XDECREF(materialized);
         return NULL;
       }
       Py_DECREF(ret);
     }
     Py_DECREF(iter);
+    Py_XDECREF(materialized);
     if (PyErr_Occurred()) return NULL;
     Py_RETURN_NONE;
   }
@@ -597,8 +608,10 @@ PyObject* PyUpb_RepeatedContainer_Extend(PyObject* _self, PyObject* value) {
                        PyUpb_ExtendBulkCb, &ctx)) {
     bool ok = upb_Array_Resize(arr, old_size, NULL);
     UPB_ASSERT(ok);
+    Py_XDECREF(materialized);
     return NULL;
   }
+  Py_XDECREF(materialized);
   Py_RETURN_NONE;
 }
 
@@ -669,6 +682,12 @@ static PyObject* PyUpb_RepeatedContainer_Subscript(PyObject* _self,
   Py_ssize_t size = arr ? upb_Array_Size(arr) : 0;
   Py_ssize_t idx, count, step;
   if (!PyUpb_IndexToRange(key, size, &idx, &count, &step)) return NULL;
+  Py_ssize_t new_size = arr ? upb_Array_Size(arr) : 0;
+  if (new_size != size) {
+    PyErr_SetString(PyExc_RuntimeError,
+                    "container was modified during index evaluation");
+    return NULL;
+  }
   const upb_FieldDef* f = PyUpb_RepeatedContainer_GetField(self);
   if (step == 0) {
     return PyUpb_UpbToPy(upb_Array_Get(arr, idx), f, self->arena);
@@ -870,7 +889,13 @@ static int PyUpb_RepeatedContainer_SetSubscript(
   if (step == 0) {
     // Set single value.
     upb_MessageValue msgval;
+    Py_ssize_t pre_size = upb_Array_Size(arr);
     if (!PyUpb_PyToUpb(value, f, &msgval, arena)) return -1;
+    if ((Py_ssize_t)upb_Array_Size(arr) != pre_size) {
+      PyErr_SetString(PyExc_RuntimeError,
+                      "container was modified during value conversion");
+      return -1;
+    }
     upb_Array_Set(arr, idx, msgval);
     return 0;
   }
@@ -942,7 +967,14 @@ static int PyUpb_RepeatedContainer_AssignSubscript(PyObject* _self,
   if (!arr) return -1;
   Py_ssize_t size = arr ? upb_Array_Size(arr) : 0;
   Py_ssize_t idx, count, step;
+  // PyUpb_IndexToRange calls __index__() which can execute arbitrary code.
   if (!PyUpb_IndexToRange(key, size, &idx, &count, &step)) return -1;
+  Py_ssize_t new_size = upb_Array_Size(arr);
+  if (new_size != size) {
+    PyErr_SetString(PyExc_RuntimeError,
+                    "container was modified during index evaluation");
+    return -1;
+  }
   if (value) {
     return PyUpb_RepeatedContainer_SetSubscript(self, arr, f, idx, count, step,
                                                 value);
@@ -983,6 +1015,13 @@ static PyObject* PyUpb_RepeatedContainer_Remove(PyObject* _self,
   }
   if (match_index == -1) {
     PyErr_SetString(PyExc_ValueError, "remove(x): x not in container");
+    return NULL;
+  }
+  // Re-check size: __eq__() can execute arbitrary Python code.
+  Py_ssize_t cur_size = upb_Array_Size(arr);
+  if (match_index >= cur_size) {
+    PyErr_SetString(PyExc_RuntimeError,
+                    "container was modified during remove()");
     return NULL;
   }
   if (PyUpb_RepeatedContainer_DeleteSubscript(arr, match_index, 1, 1) < 0) {
@@ -1191,6 +1230,15 @@ static PyObject* PyUpb_RepeatedContainer_Insert(PyObject* _self,
     msgval.msg_val = msg;
   } else {
     if (!PyUpb_PyToUpb(value, f, &msgval, arena)) return NULL;
+  }
+
+  // Re-check size: PyUpb_PyToUpb (scalar) or MergeFrom (composite) can
+  // execute arbitrary Python code that modifies the container.
+  Py_ssize_t new_size = upb_Array_Size(arr);
+  if (new_size != size) {
+    PyErr_SetString(PyExc_RuntimeError,
+                    "container was modified during insert()");
+    return NULL;
   }
 
   if (!upb_Array_Insert(arr, index, 1, arena)) {
