@@ -26,12 +26,14 @@
 // Must be last.
 #include "upb/port/def.inc"
 
+// Comparators sort in DESCENDING order because the encoder writes backwards.
+// Descending sort + backward encoding = ascending order in the final output.
 static int _upb_mapsorter_intkeys(const void* _a, const void* _b) {
   const upb_tabent* const* a = _a;
   const upb_tabent* const* b = _b;
   uintptr_t a_key = (*a)->key.num;
   uintptr_t b_key = (*b)->key.num;
-  return a_key < b_key ? -1 : a_key > b_key;
+  return a_key > b_key ? -1 : a_key < b_key;
 }
 
 static void _upb_mapsorter_getkeys(const void* _a, const void* _b, void* a_key,
@@ -47,31 +49,31 @@ static void _upb_mapsorter_getkeys(const void* _a, const void* _b, void* a_key,
 static int _upb_mapsorter_cmpi64(const void* _a, const void* _b) {
   int64_t a, b;
   _upb_mapsorter_getkeys(_a, _b, &a, &b, 8);
-  return a < b ? -1 : a > b;
+  return a > b ? -1 : a < b;
 }
 
 static int _upb_mapsorter_cmpu64(const void* _a, const void* _b) {
   uint64_t a, b;
   _upb_mapsorter_getkeys(_a, _b, &a, &b, 8);
-  return a < b ? -1 : a > b;
+  return a > b ? -1 : a < b;
 }
 
 static int _upb_mapsorter_cmpi32(const void* _a, const void* _b) {
   int32_t a, b;
   _upb_mapsorter_getkeys(_a, _b, &a, &b, 4);
-  return a < b ? -1 : a > b;
+  return a > b ? -1 : a < b;
 }
 
 static int _upb_mapsorter_cmpu32(const void* _a, const void* _b) {
   uint32_t a, b;
   _upb_mapsorter_getkeys(_a, _b, &a, &b, 4);
-  return a < b ? -1 : a > b;
+  return a > b ? -1 : a < b;
 }
 
 static int _upb_mapsorter_cmpbool(const void* _a, const void* _b) {
   bool a, b;
   _upb_mapsorter_getkeys(_a, _b, &a, &b, 1);
-  return a < b ? -1 : a > b;
+  return a > b ? -1 : a < b;
 }
 
 static int _upb_mapsorter_cmpstr(const void* _a, const void* _b) {
@@ -80,7 +82,7 @@ static int _upb_mapsorter_cmpstr(const void* _a, const void* _b) {
   size_t common_size = UPB_MIN(a.size, b.size);
   int cmp = memcmp(a.data, b.data, common_size);
   if (cmp) return -cmp;
-  return a.size < b.size ? -1 : a.size > b.size;
+  return a.size > b.size ? -1 : a.size < b.size;
 }
 
 static int (*const compar[kUpb_FieldType_SizeOf])(const void*, const void*) = {
