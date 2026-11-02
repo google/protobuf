@@ -124,7 +124,8 @@ upb_GetExtension_Status upb_Message_GetOrPromoteExtension(
   // extensions are read as upb_Array* by the encoder and accessors, so
   // promoting a repeated message extension is a type confusion. Repeated
   // unknowns should use upb_MiniTable_PromoteUnknownToMessageArray.
-  if (!upb_MiniTableField_IsScalar(upb_MiniTableExtension_ToField(ext_table))) {
+  if (UPB_UNLIKELY(!upb_MiniTableField_IsScalar(
+          upb_MiniTableExtension_ToField(ext_table)))) {
     return kUpb_GetExtension_ParseError;
   }
   const upb_Extension* extension =
