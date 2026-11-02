@@ -638,7 +638,7 @@ class PROTOBUF_EXPORT PROTOBUF_ALIGNAS(8)
                     internal::HasDeprecatedArenaConstructor<T>()) {
         return new T();
       } else {
-        return new T(nullptr);
+        return new T(/*arena=*/nullptr);
       }
     }
 
@@ -719,7 +719,7 @@ class PROTOBUF_EXPORT PROTOBUF_ALIGNAS(8)
                     internal::HasDeprecatedArenaConstructor<T>()) {
         return new T(static_cast<Args&&>(args)...);
       } else {
-        return new T(nullptr, static_cast<Args&&>(args)...);
+        return new T(/*arena=*/nullptr, static_cast<Args&&>(args)...);
       }
     } else {
       return arena->DoCreateMessage<T>(static_cast<Args&&>(args)...);
