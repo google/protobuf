@@ -60,6 +60,7 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
+
 OptionInterpreter::OptionInterpreter(DescriptorBuilder* builder,
                                      bool update_source_code_info)
     : builder_(builder), update_source_code_info_(update_source_code_info) {
@@ -296,7 +297,8 @@ bool OptionInterpreter::InterpretSingleOption(
       });
     }
 
-    if (field->containing_type() != descriptor) {
+    bool is_field_of_descriptor = field->containing_type() == descriptor;
+    if (!is_field_of_descriptor) {
       if (DescriptorBuilder::get_is_placeholder(field->containing_type())) {
         // The field is an extension of a placeholder type, so we can't
         // reliably verify whether it is a valid extension to use here (e.g.
@@ -306,9 +308,8 @@ bool OptionInterpreter::InterpretSingleOption(
         AddWithoutInterpreting(*uninterpreted_option_, options);
         return true;
       }
-      // This can only happen if, due to some insane misconfiguration of the
-      // pools, we find the options message in one pool but the field in
-      // another. This would probably imply a hefty bug somewhere.
+      // The extension extends another options message, or the options message
+      // of a different pool.
       return AddNameError([&] {
         return absl::StrCat("Option field \"", debug_msg_name,
                             "\" is not a field or extension of message \"",
