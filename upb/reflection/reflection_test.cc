@@ -62,6 +62,15 @@ absl::StatusOr<upb::DefPool> LoadDescriptorProto(absl::string_view proto_text) {
   return LoadDescriptorSetFromProto(set);
 }
 
+TEST(ReflectionTest, EmptyFileWithoutExtensionsLoads) {
+  absl::StatusOr<upb::DefPool> pool = LoadDescriptorProto(
+      R"pb(
+        syntax: "proto3"
+        name: "empty.proto"
+      )pb");
+  ASSERT_TRUE(pool.ok()) << pool.status();
+}
+
 TEST(ReflectionTest, OpenEnumWithNonZeroDefault) {
   absl::Status status = LoadDescriptorProto(
                             R"pb(
