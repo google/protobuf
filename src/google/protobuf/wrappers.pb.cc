@@ -165,8 +165,9 @@ static_assert(alignof(UInt64ValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt64ValueGlobalsTypeInternal UInt64Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt64ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) UInt64Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class UInt32Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<UInt32Value>()._impl_._has_bits_);
@@ -275,8 +276,9 @@ static_assert(alignof(UInt32ValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt32ValueGlobalsTypeInternal UInt32Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt32ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) UInt32Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class StringValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<StringValue>()._impl_._has_bits_);
@@ -389,8 +391,9 @@ static_assert(alignof(StringValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const StringValueGlobalsTypeInternal StringValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const StringValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) StringValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class Int64Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<Int64Value>()._impl_._has_bits_);
@@ -499,8 +502,9 @@ static_assert(alignof(Int64ValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int64ValueGlobalsTypeInternal Int64Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int64ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) Int64Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class Int32Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<Int32Value>()._impl_._has_bits_);
@@ -609,8 +613,9 @@ static_assert(alignof(Int32ValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int32ValueGlobalsTypeInternal Int32Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int32ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) Int32Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class FloatValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<FloatValue>()._impl_._has_bits_);
@@ -719,8 +724,9 @@ static_assert(alignof(FloatValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const FloatValueGlobalsTypeInternal FloatValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const FloatValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) FloatValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class DoubleValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<DoubleValue>()._impl_._has_bits_);
@@ -829,8 +835,9 @@ static_assert(alignof(DoubleValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DoubleValueGlobalsTypeInternal DoubleValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DoubleValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) DoubleValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class BytesValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<BytesValue>()._impl_._has_bits_);
@@ -941,8 +948,9 @@ static_assert(alignof(BytesValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BytesValueGlobalsTypeInternal BytesValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BytesValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) BytesValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class BoolValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<BoolValue>()._impl_._has_bits_);
@@ -1051,8 +1059,9 @@ static_assert(alignof(BoolValueGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BoolValueGlobalsTypeInternal BoolValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BoolValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) BoolValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 }  // namespace protobuf
 }  // namespace google
 static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE

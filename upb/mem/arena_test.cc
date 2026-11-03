@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <thread>
 #include <type_traits>
@@ -37,6 +38,10 @@
 
 // Must be last.
 #include "upb/port/def.inc"
+
+#if UPB_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
 
 namespace {
 
@@ -392,6 +397,33 @@ TEST(ArenaTest, FixedInitialBlockNoAlloc) {
   EXPECT_EQ(upb_Arena_Malloc(arena, 2048), nullptr);
   EXPECT_EQ(upb_Arena_Malloc(arena, 1024), nullptr);
 
+  upb_Arena_Free(arena);
+}
+
+TEST(ArenaTest, InitialBlockIsTreatedAsFreshMemory) {
+  // upb takes ownership of the initial block, so whatever the caller left in it
+  // must not count as initialized, and unallocated space must be poisoned.
+  char buf[1024];
+  memset(buf, 0x42, sizeof(buf));
+  upb_Arena* arena = upb_Arena_Init(buf, sizeof(buf), nullptr);
+  char* p = static_cast<char*>(upb_Arena_Malloc(arena, 64));
+  ASSERT_NE(p, nullptr);
+#if UPB_MSAN
+  // __msan_test_shadow() returns the offset of the first uninitialized byte.
+  EXPECT_EQ(__msan_test_shadow(p, 64), 0);
+#endif
+#if UPB_HWASAN
+  // The arena state is allocated like any other region, so it has its own tag.
+  // (Not compared with `buf`, whose stack tag is random and could collide.)
+  EXPECT_NE(UPB_PRIVATE(_upb_Xsan_GetTag)(arena),
+            UPB_PRIVATE(_upb_Xsan_GetTag)(p));
+#endif
+#if UPB_ASAN
+  EXPECT_FALSE(__asan_address_is_poisoned(p));
+  EXPECT_FALSE(__asan_address_is_poisoned(p + 63));
+  // The guard after the allocation, like the rest of the free space.
+  EXPECT_TRUE(__asan_address_is_poisoned(p + 64));
+#endif
   upb_Arena_Free(arena);
 }
 
