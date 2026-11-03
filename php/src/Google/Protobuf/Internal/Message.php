@@ -1292,6 +1292,14 @@ class Message
                 if (is_null($value)) {
                     continue;
                 }
+                if (!is_array($value)) {
+                    trigger_error(
+                        "Invalid data type for repeated field. " .
+                        "This will fail in a future version of Protobuf.",
+                        E_USER_WARNING
+                    );
+                    continue;
+                }
                 foreach ($value as $tmp) {
                     if (is_null($tmp)) {
                         throw new \Exception(

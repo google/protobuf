@@ -2857,6 +2857,18 @@ class PROTOBUF_EXPORT DescriptorPool {
   // mutex which must be locked while accessing tables_.
   absl::Mutex* mutex_;
 
+  void AssertHeld() const {
+    if (mutex_ != nullptr) {
+      mutex_->AssertHeld();
+    }
+  }
+
+  void AssertReaderHeld() const {
+    if (mutex_ != nullptr) {
+      mutex_->AssertReaderHeld();
+    }
+  }
+
   // See constructor.
   DescriptorDatabase* fallback_database_;
   ErrorCollector* default_error_collector_;
