@@ -218,6 +218,12 @@ Error, UINTPTR_MAX is undefined
 #define UPB_MSAN 0
 #endif
 
+#if UPB_HAS_FEATURE(type_sanitizer)
+#define UPB_TYSAN 1
+#else
+#define UPB_TYSAN 0
+#endif
+
 // An unfortunate concession to C++17 and MSVC, which don't support zero-sized
 // structs.
 #if UPB_ASAN || UPB_HWASAN || UPB_TSAN
@@ -8082,6 +8088,7 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
 #ifndef NDEBUG
   a->body.refs = NULL;
 #endif
+  UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->head));
   UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->body));
 
   UPB_PRIVATE(_upb_Arena_AddBlock)(&a->head, block);
@@ -8104,6 +8111,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     size_t delta = (uintptr_t)aligned - (uintptr_t)mem;
     n = delta <= n ? n - delta : 0;
     mem = aligned;
+#if UPB_HWASAN
+    // HWASAN tags whole granules; never tag past the end of the caller's
+    // buffer.
+    n = UPB_ALIGN_DOWN(n, UPB_MALLOC_ALIGN);
+#endif
   }
   if (UPB_UNLIKELY(n < sizeof(upb_ArenaState) || !mem)) {
     upb_Arena* ret = _upb_Arena_InitSlow(alloc, mem ? 0 : n);
@@ -8113,7 +8125,20 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     return ret;
   }
 
-  a = mem;
+  // upb now owns the whole block, so treat it like freshly allocated arena
+  // memory: poison all of it (which also makes MSAN treat the previous contents
+  // as uninitialized and TYSAN forget their types), then allocate the arena
+  // state at the front like any other region. With HWASAN it gets the first tag
+  // of the arena's sequence, so the caller's pointer to the block cannot be
+  // used to access it, and later allocations continue the sequence.
+  upb_Xsan xsan;
+  UPB_PRIVATE(upb_Xsan_Init)(&xsan);
+  UPB_PRIVATE(upb_Xsan_PoisonRegion)(mem, n);
+  a = UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(&xsan, mem,
+                                                sizeof(upb_ArenaState));
+#if UPB_XSAN_STRUCT_SIZE
+  a->head.xsan = xsan;
+#endif
 
   upb_Atomic_Init(&a->body.parent_or_count, _upb_Arena_TaggedFromRefcount(1));
   upb_Atomic_Init(&a->body.next, NULL);
@@ -8127,7 +8152,9 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
   a->body.size_hint = 128;
   a->body.last_block_size = 128;
   a->body.block_alloc = _upb_Arena_MakeBlockAlloc(alloc, 1);
-  a->head.UPB_PRIVATE(ptr) = (void*)UPB_ALIGN_MALLOC((uintptr_t)(a + 1));
+  // Derive both bounds from `mem` so that they carry the same HWASAN tag.
+  a->head.UPB_PRIVATE(ptr) =
+      (void*)UPB_ALIGN_MALLOC((uintptr_t)mem + sizeof(upb_ArenaState));
   a->head.UPB_PRIVATE(end) = UPB_PTR_AT(mem, n, char);
   a->head.UPB_ONLYBITS(pool) =
       (UPB_PRIVATE(_upb_ArenaPool)*)&UPB_PRIVATE(_upb_Arena_EmptyPool);
@@ -20836,6 +20863,7 @@ const char* UPB_PRIVATE(_upb_WireReader_SkipGroup)(
 #undef UPB_HWASAN
 #undef UPB_HWASAN_POISON_TAG
 #undef UPB_MSAN
+#undef UPB_TYSAN
 #undef UPB_MALLOC_ALIGN
 #undef UPB_TSAN
 #undef UPB_DEPRECATED
