@@ -61,6 +61,7 @@
 #undef UPB_HWASAN
 #undef UPB_HWASAN_POISON_TAG
 #undef UPB_MSAN
+#undef UPB_TYSAN
 #undef UPB_MALLOC_ALIGN
 #undef UPB_TSAN
 #undef UPB_DEPRECATED
