@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 "Validate that the protoc binary is authentic and not spoofed by a malicious actor."
 
 load("//bazel/common:proto_common.bzl", "proto_common")
@@ -67,4 +74,14 @@ protoc_authenticity = rule(
         ),
     }),
     toolchains = toolchains.use_toolchain(toolchains.PROTO_TOOLCHAIN),
+)
+
+def _fail_if_analyzed_impl(ctx):
+    fail(ctx.attr.message)
+
+fail_if_analyzed = rule(
+    implementation = _fail_if_analyzed_impl,
+    attrs = {
+        "message": attr.string(mandatory = True),
+    },
 )

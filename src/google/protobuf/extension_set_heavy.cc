@@ -267,7 +267,6 @@ bool DescriptorPoolExtensionFinder::Find(int number, ExtensionInfo* output) {
   }
 }
 
-
 bool ExtensionSet::FindExtension(int wire_type, uint32_t field,
                                  const Message* extendee,
                                  const internal::ParseContext* ctx,
@@ -359,9 +358,9 @@ int ExtensionSet::SpaceUsedExcludingSelf() const {
 }
 
 size_t ExtensionSet::SpaceUsedExcludingSelfLong() const {
-  size_t total_size = is_large() ? map_.large->large.size() * sizeof(FlatItem) +
-                                       sizeof(LargeRep)
-                                 : flat_capacity() * sizeof(FlatItem);
+  size_t total_size = is_large()
+                          ? map_.large->size * sizeof(FlatItem) + LargeRepSize()
+                          : flat_capacity() * sizeof(FlatItem);
   ForEach(
       [&total_size](int /* number */, const Extension& ext) {
         total_size += ext.SpaceUsedExcludingSelfLong();

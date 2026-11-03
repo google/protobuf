@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_CONFORMANCE_TESTEE_H__
 #define GOOGLE_PROTOBUF_CONFORMANCE_TESTEE_H__
 
@@ -56,13 +63,19 @@ enum class TestPriority { kP0 = 0, kP1 = 1 };
 inline constexpr TestPriority kP0 = TestPriority::kP0;
 inline constexpr TestPriority kP1 = TestPriority::kP1;
 
-// The lowest priority there is.  An enforcement level (see TestManager in
-// test_manager.h) is the lowest priority whose unlisted failures fail the run;
+// The lowest priority there is.  An enforcement level (see ResultLedger in
+// result_ledger.h) is the lowest priority whose unlisted failures fail the run;
 // kLowestPriority, the default, enforces every priority.
 inline constexpr TestPriority kLowestPriority = kP1;
 
 // The name of a priority: "P0" or "P1".
 absl::string_view PriorityName(TestPriority priority);
+
+// Flag support for TestPriority, as the priority's number: "0" is kP0, "1" is
+// kP1.
+bool AbslParseFlag(absl::string_view text, TestPriority* priority,
+                   std::string* error);
+std::string AbslUnparseFlag(TestPriority priority);
 
 // The level a priority is named with in test names, until the rename (see
 // TestPriority): "Required" for kP0, "Recommended" for kP1.

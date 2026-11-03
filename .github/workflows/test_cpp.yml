@@ -417,7 +417,10 @@ jobs:
 
   linux-cmake-32-bit:
     name: Linux CMake 32-bit
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-24.04: Docker 29.4.2's seccomp profile on Ubuntu 26.04
+    # blocks socketcall(2) in i386 glibc containers, breaking networking.
+    # https://github.com/actions/runner-images/issues/14790
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout pending changes
         uses: protocolbuffers/protobuf-ci/checkout@v7
@@ -635,8 +638,7 @@ jobs:
           image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/abseil_head
-          # Remove deprecation supression after clean up
-          bazel: test //src/... --override_module=abseil-cpp=abseil-cpp-head --copt="-Wno-deprecated-declarations"
+          bazel: test //src/... --override_module=abseil-cpp=abseil-cpp-head
 
   # Runs tests against unreleased Bazel HEAD (last_green) to catch regressions early.
   linux-bazel-last-green:

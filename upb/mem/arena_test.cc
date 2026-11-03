@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <thread>
 #include <type_traits>
@@ -37,6 +38,10 @@
 
 // Must be last.
 #include "upb/port/def.inc"
+
+#if UPB_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
 
 namespace {
 
@@ -395,6 +400,33 @@ TEST(ArenaTest, FixedInitialBlockNoAlloc) {
   upb_Arena_Free(arena);
 }
 
+TEST(ArenaTest, InitialBlockIsTreatedAsFreshMemory) {
+  // upb takes ownership of the initial block, so whatever the caller left in it
+  // must not count as initialized, and unallocated space must be poisoned.
+  char buf[1024];
+  memset(buf, 0x42, sizeof(buf));
+  upb_Arena* arena = upb_Arena_Init(buf, sizeof(buf), nullptr);
+  char* p = static_cast<char*>(upb_Arena_Malloc(arena, 64));
+  ASSERT_NE(p, nullptr);
+#if UPB_MSAN
+  // __msan_test_shadow() returns the offset of the first uninitialized byte.
+  EXPECT_EQ(__msan_test_shadow(p, 64), 0);
+#endif
+#if UPB_HWASAN
+  // The arena state is allocated like any other region, so it has its own tag.
+  // (Not compared with `buf`, whose stack tag is random and could collide.)
+  EXPECT_NE(UPB_PRIVATE(_upb_Xsan_GetTag)(arena),
+            UPB_PRIVATE(_upb_Xsan_GetTag)(p));
+#endif
+#if UPB_ASAN
+  EXPECT_FALSE(__asan_address_is_poisoned(p));
+  EXPECT_FALSE(__asan_address_is_poisoned(p + 63));
+  // The guard after the allocation, like the rest of the free space.
+  EXPECT_TRUE(__asan_address_is_poisoned(p + 64));
+#endif
+  upb_Arena_Free(arena);
+}
+
 class Environment {
  public:
   void RandomNewFree(absl::BitGen& gen, size_t min_index = 0) {
@@ -458,7 +490,7 @@ class Environment {
   }
 
   std::shared_ptr<const upb::Arena> IndexedNonNullArena(size_t index) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     std::shared_ptr<const upb::Arena>& ret = arenas_[index];
     if (!ret) ret = std::make_shared<const upb::Arena>();
     return ret;
@@ -487,7 +519,7 @@ class Environment {
   void SwapRandomArena(absl::BitGen& gen, std::shared_ptr<const upb::Arena>& a,
                        size_t min_index) {
     size_t i = RandomIndex(gen, min_index);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     arenas_[i].swap(a);
   }
 
@@ -934,6 +966,22 @@ TEST(ArenaTest, ArenaOwnerFreedFirst) {
 
   // Now when we free arena2, it is actually freed.
   upb_Arena_Free(arena2);
+}
+
+TEST(ArenaTest, FreeLongRefChainDoesNotOverflowStack) {
+  constexpr int kChainLength = 200000;
+  std::vector<upb_Arena*> arenas(kChainLength);
+  for (int i = 0; i < kChainLength; ++i) {
+    arenas[i] = upb_Arena_New();
+    ASSERT_NE(arenas[i], nullptr);
+  }
+  for (int i = 0; i + 1 < kChainLength; ++i) {
+    ASSERT_TRUE(upb_Arena_RefArena(arenas[i], arenas[i + 1]));
+  }
+  for (int i = kChainLength - 1; i >= 1; --i) {
+    upb_Arena_Free(arenas[i]);
+  }
+  upb_Arena_Free(arenas[0]);
 }
 
 #ifndef UPB_ENABLE_REF_CYCLE_CHECKS

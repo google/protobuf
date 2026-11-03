@@ -16,10 +16,14 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 #include "absl/log/absl_check.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/pyext/container_base.h"
+#include "google/protobuf/pyext/free_threading/access_guard.h"
 #include "google/protobuf/pyext/lazy_unique_ptr.h"
+#include "google/protobuf/pyext/message_tree.h"
 #include "google/protobuf/pyext/weak_value_map.h"
 
 namespace google {
@@ -71,37 +75,6 @@ enum MessageMutabilityState : uint8_t {
   // Permanently read-only (e.g., Descriptor Options).
   // Any attempt to mutate will raise a Python FrozenInstanceError.
   MESSAGE_FROZEN = 2,
-};
-
-struct ContainerBase {
-  // clang-format off
-  PyObject_HEAD
-
-  // Strong reference to a parent message object. For a CMessage there are three
-  // cases:
-  // - For a top-level message, this pointer is NULL.
-  // - For a sub-message, this points to the parent message.
-  // - For a message managed externally, this is a owned reference to Py_None.
-  //
-  // For all other types: repeated containers, maps, it always point to a
-  // valid parent CMessage.
-  struct CMessage* parent;
-  // clang-format on
-
-  // If this object belongs to a parent message, describes which field it comes
-  // from.
-  // The pointer is owned by the DescriptorPool (which is kept alive
-  // through the message's Python class)
-  const FieldDescriptor* parent_field_descriptor;
-
-  PyObject* AsPyObject() { return reinterpret_cast<PyObject*>(this); }
-
-  // The Three methods below are only used by Repeated containers, and Maps.
-
-  // This implementation works for all containers which have a parent.
-  PyObject* DeepCopy();
-  // Delete this container object from its parent. Does not work for messages.
-  void RemoveFromParentCache();
 };
 
 typedef struct CMessage : public ContainerBase {
@@ -171,6 +144,15 @@ typedef struct CMessage : public ContainerBase {
                                        CMessageClass* message_class,
                                        MessageMutabilityState state);
   CMessage* MaybeReleaseSubMessage(const Message* sub_message);
+
+  // Detaches the live Python wrapper (if any) for `sub_message`, a message
+  // value in one of this message's map fields that is about to be overwritten
+  // or deleted: the wrapper becomes a standalone message that owns the value's
+  // current contents, which are moved into a new message.
+  //
+  // Note that ClearField() cannot call this, because it also must handle
+  // repeated and map fields, and their wrappers always need a parent message.
+  void DetachSubMessage(Message* sub_message);
 } CMessage;
 
 // The (meta) type of all Messages classes.
@@ -307,6 +289,8 @@ PyObject* FindInitializationErrors(CMessage* self);
 
 Message* AssureWritable(CMessage* self);
 
+void UpdateSubtreeTree(CMessage* cmsg, MessageTree* new_tree);
+
 // Returns the message factory for the given message.
 // This is equivalent to message.MESSAGE_FACTORY
 //
@@ -400,11 +384,9 @@ PyObject* SetFrozenError(const char* msg);
 // Sets a Python FrozenInstanceError with the default error message for messages
 // type and returns nullptr.
 PyObject* SetMessageFrozenError();
-// Emits a DeprecationWarning when mutating a frozen message or container in
-// OSS.
-int WarnMessageFrozen();
-// Returns 0 if writable (might have thrown warning).
-// Returns -1 on error (sets Python exception).
+// Returns 0 if `parent` is writable.
+// Returns -1 if `parent` is frozen (sets a Python FrozenInstanceError with
+// `error_msg`).
 int CheckFrozen(CMessage* parent, const char* error_msg);
 
 PyObject* PyMessage_New(const Descriptor* descriptor,
