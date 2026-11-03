@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 """Macros that implement bootstrapping for the upb code generator."""
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
@@ -27,7 +34,10 @@ def _c_library_with_default_copts(**kwargs):
 _stages = ["_stage0", "_stage1", ""]
 _protoc = "//src/google/protobuf/compiler/release:protoc_minimal"
 
-_extra_proto_path = "-I$$(dirname $(location //:descriptor_proto_srcs))/../.. "
+# Uses bash parameter expansion (${var%/*}) instead of the external `dirname`
+# binary, which may not be resolvable in a sandboxed action with no PATH.
+_extra_proto_path_setup = "descriptor_proto_dir=$(location //:descriptor_proto_srcs); "
+_extra_proto_path = "-I$${descriptor_proto_dir%/*}/../.. "
 
 # This visibility is used automatically for anything used by the bootstrapping process.
 _bootstrap_visibility = [
@@ -121,6 +131,7 @@ def _stage0_proto_staleness_test(name, src_files, src_rules, strip_prefix, third
         outs = ["bootstrap_generated_sources/" + f.replace("third_party", third_party_dir) for f in _generated_hdrs_and_srcs(src_files, "stage0", "upb")],
         tools = [_protoc, _upbc("upb", 0)],
         cmd =
+            _extra_proto_path_setup +
             "$(location " + _protoc + ") " +
             "-I. -I$(GENDIR)/" + strip_prefix + " " + _extra_proto_path +
             "--plugin=protoc-gen-upb=$(location " + _upbc("upb", 0) + ") " +
@@ -150,7 +161,8 @@ def _generate_stage1_proto(name, src_files, src_rules, generator, kwargs):
         name = "gen_{}_{}_stage1".format(name, generator),
         srcs = src_rules,
         outs = _generated_hdrs_and_srcs(src_files, "stage1", generator),
-        cmd = "$(location " + _protoc + ") " +
+        cmd = _extra_proto_path_setup +
+              "$(location " + _protoc + ") " +
               "--plugin=protoc-gen-" + generator +
               "=$(location " + _upbc(generator, 0) + ") " + _extra_proto_path +
               "--" + generator + "_out=bootstrap_stage=1:$(RULEDIR)/stage1 " +

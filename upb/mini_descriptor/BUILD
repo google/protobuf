@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
@@ -35,6 +42,7 @@ cc_library(
         "//upb/port",
     ] + select({
         "//upb:fasttable_enabled_setting": [
+            "//upb/wire/decode_fast:data",
             "//upb/wire/decode_fast:field_parsers",
             "//upb/wire/decode_fast:function_array",
             "//upb/wire/decode_fast:select",

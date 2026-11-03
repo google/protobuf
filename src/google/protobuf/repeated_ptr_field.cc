@@ -47,8 +47,13 @@ std::string* CloneSlow(Arena* arena, const std::string& value) {
 }
 
 void** RepeatedPtrFieldBase::InternalExtend(int extend_amount, Arena* arena) {
+  return InternalExtend(extend_amount, GetSerialArena(arena));
+}
+
+void** RepeatedPtrFieldBase::InternalExtend(int extend_amount,
+                                            SerialArena* arena) {
   ABSL_DCHECK(extend_amount > 0);
-  ABSL_DCHECK_EQ(arena, GetArena());
+  ABSL_DCHECK_EQ(arena, GetSerialArena(GetArena()));
   constexpr size_t kPtrSize = sizeof(rep()->elements[0]);
   constexpr size_t kMaxSize = std::numeric_limits<size_t>::max();
   constexpr size_t kMaxCapacity = (kMaxSize - kRepHeaderSize) / kPtrSize;
@@ -60,13 +65,29 @@ void** RepeatedPtrFieldBase::InternalExtend(int extend_amount, Arena* arena) {
   {
     ABSL_DCHECK_LE(new_capacity, kMaxCapacity)
         << "New capacity is too large to fit into internal representation";
-    const size_t new_size = kRepHeaderSize + kPtrSize * new_capacity;
+    size_t bytes = kRepHeaderSize + kPtrSize * new_capacity;
     if (arena == nullptr) {
-      const internal::SizedPtr alloc = internal::AllocateAtLeast(new_size);
+      const internal::SizedPtr alloc = internal::AllocateAtLeast(bytes);
       new_capacity = static_cast<int>((alloc.n - kRepHeaderSize) / kPtrSize);
       new_rep = reinterpret_cast<Rep*>(alloc.p);
     } else {
-      auto* alloc = Arena::CreateArray<char>(arena, new_size);
+      if constexpr (internal::ArenaAlignDefault::Ceil(kPtrSize) != kPtrSize) {
+        // We need to manually align the allocation.
+        bytes = internal::ArenaAlignDefault::Ceil(bytes);
+        new_capacity = (bytes - kRepHeaderSize) / kPtrSize;
+      }
+
+      // Try grow in place if the arena allows it.
+      if (!using_sso()) {
+        auto* r = rep();
+        const size_t old_bytes = kRepHeaderSize + kPtrSize * old_capacity;
+        if (arena->TryGrowTail(r->elements + old_capacity, bytes - old_bytes)) {
+          r->capacity = new_capacity;
+          return r->elements + current_size_;
+        }
+      }
+      auto* alloc =
+          arena->AllocateAligned<internal::AllocationClient::kArray>(bytes);
       new_rep = reinterpret_cast<Rep*>(alloc);
     }
   }
@@ -172,6 +193,26 @@ void InternalOutOfLineDeleteMessageLite(MessageLite* message) {
   delete message;
 }
 
+void MemswapLarge(char* PROTOBUF_RESTRICT a, char* PROTOBUF_RESTRICT b,
+                  size_t n) {
+  ABSL_DCHECK_GE(n, size_t{16});
+  size_t i = 0;
+  for (; i + 16 < n; i += 8) {
+    MemswapWord(a + i, b + i);
+  }
+  // Swap the remaining (8, 16] bytes using two potentially overlapping 8-byte
+  // words. Load both words before storing so the overlap is not swapped twice.
+  uint64_t a0, a1, b0, b1;
+  std::memcpy(&a0, a + i, sizeof(a0));
+  std::memcpy(&a1, a + n - 8, sizeof(a1));
+  std::memcpy(&b0, b + i, sizeof(b0));
+  std::memcpy(&b1, b + n - 8, sizeof(b1));
+  std::memcpy(a + i, &b0, sizeof(b0));
+  std::memcpy(a + n - 8, &b1, sizeof(b1));
+  std::memcpy(b + i, &a0, sizeof(a0));
+  std::memcpy(b + n - 8, &a1, sizeof(a1));
+}
+
 template PROTOBUF_EXPORT_TEMPLATE_DEFINE void
 memswap<InternalMetadataResolverOffsetHelper<RepeatedPtrFieldBase>::value>(
     char* PROTOBUF_RESTRICT, char* PROTOBUF_RESTRICT);
@@ -216,8 +257,9 @@ PROTOBUF_ALWAYS_INLINE void RepeatedPtrFieldBase::MergeFromInternal(
 }
 
 template <>
-void RepeatedPtrFieldBase::MergeFrom<std::string>(
-    const RepeatedPtrFieldBase& from, Arena* arena) {
+PROTOBUF_EXPORT_TEMPLATE_DEFINE void
+RepeatedPtrFieldBase::MergeFrom<std::string>(const RepeatedPtrFieldBase& from,
+                                             Arena* arena) {
   MergeFromInternal<std::string>(
       from, arena, [](Arena* arena, std::string* dst, const std::string& src) {
         dst->assign(src);
@@ -272,8 +314,9 @@ void RepeatedPtrFieldBase::MergeFromConcreteMessage(
 }
 
 template <>
-void RepeatedPtrFieldBase::MergeFrom<MessageLite>(
-    const RepeatedPtrFieldBase& from, Arena* arena) {
+PROTOBUF_EXPORT_TEMPLATE_DEFINE void
+RepeatedPtrFieldBase::MergeFrom<MessageLite>(const RepeatedPtrFieldBase& from,
+                                             Arena* arena) {
   ABSL_DCHECK(from.current_size_ > 0);
   const ClassData* class_data =
       GetClassData(*reinterpret_cast<const MessageLite*>(from.element_at(0)));

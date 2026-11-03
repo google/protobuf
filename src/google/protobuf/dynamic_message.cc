@@ -53,6 +53,7 @@
 #include "absl/log/absl_check.h"
 #include "absl/log/absl_log.h"
 #include "google/protobuf/arenastring.h"
+#include "google/protobuf/class_data.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/extension_set.h"
@@ -335,10 +336,10 @@ class DynamicMessage final : public Message {
 
   bool is_prototype() const;
 
-  inline void* OffsetToPointer(int offset) {
+  void* OffsetToPointer(int offset) {
     return reinterpret_cast<uint8_t*>(this) + offset;
   }
-  inline const void* OffsetToPointer(int offset) const {
+  const void* OffsetToPointer(int offset) const {
     return reinterpret_cast<const uint8_t*>(this) + offset;
   }
 
@@ -414,10 +415,11 @@ struct DynamicMessageFactory::TypeInfo {
     // Deleting globals means deleting class_data. Access class_data beforehand.
     delete class_data.reflection();
     auto* type = class_data.descriptor();
-    internal::SizedDelete(
+    internal::SizedAlignedDelete(
         const_cast<MessageGlobalsBase*>(
             MessageGlobalsBase::FromDefaultInstance(GetPrototype())),
-        MsgSizeToGlobalsSize(class_data.message_creator.allocation_size()));
+        MsgSizeToGlobalsSize(class_data.message_creator.allocation_size()),
+        static_cast<std::align_val_t>(internal::kClassDataAlignment));
 
     // Scribble the payload to prevent unsanitized opt builds from silently
     // allowing use-after-free bugs where the factory is destroyed but the
@@ -822,7 +824,7 @@ DynamicMessageFactory::~DynamicMessageFactory() {
 const Message* PROTOBUF_NONNULL
 DynamicMessageFactory::GetPrototype(const Descriptor* PROTOBUF_NONNULL type) {
   ABSL_CHECK(type != nullptr);
-  absl::MutexLock lock(&prototypes_mutex_);
+  absl::MutexLock lock(prototypes_mutex_);
   auto* result = GetPrototypeNoLock(type);
   return result;
 }
@@ -979,11 +981,16 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
     size += kMaxOneofUnionSize;
   }
 
+  // Align size to the alignment of the whole message.
+  size = AlignOffset(size);
+
   // Construct the reflection object.
 
   // Allocate the message globals object that contains the default instance.
   uint32_t globals_size = MsgSizeToGlobalsSize(size);
-  void* globals_base = internal::Allocate(globals_size);
+  void* globals_base = internal::AllocateAligned(
+      globals_size,
+      static_cast<std::align_val_t>(internal::kClassDataAlignment));
   memset(globals_base, 0, globals_size);
   auto* msg_base = DynamicMessageGlobalsToDefaultInstance(globals_base);
 
@@ -1020,6 +1027,9 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
   type_info->globals->class_data.set_reflection(
       new Reflection(type_info->globals->class_data.descriptor(), schema,
                      type_info->pool, this));
+
+  internal::DebugAssertPtrIsAligned(&type_info->globals->class_data,
+                                    internal::kClassDataAlignment);
 
   // Cross link prototypes.
   prototype->CrossLinkPrototypes();

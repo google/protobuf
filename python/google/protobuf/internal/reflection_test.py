@@ -861,7 +861,50 @@ class ReflectionTest(unittest.TestCase):
     nested2 = copy.deepcopy(proto1.optional_nested_message)
     self.assertEqual(0, nested2.bb)
 
-    # TODO: Implement deepcopy for extension dict
+  def testMessageCloneSignature(self, message_module):
+    proto1 = message_module.TestAllTypes()
+    proto1.optional_int32 = 123
+    copied = proto1.__deepcopy__({})
+    self.assertEqual(123, copied.optional_int32)
+
+  def testSyncSubobjsMultipleStubs(self, message_module):
+    proto = message_module.TestAllTypes()
+    stubs = []
+    other = message_module.TestAllTypes()
+
+    for field in proto.DESCRIPTOR.fields:
+      if (
+          field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE
+          and not field.is_repeated
+          and not field.containing_oneof
+      ):
+        if field.name == 'optional_group':
+          continue
+        stub = getattr(proto, field.name)
+        stubs.append((field.name, stub))
+        sub_other = getattr(other, field.name)
+        if hasattr(sub_other, 'bb'):
+          sub_other.bb = 42
+        elif hasattr(sub_other, 'c'):
+          sub_other.c = 42
+        elif hasattr(sub_other, 'a'):
+          sub_other.a = 42
+
+    proto.MergeFrom(other)
+
+    for name, stub in stubs:
+      if hasattr(stub, 'bb'):
+        self.assertEqual(
+            42, stub.bb, f'Field {name} was skipped during SyncSubobjs!'
+        )
+      elif hasattr(stub, 'c'):
+        self.assertEqual(
+            42, stub.c, f'Field {name} was skipped during SyncSubobjs!'
+        )
+      elif hasattr(stub, 'a'):
+        self.assertEqual(
+            42, stub.a, f'Field {name} was skipped during SyncSubobjs!'
+        )
 
   def testDisconnectingBeforeClear(self, message_module):
     proto = message_module.TestAllTypes()
@@ -1358,6 +1401,26 @@ class Proto2ReflectionTest(unittest.TestCase):
     del proto.repeated_int32[100:10000]
     self.assertEqual([2], proto.repeated_int32)
 
+    # Test empty extended slice deletion (out-of-bounds, at index 0, negative
+    # step, and on an empty container).
+    proto.repeated_int32[:] = [1, 2, 3]
+    del proto.repeated_int32[10:20:2]
+    self.assertEqual([1, 2, 3], proto.repeated_int32)
+    del proto.repeated_int32[0:0:2]
+    self.assertEqual([1, 2, 3], proto.repeated_int32)
+    del proto.repeated_int32[3:3:2]
+    self.assertEqual([1, 2, 3], proto.repeated_int32)
+    del proto.repeated_int32[2:2:-2]
+    self.assertEqual([1, 2, 3], proto.repeated_int32)
+    del proto.repeated_int32[0:2:-2]
+    self.assertEqual([1, 2, 3], proto.repeated_int32)
+    del proto.repeated_int32[:]
+    del proto.repeated_int32[::2]
+    self.assertEqual([], proto.repeated_int32)
+    self.assertRaises(
+        ValueError, proto.repeated_int32.__delitem__, slice(None, None, 0)
+    )
+
   def testRepeatedScalarsRemove(self):
     proto = unittest_pb2.TestAllTypes()
 
@@ -1471,6 +1534,12 @@ class Proto2ReflectionTest(unittest.TestCase):
 
     # Test slice deletion.
     del proto.repeated_nested_message[2:]
+    self.assertListsEqual([m0, m1], proto.repeated_nested_message)
+    del proto.repeated_nested_message[10:20:2]
+    self.assertListsEqual([m0, m1], proto.repeated_nested_message)
+    del proto.repeated_nested_message[0:0:2]
+    self.assertListsEqual([m0, m1], proto.repeated_nested_message)
+    del proto.repeated_nested_message[1:1:-2]
     self.assertListsEqual([m0, m1], proto.repeated_nested_message)
 
     # Test extending.

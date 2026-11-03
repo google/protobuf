@@ -1,5 +1,5 @@
-# Copyright (c) 2009-2025, Google LLC
-# All rights reserved.
+# Protocol Buffers - Google's data interchange format
+# Copyright 2009 Google LLC
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -39,6 +39,7 @@ cc_library(
         "field_fixed.c",
         "field_generic.c",
         "field_helpers.h",
+        "field_map.c",
         "field_message.c",
         "field_mismatch.c",
         "field_string.c",
@@ -65,6 +66,7 @@ cc_library(
         "//third_party/utf8_range",
         "//upb/base",
         "//upb/base:internal",
+        "//upb/hash",
         "//upb/message",
         "//upb/message:internal",
         "//upb/message:types",
@@ -73,6 +75,7 @@ cc_library(
         "//upb/port",
         "//upb/wire",
         "//upb/wire:decoder",
+        "//upb/wire:encoder",
         "//upb/wire:eps_copy_input_stream",
         "//upb/wire:eps_copy_input_stream_internal",
         "//upb/wire:reader",
@@ -126,8 +129,13 @@ cc_test(
     srcs = ["select_test.cc"],
     deps = [
         ":combinations",
+        ":data",
         ":select",
+        "//upb/base",
         "//upb/mem",
+        "//upb/mini_descriptor",
+        "//upb/mini_descriptor:internal",
+        "//upb/mini_table",
         "//upb/mini_table:internal",
         "//upb/port",
         "//upb/wire",  # buildcleaner: keep
@@ -162,6 +170,7 @@ cc_library(
     features = UPB_DEFAULT_FEATURES,
     visibility = [
         "//upb:__pkg__",
+        "//upb/mini_descriptor:__pkg__",
         "//upb/wire:__subpackages__",
     ],
     deps = [

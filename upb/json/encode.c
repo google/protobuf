@@ -227,9 +227,14 @@ static void jsonenc_enum(int32_t val, const upb_FieldDef* f, jsonenc* e) {
 }
 
 static void jsonenc_bytes(jsonenc* e, upb_StringView str) {
-  /* This is the regular base64, not the "web-safe" version. */
-  static const char base64[] =
+  /* Regular base64 (RFC 4648 section 4) by default; the URL- and filename-safe
+   * alphabet (RFC 4648 section 5) when upb_JsonEncode_WebSafeBase64 is set. */
+  static const char kBase64[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  static const char kWebSafeBase64[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const char* base64 =
+      (e->options & upb_JsonEncode_WebSafeBase64) ? kWebSafeBase64 : kBase64;
   const unsigned char* ptr = (unsigned char*)str.data;
   const unsigned char* end = UPB_PTRADD(ptr, str.size);
   char buf[4];
@@ -353,7 +358,7 @@ static void jsonenc_wrapper(jsonenc* e, const upb_Message* msg,
 static const upb_MessageDef* jsonenc_getanymsg(jsonenc* e,
                                                upb_StringView type_url) {
   /* Find last '/', if any. */
-  const char* end = type_url.data + type_url.size;
+  const char* end = UPB_PTRADD(type_url.data, type_url.size);
   const char* ptr = end;
   const upb_MessageDef* ret;
 
@@ -432,7 +437,7 @@ static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
 
 static void jsonenc_fieldpath(jsonenc* e, upb_StringView path) {
   const char* ptr = path.data;
-  const char* end = ptr + path.size;
+  const char* end = UPB_PTRADD(ptr, path.size);
 
   while (ptr < end) {
     char ch = *ptr;

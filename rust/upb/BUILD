@@ -1,3 +1,4 @@
+# Protocol Buffers - Google's data interchange format
 # Copyright 2024 Google LLC
 #
 # Use of this source code is governed by a BSD-style
@@ -31,6 +32,33 @@ rust_library(
     ],
     deps = [
         "//rust/upb/sys",
+    ],
+)
+
+rust_library(
+    name = "reflection",
+    srcs = [
+        "reflection.rs",
+    ],
+    edition = "2024",
+    rustc_flags = ["--cfg=bzl"],
+    visibility = [
+        "//rust:__subpackages__",
+        "//src/google/protobuf:__subpackages__",
+    ],
+    deps = [
+        ":upb",
+        "//rust/upb/sys:reflection",
+    ],
+)
+
+rust_test(
+    name = "upb_reflection_test",
+    crate = ":reflection",
+    edition = "2024",
+    rustc_flags = ["--cfg=bzl"],
+    deps = [
+        "@crate_index//:googletest",
     ],
 )
 

@@ -11,15 +11,19 @@
 #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_H__
 #define GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_H__
 
-#include <atomic>
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 
+#include "absl/log/absl_check.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/pyext/container_base.h"
+#include "google/protobuf/pyext/free_threading/access_guard.h"
 #include "google/protobuf/pyext/lazy_unique_ptr.h"
+#include "google/protobuf/pyext/message_tree.h"
 #include "google/protobuf/pyext/weak_value_map.h"
 
 namespace google {
@@ -49,7 +53,7 @@ struct CMessageClass;
 // don't store any data, and always refer to their parent message.
 
 // Defines the mutability and promotion state of a CMessage.
-enum MessageMutabilityState {
+enum MessageMutabilityState : uint8_t {
   // Backed by a fully allocated, mutable C++ Message object whose parent
   // hierarchy is already mutable / marked dirty. Mutations on this message
   // do not require promoting the parent hierarchy.
@@ -73,37 +77,6 @@ enum MessageMutabilityState {
   MESSAGE_FROZEN = 2,
 };
 
-struct ContainerBase {
-  // clang-format off
-  PyObject_HEAD
-
-  // Strong reference to a parent message object. For a CMessage there are three
-  // cases:
-  // - For a top-level message, this pointer is NULL.
-  // - For a sub-message, this points to the parent message.
-  // - For a message managed externally, this is a owned reference to Py_None.
-  //
-  // For all other types: repeated containers, maps, it always point to a
-  // valid parent CMessage.
-  struct CMessage* parent;
-  // clang-format on
-
-  // If this object belongs to a parent message, describes which field it comes
-  // from.
-  // The pointer is owned by the DescriptorPool (which is kept alive
-  // through the message's Python class)
-  const FieldDescriptor* parent_field_descriptor;
-
-  PyObject* AsPyObject() { return reinterpret_cast<PyObject*>(this); }
-
-  // The Three methods below are only used by Repeated containers, and Maps.
-
-  // This implementation works for all containers which have a parent.
-  PyObject* DeepCopy();
-  // Delete this container object from its parent. Does not work for messages.
-  void RemoveFromParentCache();
-};
-
 typedef struct CMessage : public ContainerBase {
   // Pointer to the C++ Message object for this CMessage.
   // - If this object has no parent, we own this pointer.
@@ -112,6 +85,9 @@ typedef struct CMessage : public ContainerBase {
 
   // Indicates the mutability state of this CMessage wrapper.
   MessageMutabilityState state;
+
+  // Whether there is a map ancestor anywhere in the hierarchy.
+  bool has_mutable_map_ancestor;
 
   // A mapping indexed by field, containing weak references to contained objects
   // which need to implement the "Release" mechanism:
@@ -136,6 +112,31 @@ typedef struct CMessage : public ContainerBase {
     return reinterpret_cast<CMessageClass*>(Py_TYPE(this));
   }
 
+  // Returns true if this CMessage is quiescent: either being deallocated
+  // (ob_refcnt == 0), or uniquely referenced by the current thread with no
+  // parent.
+  bool IsQuiescent() const {
+    if (Py_REFCNT(this) == 0) return true;
+#ifdef Py_GIL_DISABLED
+    if (!PyUnstable_Object_IsUniquelyReferenced(
+            reinterpret_cast<PyObject*>(const_cast<CMessage*>(this)))) {
+      return false;
+    }
+#else
+    if (Py_REFCNT(this) != 1) return false;
+#endif
+    return parent == nullptr;
+  }
+
+  // Returns the underlying mutable Message* without locking. Must ONLY be used
+  // when this CMessage is quiescent.
+  Message* GetQuiescent() const {
+    ABSL_DCHECK(IsQuiescent());
+    ABSL_DCHECK_EQ(state, MESSAGE_MUTABLE);
+    // Cast away constness is safe because of the checks above.
+    return const_cast<Message*>(message);
+  }
+
   // For container containing messages, return a Python object for the given
   // pointer to a message.
   CMessage* BuildSubMessageFromPointer(const FieldDescriptor* field_descriptor,
@@ -143,6 +144,15 @@ typedef struct CMessage : public ContainerBase {
                                        CMessageClass* message_class,
                                        MessageMutabilityState state);
   CMessage* MaybeReleaseSubMessage(const Message* sub_message);
+
+  // Detaches the live Python wrapper (if any) for `sub_message`, a message
+  // value in one of this message's map fields that is about to be overwritten
+  // or deleted: the wrapper becomes a standalone message that owns the value's
+  // current contents, which are moved into a new message.
+  //
+  // Note that ClearField() cannot call this, because it also must handle
+  // repeated and map fields, and their wrappers always need a parent message.
+  void DetachSubMessage(Message* sub_message);
 } CMessage;
 
 // The (meta) type of all Messages classes.
@@ -179,6 +189,9 @@ namespace cmessage {
 // pointers to the C++ objects.
 // The caller must fill self->message, self->owner and eventually self->parent.
 CMessage* NewEmptyMessage(CMessageClass* type);
+
+// Creates a new CMessage Python object and allocates its C++ Message.
+CMessage* NewCMessage(CMessageClass* type);
 
 // Retrieves the C++ descriptor of a Python Extension descriptor.
 // On error, return NULL with an exception set.
@@ -276,6 +289,8 @@ PyObject* FindInitializationErrors(CMessage* self);
 
 Message* AssureWritable(CMessage* self);
 
+void UpdateSubtreeTree(CMessage* cmsg, MessageTree* new_tree);
+
 // Returns the message factory for the given message.
 // This is equivalent to message.MESSAGE_FACTORY
 //
@@ -369,11 +384,9 @@ PyObject* SetFrozenError(const char* msg);
 // Sets a Python FrozenInstanceError with the default error message for messages
 // type and returns nullptr.
 PyObject* SetMessageFrozenError();
-// Emits a DeprecationWarning when mutating a frozen message or container in
-// OSS.
-int WarnMessageFrozen();
-// Returns 0 if writable (might have thrown warning).
-// Returns -1 on error (sets Python exception).
+// Returns 0 if `parent` is writable.
+// Returns -1 if `parent` is frozen (sets a Python FrozenInstanceError with
+// `error_msg`).
 int CheckFrozen(CMessage* parent, const char* error_msg);
 
 PyObject* PyMessage_New(const Descriptor* descriptor,

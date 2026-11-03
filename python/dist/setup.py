@@ -47,7 +47,7 @@ fasttable_decoder_enabled = False
 
 srcs = (
     glob.glob('google/protobuf/*.c')
-    + glob.glob('python/*.c')
+    + glob.glob('python/**/*.c', recursive=True)
     + glob.glob('upb/**/*.c', recursive=True)
     + glob.glob('utf8_range/*.c')
 )
@@ -74,7 +74,6 @@ setup(
     classifiers=[
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
@@ -92,5 +91,5 @@ setup(
             extra_compile_args=extra_compile_args,
         )
     ],
-    python_requires='>=3.10',
+    python_requires='>=3.11',
 )

@@ -7,6 +7,7 @@
 
 #include "upb/mem/arena.h"
 
+#include <limits.h>
 #include <string.h>
 
 #include "upb/mem/internal/alloc.h"
@@ -20,6 +21,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "upb/base/internal/log2.h"
 #include "upb/mem/alloc.h"
 #include "upb/mem/internal/arena.h"
 #include "upb/port/atomic.h"
@@ -81,10 +83,6 @@ typedef struct upb_ArenaInternal {
 
   // Total space allocated in blocks, atomic only for SpaceAllocated
   UPB_ATOMIC(uintptr_t) space_allocated;
-
-  // The cleanup for the allocator. This is called after all the blocks are
-  // freed in an arena.
-  upb_AllocCleanupFunc* upb_alloc_cleanup;
 
   // When multiple arenas are fused together, each arena points to a parent
   // arena (root points to itself). The root tracks how many live arenas
@@ -420,6 +418,17 @@ void UPB_PRIVATE(_upb_Arena_UseBlock)(upb_Arena* a, void* ptr, size_t size) {
   size = UPB_ALIGN_DOWN(size, UPB_MALLOC_ALIGN);
 #endif
   if (size <= UPB_PRIVATE(_upb_ArenaHas)(a)) return;
+
+  // Harvest remaining space from the retired active block into power-of-2
+  // pool bins.
+  if (a->UPB_ONLYBITS(ptr) && a->UPB_ONLYBITS(end)) {
+    char* curr = (char*)a->UPB_ONLYBITS(ptr);
+    char* end = (char*)a->UPB_ONLYBITS(end);
+    if (end > curr) {
+      UPB_PRIVATE(_upb_Arena_Harvest)(a, curr, end - curr);
+    }
+  }
+
   a->UPB_ONLYBITS(ptr) = ptr;
   a->UPB_ONLYBITS(end) = UPB_PTR_AT(ptr, size, char);
   UPB_PRIVATE(upb_Xsan_PoisonRegion)(ptr, size);
@@ -508,6 +517,54 @@ void* UPB_PRIVATE(_upb_Arena_SlowMalloc)(upb_Arena* a, size_t span) {
   }
 }
 
+// Having a sentinel empty pool allows us to unconditionally load the bin count,
+// avoiding a branch to check for null on the hot path.
+const UPB_PRIVATE(_upb_ArenaPool) UPB_PRIVATE(_upb_Arena_EmptyPool) = {0};
+
+static size_t _upb_Arena_PoolCapacity(size_t size) {
+  UPB_ASSERT(size >= sizeof(UPB_PRIVATE(_upb_ArenaPool)));
+  return (size - offsetof(UPB_PRIVATE(_upb_ArenaPool), UPB_PRIVATE(bins)[0])) /
+         sizeof(void*);
+}
+
+void UPB_PRIVATE(_upb_Arena_GrowPool)(upb_Arena* a, void* ptr, size_t size) {
+  UPB_ASSERT(a);
+  UPB_ASSERT(ptr);
+  UPB_PRIVATE(upb_Xsan_PoisonRegion)(ptr, size);
+  UPB_ASSERT(size >= UPB_PRIVATE(kUpb_Arena_MinPoolBlockSize));
+
+  const size_t kMaxBins =
+      (sizeof(size_t) * CHAR_BIT) - _UPB_ARENA_MIN_POOL_BIN_LG2;
+  size_t new_cap = UPB_MIN(kMaxBins, _upb_Arena_PoolCapacity(size));
+
+  UPB_PRIVATE(_upb_ArenaPool)* new_pool =
+      (UPB_PRIVATE(_upb_ArenaPool)*)UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(
+          UPB_XSAN(a), ptr,
+          UPB_SIZEOF_FLEX(UPB_PRIVATE(_upb_ArenaPool), UPB_PRIVATE(bins),
+                          new_cap));
+  UPB_PRIVATE(_upb_ArenaPool)* old_pool = a->UPB_ONLYBITS(pool);
+  size_t old_num_bins = old_pool->UPB_PRIVATE(num_bins);
+
+  UPB_PRIVATE(_upb_ArenaFreeBlock)** dst = new_pool->UPB_PRIVATE(bins);
+  UPB_PRIVATE(_upb_ArenaFreeBlock)** src = old_pool->UPB_PRIVATE(bins);
+
+  size_t i;
+  for (i = 0; i < old_num_bins; i++) {
+    *dst++ = *src++;
+  }
+  if (old_pool != &UPB_PRIVATE(_upb_Arena_EmptyPool)) {
+    UPB_PRIVATE(upb_Xsan_PoisonRegion)(
+        old_pool, UPB_SIZEOF_FLEX(UPB_PRIVATE(_upb_ArenaPool),
+                                  UPB_PRIVATE(bins), old_num_bins));
+  }
+  for (i = old_num_bins; i < new_cap; i++) {
+    *dst++ = NULL;
+  }
+
+  new_pool->UPB_PRIVATE(num_bins) = new_cap;
+  a->UPB_ONLYBITS(pool) = new_pool;
+}
+
 static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
   if (!upb_AllocationCount_IncrementAndCheck()) {
     return NULL;
@@ -529,6 +586,8 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
   a->body.size_hint = UPB_MIN(block_size, UINT32_MAX);
   a->head.UPB_ONLYBITS(ptr) = NULL;
   a->head.UPB_ONLYBITS(end) = NULL;
+  a->head.UPB_ONLYBITS(pool) =
+      (UPB_PRIVATE(_upb_ArenaPool)*)&UPB_PRIVATE(_upb_Arena_EmptyPool);
 
   upb_Atomic_Init(&a->body.parent_or_count, _upb_Arena_TaggedFromRefcount(1));
   upb_Atomic_Init(&a->body.next, NULL);
@@ -539,7 +598,7 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
 #ifndef NDEBUG
   a->body.refs = NULL;
 #endif
-  a->body.upb_alloc_cleanup = NULL;
+  UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->head));
   UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->body));
 
   UPB_PRIVATE(_upb_Arena_AddBlock)(&a->head, block);
@@ -562,6 +621,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     size_t delta = (uintptr_t)aligned - (uintptr_t)mem;
     n = delta <= n ? n - delta : 0;
     mem = aligned;
+#if UPB_HWASAN
+    // HWASAN tags whole granules; never tag past the end of the caller's
+    // buffer.
+    n = UPB_ALIGN_DOWN(n, UPB_MALLOC_ALIGN);
+#endif
   }
   if (UPB_UNLIKELY(n < sizeof(upb_ArenaState) || !mem)) {
     upb_Arena* ret = _upb_Arena_InitSlow(alloc, mem ? 0 : n);
@@ -571,7 +635,20 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     return ret;
   }
 
-  a = mem;
+  // upb now owns the whole block, so treat it like freshly allocated arena
+  // memory: poison all of it (which also makes MSAN treat the previous contents
+  // as uninitialized and TYSAN forget their types), then allocate the arena
+  // state at the front like any other region. With HWASAN it gets the first tag
+  // of the arena's sequence, so the caller's pointer to the block cannot be
+  // used to access it, and later allocations continue the sequence.
+  upb_Xsan xsan;
+  UPB_PRIVATE(upb_Xsan_Init)(&xsan);
+  UPB_PRIVATE(upb_Xsan_PoisonRegion)(mem, n);
+  a = UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(&xsan, mem,
+                                                sizeof(upb_ArenaState));
+#if UPB_XSAN_STRUCT_SIZE
+  a->head.xsan = xsan;
+#endif
 
   upb_Atomic_Init(&a->body.parent_or_count, _upb_Arena_TaggedFromRefcount(1));
   upb_Atomic_Init(&a->body.next, NULL);
@@ -584,10 +661,13 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
 #endif
   a->body.size_hint = 128;
   a->body.last_block_size = 128;
-  a->body.upb_alloc_cleanup = NULL;
   a->body.block_alloc = _upb_Arena_MakeBlockAlloc(alloc, 1);
-  a->head.UPB_PRIVATE(ptr) = (void*)UPB_ALIGN_MALLOC((uintptr_t)(a + 1));
+  // Derive both bounds from `mem` so that they carry the same HWASAN tag.
+  a->head.UPB_PRIVATE(ptr) =
+      (void*)UPB_ALIGN_MALLOC((uintptr_t)mem + sizeof(upb_ArenaState));
   a->head.UPB_PRIVATE(end) = UPB_PTR_AT(mem, n, char);
+  a->head.UPB_ONLYBITS(pool) =
+      (UPB_PRIVATE(_upb_ArenaPool)*)&UPB_PRIVATE(_upb_Arena_EmptyPool);
   UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->body));
 #ifdef UPB_TRACING_ENABLED
   upb_Arena_LogInit(&a->head, n);
@@ -595,8 +675,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
   return &a->head;
 }
 
+static upb_ArenaInternal* _upb_Arena_DecRef(const upb_Arena* a);
+
 static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
   UPB_ASSERT(_upb_Arena_RefCountFromTagged(ai->parent_or_count) == 1);
+  upb_ArenaInternal* roots_to_free = NULL;
   while (ai != NULL) {
     UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(ai));
     // Load first since arena itself is likely from one of its blocks. Relaxed
@@ -611,7 +694,6 @@ static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
     }
     upb_alloc* block_alloc = _upb_ArenaInternal_BlockAlloc(ai);
     upb_MemBlock* block = ai->blocks;
-    upb_AllocCleanupFunc* alloc_cleanup = ai->upb_alloc_cleanup;
     while (block != NULL) {
       // Load first since we are deleting block.
       upb_MemBlock* next_block = block->next;
@@ -619,20 +701,44 @@ static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
         // If the block is an arena ref, then we need to release our ref on the
         // referenced arena.
         upb_ArenaRef* ref = (upb_ArenaRef*)block;
-        upb_Arena_DecRefFor((upb_Arena*)ref->arena, ai);
+        upb_ArenaInternal* to_free = _upb_Arena_DecRef(ref->arena);
+        if (to_free != NULL) {
+          // The arena is ready to be freed, but we want to avoid a recursive
+          // free to avoid stack overflow in the case of long ref chains.
+          // To that end, we prepend it to a linked list for later processing.
+          // We pick an arbitrary member `previous_or_tail` as the "next"
+          // pointer -- any member would work as long as it is not read during
+          // deletion.
+          UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(to_free));
+          upb_Atomic_Store(&to_free->previous_or_tail, (uintptr_t)roots_to_free,
+                           memory_order_relaxed);
+          roots_to_free = to_free;
+        }
       } else {
         upb_free_sized(block_alloc, block, block->size);
       }
       block = next_block;
     }
-    if (alloc_cleanup != NULL) {
-      alloc_cleanup(block_alloc);
+    if (block_alloc && block_alloc->cleanup != NULL) {
+      block_alloc->cleanup(block_alloc);
+    }
+    if (next_arena == NULL && roots_to_free != NULL) {
+      next_arena = roots_to_free;
+      roots_to_free = (upb_ArenaInternal*)upb_Atomic_Load(
+          &next_arena->previous_or_tail, memory_order_relaxed);
     }
     ai = next_arena;
   }
 }
 
 void upb_Arena_Free(upb_Arena* a) {
+  upb_ArenaInternal* ai = _upb_Arena_DecRef(a);
+  if (ai != NULL) {
+    _upb_Arena_DoFree(ai);
+  }
+}
+
+static upb_ArenaInternal* _upb_Arena_DecRef(const upb_Arena* a) {
   upb_ArenaInternal* ai = upb_Arena_Internal(a);
   // Cannot be replaced with _upb_Arena_FindRoot, as that provides only a
   // relaxed read of the refcount if ai is already the root.
@@ -651,8 +757,7 @@ retry:
 #ifdef UPB_TRACING_ENABLED
     upb_Arena_LogFree(a);
 #endif
-    _upb_Arena_DoFree(ai);
-    return;
+    return ai;
   }
 
   if (upb_Atomic_CompareExchangeWeak(
@@ -660,7 +765,7 @@ retry:
           _upb_Arena_TaggedFromRefcount(_upb_Arena_RefCountFromTagged(poc) - 1),
           memory_order_release, memory_order_acquire)) {
     // We were >1 and we decremented it successfully, so we are done.
-    return;
+    return NULL;
   }
 
   // We failed our update, so someone has done something, retry the whole
@@ -776,13 +881,6 @@ static void _upb_Arena_DoFuseArenaLists(upb_ArenaInternal* const parent,
   upb_ArenaInternal* old_parent_tail = _upb_Arena_LinkForward(parent, child);
   _upb_Arena_UpdateParentTail(parent, child);
   _upb_Arena_LinkBackward(child, old_parent_tail);
-}
-
-void upb_Arena_SetAllocCleanup(upb_Arena* a, upb_AllocCleanupFunc* func) {
-  UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(a));
-  upb_ArenaInternal* ai = upb_Arena_Internal(a);
-  UPB_ASSERT(ai->upb_alloc_cleanup == NULL);
-  ai->upb_alloc_cleanup = func;
 }
 
 // Thread safe.

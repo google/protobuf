@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <thread>
 #include <type_traits>
@@ -38,12 +39,16 @@
 // Must be last.
 #include "upb/port/def.inc"
 
+#if UPB_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
+
 namespace {
 
 struct CustomAlloc {
-  upb_alloc alloc;
-  int counter;
-  bool ran_cleanup;
+  upb_alloc alloc = {};
+  int counter = 0;
+  bool ran_cleanup = false;
 };
 
 void* CustomAllocFunc(upb_alloc* alloc, void* ptr, size_t oldsize, size_t size,
@@ -64,11 +69,10 @@ void CustomAllocCleanup(upb_alloc* alloc) {
 }
 
 TEST(ArenaTest, ArenaWithAllocCleanup) {
-  CustomAlloc alloc = {{&CustomAllocFunc}, 0, false};
+  CustomAlloc alloc = {{&CustomAllocFunc, &CustomAllocCleanup}, 0, false};
   upb_Arena* arena =
       upb_Arena_Init(nullptr, 0, reinterpret_cast<upb_alloc*>(&alloc));
   EXPECT_EQ(alloc.counter, 1);
-  upb_Arena_SetAllocCleanup(arena, CustomAllocCleanup);
   upb_Arena_Free(arena);
   EXPECT_TRUE(alloc.ran_cleanup);
 }
@@ -79,9 +83,9 @@ struct Size {
 };
 
 struct SizeTracker {
-  upb_alloc alloc;
-  upb_alloc* delegate_alloc;
-  absl::flat_hash_map<void*, Size>* sizes;
+  upb_alloc alloc = {};
+  upb_alloc* delegate_alloc = nullptr;
+  absl::flat_hash_map<void*, Size>* sizes = nullptr;
 };
 
 static_assert(std::is_standard_layout<SizeTracker>());
@@ -396,6 +400,33 @@ TEST(ArenaTest, FixedInitialBlockNoAlloc) {
   upb_Arena_Free(arena);
 }
 
+TEST(ArenaTest, InitialBlockIsTreatedAsFreshMemory) {
+  // upb takes ownership of the initial block, so whatever the caller left in it
+  // must not count as initialized, and unallocated space must be poisoned.
+  char buf[1024];
+  memset(buf, 0x42, sizeof(buf));
+  upb_Arena* arena = upb_Arena_Init(buf, sizeof(buf), nullptr);
+  char* p = static_cast<char*>(upb_Arena_Malloc(arena, 64));
+  ASSERT_NE(p, nullptr);
+#if UPB_MSAN
+  // __msan_test_shadow() returns the offset of the first uninitialized byte.
+  EXPECT_EQ(__msan_test_shadow(p, 64), 0);
+#endif
+#if UPB_HWASAN
+  // The arena state is allocated like any other region, so it has its own tag.
+  // (Not compared with `buf`, whose stack tag is random and could collide.)
+  EXPECT_NE(UPB_PRIVATE(_upb_Xsan_GetTag)(arena),
+            UPB_PRIVATE(_upb_Xsan_GetTag)(p));
+#endif
+#if UPB_ASAN
+  EXPECT_FALSE(__asan_address_is_poisoned(p));
+  EXPECT_FALSE(__asan_address_is_poisoned(p + 63));
+  // The guard after the allocation, like the rest of the free space.
+  EXPECT_TRUE(__asan_address_is_poisoned(p + 64));
+#endif
+  upb_Arena_Free(arena);
+}
+
 class Environment {
  public:
   void RandomNewFree(absl::BitGen& gen, size_t min_index = 0) {
@@ -459,7 +490,7 @@ class Environment {
   }
 
   std::shared_ptr<const upb::Arena> IndexedNonNullArena(size_t index) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     std::shared_ptr<const upb::Arena>& ret = arenas_[index];
     if (!ret) ret = std::make_shared<const upb::Arena>();
     return ret;
@@ -471,16 +502,16 @@ class Environment {
   std::pair<std::shared_ptr<const upb::Arena>,
             std::shared_ptr<const upb::Arena>>
   GetArenaPairWithOffset(absl::BitGen& gen, size_t offset) {
-    size_t index = RandomIndex(gen, 0, std::tuple_size<ArenaArray>::value - 1);
+    size_t index = RandomIndex(gen, 0, std::tuple_size_v<ArenaArray> - 1);
     size_t a_index = index % 2 == 0 ? index : index + 1;
     std::shared_ptr<const upb::Arena> a = IndexedNonNullArena(a_index);
-    std::shared_ptr<const upb::Arena> b = IndexedNonNullArena(
-        (a_index + offset) % std::tuple_size<ArenaArray>::value);
+    std::shared_ptr<const upb::Arena> b =
+        IndexedNonNullArena((a_index + offset) % std::tuple_size_v<ArenaArray>);
     return {a, b};
   }
 
   size_t RandomIndex(absl::BitGen& gen, size_t min_index = 0,
-                     size_t max_index = std::tuple_size<ArenaArray>::value) {
+                     size_t max_index = std::tuple_size_v<ArenaArray>) {
     return absl::Uniform<size_t>(gen, min_index, max_index);
   }
 
@@ -488,7 +519,7 @@ class Environment {
   void SwapRandomArena(absl::BitGen& gen, std::shared_ptr<const upb::Arena>& a,
                        size_t min_index) {
     size_t i = RandomIndex(gen, min_index);
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     arenas_[i].swap(a);
   }
 
@@ -937,6 +968,22 @@ TEST(ArenaTest, ArenaOwnerFreedFirst) {
   upb_Arena_Free(arena2);
 }
 
+TEST(ArenaTest, FreeLongRefChainDoesNotOverflowStack) {
+  constexpr int kChainLength = 200000;
+  std::vector<upb_Arena*> arenas(kChainLength);
+  for (int i = 0; i < kChainLength; ++i) {
+    arenas[i] = upb_Arena_New();
+    ASSERT_NE(arenas[i], nullptr);
+  }
+  for (int i = 0; i + 1 < kChainLength; ++i) {
+    ASSERT_TRUE(upb_Arena_RefArena(arenas[i], arenas[i + 1]));
+  }
+  for (int i = kChainLength - 1; i >= 1; --i) {
+    upb_Arena_Free(arenas[i]);
+  }
+  upb_Arena_Free(arenas[0]);
+}
+
 #ifndef UPB_ENABLE_REF_CYCLE_CHECKS
 
 TEST(ArenaDeathTest, ArenaRefCycle) {
@@ -1066,4 +1113,44 @@ TEST(ArenaTest, AllocationCountFailureInjection) {
   upb_AllocationCount_Reset();
 }
 
+TEST(ArenaTest, PoolMultiSizeReuse) {
+  upb_Arena* arena = upb_Arena_New();
+
+  const size_t kSizes[] = {32, 64, 256};
+  void* blocks[3][2];
+
+  // Prime the pool across multiple cycles.
+  for (int cycle = 0; cycle < 3; ++cycle) {
+    for (int s = 0; s < 3; ++s) {
+      blocks[s][0] = upb_Arena_AllocPool(arena, kSizes[s]);
+      blocks[s][1] = upb_Arena_AllocPool(arena, kSizes[s]);
+      ASSERT_NE(blocks[s][0], nullptr);
+      ASSERT_NE(blocks[s][1], nullptr);
+    }
+    for (int s = 0; s < 3; ++s) {
+      upb_Arena_FreePool(arena, blocks[s][0], kSizes[s]);
+      upb_Arena_FreePool(arena, blocks[s][1], kSizes[s]);
+    }
+  }
+
+  size_t space_initial = upb_Arena_SpaceAllocated(arena, nullptr);
+
+  // Subsequent cycles should reuse pooled blocks repeatedly without
+  // allocating additional memory from the arena.
+  for (int cycle = 0; cycle < 100; ++cycle) {
+    for (int s = 0; s < 3; ++s) {
+      blocks[s][0] = upb_Arena_AllocPool(arena, kSizes[s]);
+      blocks[s][1] = upb_Arena_AllocPool(arena, kSizes[s]);
+      ASSERT_NE(blocks[s][0], nullptr);
+      ASSERT_NE(blocks[s][1], nullptr);
+    }
+    for (int s = 0; s < 3; ++s) {
+      upb_Arena_FreePool(arena, blocks[s][0], kSizes[s]);
+      upb_Arena_FreePool(arena, blocks[s][1], kSizes[s]);
+    }
+    EXPECT_EQ(upb_Arena_SpaceAllocated(arena, nullptr), space_initial);
+  }
+
+  upb_Arena_Free(arena);
+}
 }  // namespace

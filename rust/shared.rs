@@ -18,6 +18,8 @@ use std::fmt;
 pub use crate::__internal::runtime::message_eq;
 
 pub use crate::__internal::runtime::interop::*;
+#[cfg(not(lite_runtime))]
+pub use crate::codegen_traits::WithReflection;
 pub use crate::codegen_traits::{
     create::Parse,
     read::Serialize,
@@ -29,8 +31,10 @@ pub use crate::extension::ExtensionId;
 pub use crate::map::{Map, MapIter, MapKey, MapMut, MapValue, MapView};
 
 pub use crate::proxied::{
-    AsMut, AsView, IntoMut, IntoProxied, IntoView, Mut, MutProxied, Proxied, View,
+    AsMut, AsView, IntoMut, IntoProxied, IntoView, Mut, MutProtoObject, ProtoObject, View,
 };
+#[allow(deprecated)]
+pub use crate::proxied::{MutProxied, Proxied};
 pub use crate::r#enum::{Enum, UnknownEnumValue};
 pub use crate::repeated::{Repeated, RepeatedIter, RepeatedMut, RepeatedView};
 pub use crate::singular::Singular;
@@ -102,5 +106,35 @@ impl std::error::Error for SerializeError {}
 impl fmt::Display for SerializeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Couldn't serialize proto into bytes (depth too deep or missing required fields)")
+    }
+}
+
+/// Options for [`Serialize::serialize_with_options`].
+///
+/// The default options produce the same output as [`Serialize::serialize`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SerializeOptions {
+    pub(crate) deterministic: bool,
+}
+
+impl SerializeOptions {
+    /// Returns the default options.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enables deterministic serialization: within a single binary, messages with equal contents
+    /// serialize to the same bytes, regardless of the order in which their map fields were
+    /// populated.
+    ///
+    /// Do not use it to compare or fingerprint serialized messages produced by
+    /// different binaries.
+    /// See <https://protobuf.dev/programming-guides/serialization-not-canonical/>.
+    ///
+    /// False by default.
+    #[must_use]
+    pub fn deterministic(mut self, deterministic: bool) -> Self {
+        self.deterministic = deterministic;
+        self
     }
 }

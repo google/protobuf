@@ -89,12 +89,12 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MapEntry : public Message {
     // We don't want to instantiate the template with every unique derived type.
     // The assertion is in the destructor because we need `Value` to be
     // complete to test it.
-    static_assert(!std::is_base_of<Message, Value>::value ||
-                      std::is_same<Message, Value>::value,
-                  "");
+    static_assert(
+        !std::is_base_of_v<Message, Value> || std::is_same_v<Message, Value>,
+        "");
 
     if (GetArena() != nullptr) return;
-    Helpers_::SharedDtor(*this);
+    SharedDtor(*this);
   }
 
   using InternalArenaConstructable_ = void;
@@ -103,14 +103,12 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MapEntry : public Message {
  protected:
   friend class google::protobuf::Arena;
 
-  struct Helpers_ {
-    static void SharedDtor(MessageLite& msg) {
-      auto& this_ = static_cast<MapEntry&>(msg);
-      this_._internal_metadata_.template Delete<UnknownFieldSet>();
-      KeyTypeHandler::DeleteNoArena(this_._impl_.key_);
-      ValueTypeHandler::DeleteNoArena(this_._impl_.value_);
-    }
-  };
+  static void SharedDtor(MessageLite& msg) {
+    auto& this_ = static_cast<MapEntry&>(msg);
+    this_._internal_metadata_.template Delete<UnknownFieldSet>();
+    KeyTypeHandler::DeleteNoArena(this_._impl_.key_);
+    ValueTypeHandler::DeleteNoArena(this_._impl_.value_);
+  }
 
   // Field naming follows the convention of generated messages to make code
   // sharing easier.
