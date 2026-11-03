@@ -25,8 +25,10 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "google/protobuf/descriptor.pb.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/flags/flag.h"
@@ -36,6 +38,7 @@
 #include "google/protobuf/arena.h"
 #include "google/protobuf/compiler/cpp/cpp_file_options_test.pb.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/map_test_util.h"
 #include "google/protobuf/map_unittest.pb.h"
 #include "google/protobuf/message.h"
@@ -1806,6 +1809,137 @@ TEST_F(GeneratedMessageReflectionCordAccessorsTest, ClearOneofCord) {
   reflection->ClearOneof(&message, descriptor->FindOneofByName("foo"));
   EXPECT_FALSE(message.has_foo_bytes_cord());
 }
+
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+namespace {
+void VerifyReflectionCordReuse(Message* msg, const FieldDescriptor* field) {
+  const Reflection* refl = msg->GetReflection();
+  const absl::Cord& cord =
+      GeneratedMessageReflectionTestHelper::GetRaw<absl::Cord>(*msg, field);
+  auto make_wire = [&](absl::string_view v) {
+    std::unique_ptr<Message> src(msg->New());
+    src->GetReflection()->SetString(src.get(), field, std::string(v));
+    return src->SerializeAsString();
+  };
+  const std::string payload_200(200, 'b'), wire_200 = make_wire(payload_200);
+  const absl::Cord wire_cord_a(make_wire(std::string(200, 'a')));
+  std::string wasteful_1024(1024, 'z');
+  wasteful_1024.reserve(4096);
+
+  ASSERT_TRUE(msg->ParseFromString(make_wire(std::string(2048, 'w'))));
+  ASSERT_TRUE(cord.TryFlat().has_value());
+  const char* const flat_ptr = cord.TryFlat()->data();
+  auto expect_flat = [&](absl::string_view expected) {
+    EXPECT_EQ(cord, expected);
+    if (absl::optional<absl::string_view> flat = cord.TryFlat();
+        flat.has_value()) {
+      EXPECT_EQ(flat->data(), flat_ptr);
+    } else {
+      ADD_FAILURE() << "Expected flat cord";
+    }
+  };
+
+  msg->Clear();
+  EXPECT_FALSE(refl->HasField(*msg, field));
+  expect_flat("");
+  EXPECT_EQ(msg->ByteSizeLong(), 0u);
+  EXPECT_EQ(msg->SerializeAsString(), "");
+
+  refl->SetString(msg, field, "0123456789");
+  expect_flat("0123456789");
+  refl->ClearField(msg, field);
+  refl->SetString(msg, field, payload_200);
+  expect_flat(payload_200);
+  refl->ClearField(msg, field);
+  EXPECT_FALSE(refl->HasField(*msg, field));
+  refl->SetString(msg, field, std::move(wasteful_1024));
+  expect_flat(std::string(1024, 'z'));
+  refl->ClearField(msg, field);
+  if (!field->has_presence()) {
+    refl->SetString(msg, field, "");
+    EXPECT_FALSE(refl->HasField(*msg, field));
+    EXPECT_EQ(msg->ByteSizeLong(), 0u);
+    EXPECT_EQ(msg->SerializeAsString(), "");
+  }
+  ASSERT_TRUE(msg->MergePartialFromString(wire_cord_a));
+  expect_flat(std::string(200, 'a'));
+  ASSERT_TRUE(msg->ParseFromString(wire_200));
+  expect_flat(payload_200);
+}
+}  // namespace
+
+TEST_F(GeneratedMessageReflectionCordAccessorsTest,
+       ClearFieldPreservesCordCapacityAndRestoresDefaults) {
+  unittest::TestCord cord_msg;
+  const Reflection* cord_refl = cord_msg.GetReflection();
+  const Descriptor* tc_desc = unittest::TestCord::descriptor();
+  const FieldDescriptor* bytes_field =
+      tc_desc->FindFieldByName("optional_bytes_cord");
+  VerifyReflectionCordReuse(&cord_msg, bytes_field);
+
+  absl::Cord shared_copy = cord_msg.optional_bytes_cord();
+  cord_refl->ClearField(&cord_msg, bytes_field);
+  EXPECT_EQ(shared_copy, std::string(200, 'b'));
+  bool released = false;
+  std::string ext_buf(128, 'e');
+  cord_refl->SetString(
+      &cord_msg, bytes_field,
+      absl::MakeCordFromExternal(ext_buf,
+                                 [&](absl::string_view) { released = true; }));
+  cord_refl->ClearField(&cord_msg, bytes_field);
+  EXPECT_TRUE(released);
+  const std::string btree_16k(16 << 10, 'L');
+  cord_refl->SetString(&cord_msg, bytes_field, absl::Cord(btree_16k));
+  cord_refl->ClearField(&cord_msg, bytes_field);
+  EXPECT_EQ(cord_msg.optional_bytes_cord().EstimatedMemoryUsage(),
+            sizeof(absl::Cord));
+
+  auto check_default = [](Message* m, const FieldDescriptor* f,
+                          absl::string_view expected) {
+    m->GetReflection()->SetString(m, f, absl::Cord("override"));
+    m->GetReflection()->ClearField(m, f);
+    EXPECT_EQ(expected, m->GetReflection()->GetCord(*m, f));
+  };
+  check_default(&cord_msg,
+                tc_desc->FindFieldByName("optional_bytes_cord_default"),
+                "hello");
+}
+
+TEST_F(GeneratedMessageReflectionCordAccessorsTest,
+       DynamicMessageAndImplicitPresenceCordReuse) {
+  DynamicMessageFactory factory;
+  const Descriptor* tc_desc = unittest::TestCord::descriptor();
+  std::unique_ptr<Message> dyn_tc(factory.GetPrototype(tc_desc)->New());
+  VerifyReflectionCordReuse(dyn_tc.get(),
+                            tc_desc->FindFieldByName("optional_bytes_cord"));
+
+  FileDescriptorProto file_proto;
+  ASSERT_TRUE(TextFormat::ParseFromString(
+      R"pb(
+        name: "implicit.proto"
+        syntax: "proto3"
+        message_type {
+          name: "M"
+          field {
+            name: "p"
+            number: 1
+            label: LABEL_OPTIONAL
+            type: TYPE_BYTES
+            options { ctype: CORD }
+          }
+        }
+      )pb",
+      &file_proto));
+  DescriptorPool pool;
+  const Descriptor* imp_desc =
+      pool.BuildFile(file_proto)->FindMessageTypeByName("M");
+  const FieldDescriptor* imp_field = imp_desc->FindFieldByName("p");
+  ASSERT_FALSE(imp_field->has_presence());
+  DynamicMessageFactory pool_factory(&pool);
+  std::unique_ptr<Message> dyn_imp(pool_factory.GetPrototype(imp_desc)->New());
+  VerifyReflectionCordReuse(dyn_imp.get(), imp_field);
+}
+#endif  // ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
 
 
 using internal::IsDescendant;

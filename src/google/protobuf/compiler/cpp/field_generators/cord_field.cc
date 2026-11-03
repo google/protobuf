@@ -238,7 +238,7 @@ void CordFieldGenerator::GenerateClearingCode(io::Printer* p) const {
   auto v = p->WithVars(variables_);
   if (field_->default_value_string().empty()) {
     p->Emit(R"cc(
-      $field_$.Clear();
+      $pbi$::ClearCord($field_$);
     )cc");
   } else {
     p->Emit(R"cc(
@@ -251,7 +251,7 @@ void CordFieldGenerator::GenerateMessageClearingCode(io::Printer* p) const {
   auto v = p->WithVars(variables_);
   if (field_->default_value_string().empty()) {
     p->Emit(R"cc(
-      $this_mutable_field$.Clear();
+      $pbi$::ClearCord($this_mutable_field$);
     )cc");
   } else {
     p->Emit(R"cc(

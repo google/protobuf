@@ -1767,6 +1767,164 @@ TEST(MESSAGE_TEST_NAME, MessageTraitsWork) {
 }
 
 
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+namespace {
+std::string MakeTestCordWire(absl::string_view v) {
+  UNITTEST::TestCord src;
+  src.set_optional_bytes_cord(v);
+  return src.SerializeAsString();
+}
+}  // namespace
+
+TEST(MESSAGE_TEST_NAME, ClearPreservesCordCapacityOnRepeatedParse) {
+  constexpr absl::string_view kShort = "0123456789";
+  auto check_repeated_parse_reuse = [&](auto proto, auto get_cord, auto has_fn,
+                                        auto clear_fn, auto set_sv) {
+    using Msg = decltype(proto);
+    for (const size_t sz : {size_t{200}, size_t{2048}}) {
+      SCOPED_TRACE(sz);
+      const std::string payload_a(sz, 'a'), payload_b(sz, 'b');
+      auto make_wire = [&](absl::string_view v) {
+        Msg src;
+        set_sv(src, v);
+        return src.SerializeAsString();
+      };
+      const std::string wire_a = make_wire(payload_a);
+      const std::string wire_b = make_wire(payload_b);
+      const std::string wire_empty = make_wire("");
+      Msg short_src, msg;
+      set_sv(short_src, kShort);
+      absl::Cord wire_cord_short;
+      ASSERT_TRUE(short_src.SerializeToString(&wire_cord_short));
+      ASSERT_TRUE(msg.ParseFromString(wire_a));
+      ASSERT_TRUE(get_cord(msg).TryFlat().has_value());
+      const char* const ptr = get_cord(msg).TryFlat()->data();
+      auto expect_flat = [&](absl::string_view expected) {
+        EXPECT_EQ(get_cord(msg), expected);
+        if (absl::optional<absl::string_view> flat = get_cord(msg).TryFlat();
+            flat.has_value()) {
+          EXPECT_EQ(flat->data(), ptr);
+        } else {
+          ADD_FAILURE() << "Expected flat cord";
+        }
+      };
+      internal::ReflectionOps::Clear(&msg);
+      EXPECT_FALSE(has_fn(msg));
+      expect_flat("");
+      ASSERT_TRUE(msg.ParseFromString(wire_a));
+      expect_flat(payload_a);
+      for (int iter = 0; iter < 2; ++iter) {
+        msg.Clear();
+        EXPECT_FALSE(has_fn(msg));
+        expect_flat("");
+        ASSERT_TRUE(msg.ParseFromString(wire_b));
+        expect_flat(payload_b);
+        clear_fn(msg);
+        EXPECT_FALSE(has_fn(msg));
+        ASSERT_TRUE(
+            msg.ParseFromArray(wire_a.data(), static_cast<int>(wire_a.size())));
+        expect_flat(payload_a);
+        ASSERT_TRUE(msg.ParseFromString(wire_cord_short));
+        expect_flat(kShort);
+        msg.Clear();
+        ASSERT_TRUE(msg.ParseFromString(wire_a));
+        expect_flat(payload_a);
+        msg.Clear();
+        set_sv(msg, "");
+        EXPECT_TRUE(has_fn(msg));
+        expect_flat("");
+        set_sv(msg, kShort);
+        expect_flat(kShort);
+        msg.Clear();
+        set_sv(msg, payload_b);
+        expect_flat(payload_b);
+        ASSERT_TRUE(msg.ParseFromString(""));
+        EXPECT_FALSE(has_fn(msg));
+        ASSERT_TRUE(msg.ParseFromString(wire_empty));
+        EXPECT_TRUE(has_fn(msg));
+        expect_flat("");
+        for (const int bs : {7, 23}) {
+          io::ArrayInputStream s(wire_b.data(), static_cast<int>(wire_b.size()),
+                                 bs);
+          ASSERT_TRUE(msg.ParseFromZeroCopyStream(&s));
+          expect_flat(payload_b);
+        }
+      }
+    }
+  };
+  check_repeated_parse_reuse(
+      UNITTEST::TestCord{},
+      [](const auto& m) -> const absl::Cord& {
+        return m.optional_bytes_cord();
+      },
+      [](const auto& m) { return m.has_optional_bytes_cord(); },
+      [](auto& m) { m.clear_optional_bytes_cord(); },
+      [](auto& m, absl::string_view v) { m.set_optional_bytes_cord(v); });
+}
+
+TEST(MESSAGE_TEST_NAME, ClearCordFieldReleasesSharedExternalAndLargeReps) {
+  UNITTEST::TestCord msg, src_1;
+  bool released = false;
+  std::string ext_storage(256, 'e');
+  msg.set_optional_bytes_cord(absl::MakeCordFromExternal(
+      ext_storage, [&](absl::string_view) { released = true; }));
+  msg.Clear();
+  EXPECT_TRUE(released);
+  src_1.set_optional_bytes_cord(std::string(1024, 'x'));
+  absl::Cord wire_cord_1;
+  ASSERT_TRUE(src_1.SerializeToString(&wire_cord_1));
+  ASSERT_TRUE(msg.ParseFromString(wire_cord_1));
+  msg.Clear();
+  ASSERT_TRUE(msg.ParseFromString(MakeTestCordWire(std::string(1024, 'y'))));
+  EXPECT_EQ(std::string(wire_cord_1), src_1.SerializeAsString());
+  ASSERT_TRUE(msg.ParseFromString(MakeTestCordWire(std::string(128, 'p'))));
+  absl::Cord shared_copy = msg.optional_bytes_cord();
+  const char* const shared_ptr = shared_copy.TryFlat()->data();
+  msg.Clear();
+  ASSERT_TRUE(msg.ParseFromString(MakeTestCordWire(std::string(128, 'q'))));
+  EXPECT_EQ(shared_copy, std::string(128, 'p'));
+  EXPECT_EQ(shared_copy.TryFlat()->data(), shared_ptr);
+  ASSERT_TRUE(
+      msg.ParseFromString(MakeTestCordWire(std::string(16 << 10, 'L'))));
+  msg.Clear();
+  EXPECT_EQ(msg.optional_bytes_cord().EstimatedMemoryUsage(),
+            sizeof(absl::Cord));
+}
+
+TEST(MESSAGE_TEST_NAME, ClearCordFieldWithDefaultAndOnArenaAndMalformedWire) {
+  UNITTEST::TestCord cord_msg;
+  cord_msg.set_optional_bytes_cord_default("override");
+  cord_msg.clear_optional_bytes_cord_default();
+  EXPECT_EQ(cord_msg.optional_bytes_cord_default(), "hello");
+  cord_msg.set_optional_bytes_cord_default("override");
+  cord_msg.Clear();
+  EXPECT_EQ(cord_msg.optional_bytes_cord_default(), "hello");
+
+  const std::string payload_a(256, 'a'), payload_b(256, 'b');
+  const std::string wire_a = MakeTestCordWire(payload_a);
+  const std::string wire_b = MakeTestCordWire(payload_b);
+  char block[16384];
+  Arena arena(block, sizeof(block));
+  auto* arena_msg = Arena::Create<UNITTEST::TestCord>(&arena);
+  ASSERT_TRUE(arena_msg->ParseFromString(wire_a));
+  ASSERT_TRUE(arena_msg->optional_bytes_cord().TryFlat().has_value());
+  const char* const ptr = arena_msg->optional_bytes_cord().TryFlat()->data();
+  {
+    arena_msg->Clear();
+    ASSERT_TRUE(arena_msg->ParseFromString(wire_b));
+    EXPECT_EQ(arena_msg->optional_bytes_cord(), payload_b);
+    EXPECT_EQ(arena_msg->optional_bytes_cord().TryFlat()->data(), ptr);
+  }
+  EXPECT_FALSE(arena_msg->ParseFromString(wire_a.substr(0, 20)));
+  ASSERT_TRUE(arena_msg->ParseFromString(wire_a));
+  EXPECT_EQ(arena_msg->optional_bytes_cord(), payload_a);
+  auto* cleared = Arena::Create<UNITTEST::TestCord>(&arena);
+  ASSERT_TRUE(cleared->ParseFromString(wire_a));
+  cleared->Clear();
+  ASSERT_TRUE(cleared->optional_bytes_cord().TryFlat().has_value());
+}
+#endif  // ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+
 TEST(MESSAGE_TEST_NAME, CheckSerializationWhenInterleavedExtensions) {
   UNITTEST::TestExtensionRangeSerialize in_message;
 

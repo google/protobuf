@@ -1159,6 +1159,84 @@ TEST_P(BlockSizesWithResetCords, ReadCordImpossiblyLarge) {
   }
 }
 
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+TEST_F(CodedStreamTest, ReadCordPreservesCapacityAndReleasesLargeCord) {
+  for (int i = 0; i < 2048; ++i) {
+    buffer_[i] = static_cast<uint8_t>('a' + (i % 26));
+  }
+  const absl::string_view full_view(reinterpret_cast<const char*>(buffer_),
+                                    2048);
+  const std::string init_2048(2048, 'w');
+  absl::Cord cord(init_2048);
+  ASSERT_TRUE(cord.TryFlat().has_value());
+  const char* const flat_ptr = cord.TryFlat()->data();
+  auto expect_flat_at = [](const absl::Cord& c, const char* ptr,
+                           absl::string_view expected) {
+    EXPECT_EQ(c, expected);
+    if (absl::optional<absl::string_view> flat = c.TryFlat();
+        flat.has_value()) {
+      EXPECT_EQ(flat->data(), ptr);
+    } else {
+      ADD_FAILURE() << "Expected flat cord";
+    }
+  };
+
+  auto clear_cord = [](absl::Cord& c) {
+    // NOLINTNEXTLINE(abseil-no-internal-dependencies)
+    ::absl::cord_internal::ClearCordPreservingCapacity(c);
+  };
+
+  // Contiguous reads: cleared 0/10B and un-cleared 128/1024B.
+  CodedInputStream contig(buffer_, 2048);
+  clear_cord(cord);
+  ASSERT_TRUE(contig.ReadCord(&cord, 0));
+  expect_flat_at(cord, flat_ptr, "");
+  clear_cord(cord);
+  ASSERT_TRUE(contig.ReadCord(&cord, 10));
+  expect_flat_at(cord, flat_ptr, full_view.substr(0, 10));
+  ASSERT_TRUE(contig.ReadCord(&cord, 128));
+  expect_flat_at(cord, flat_ptr, full_view.substr(10, 128));
+  ASSERT_TRUE(contig.ReadCord(&cord, 1024));
+  expect_flat_at(cord, flat_ptr, full_view.substr(138, 1024));
+  clear_cord(cord);
+  ASSERT_TRUE(contig.ReadCord(&cord, 10));
+  expect_flat_at(cord, flat_ptr, full_view.substr(1162, 10));
+
+  // Fragmented reads across <= 15B, 16..32B, and 128B blocks (including >=512).
+  for (const int block_size : {7, 23, 128}) {
+    ArrayInputStream raw_input(buffer_, 2048, block_size);
+    CodedInputStream input(&raw_input);
+    clear_cord(cord);
+    ASSERT_TRUE(input.ReadCord(&cord, 150));
+    expect_flat_at(cord, flat_ptr, full_view.substr(0, 150));
+    ASSERT_TRUE(input.ReadCord(&cord, 600));
+    expect_flat_at(cord, flat_ptr, full_view.substr(150, 600));
+  }
+
+  // Mid-stream truncation/EOF on a fragmented read (>= kMaxCordBytesToCopy)
+  // returns false while reusing the flat buffer for the available prefix.
+  ArrayInputStream trunc_raw(buffer_, 100, 23);
+  CodedInputStream trunc_input(&trunc_raw);
+  EXPECT_FALSE(trunc_input.ReadCord(&cord, 600));
+  expect_flat_at(cord, flat_ptr, full_view.substr(0, 100));
+
+  // Negative size on a flat-backed cord releases its heap buffer.
+  EXPECT_FALSE(contig.ReadCord(&cord, -1));
+  EXPECT_TRUE(cord.empty());
+  EXPECT_EQ(cord.EstimatedMemoryUsage(), sizeof(absl::Cord));
+
+  const std::string btree_16k(16 << 10, 'B');
+  for (const int sz : {-1, 0}) {
+    cord = absl::Cord(btree_16k);
+    ASSERT_GT(cord.EstimatedMemoryUsage(), 16u << 10);
+    CodedInputStream input(buffer_, 64);
+    EXPECT_EQ(input.ReadCord(&cord, sz), sz == 0);
+    EXPECT_TRUE(cord.empty());
+    EXPECT_EQ(cord.EstimatedMemoryUsage(), sizeof(absl::Cord));
+  }
+}
+#endif  // ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+
 TEST_P(BlockSizes, WriteCord) {
   int kBlockSizes_case = GetParam();
   ArrayOutputStream output(buffer_, sizeof(buffer_), kBlockSizes_case);
