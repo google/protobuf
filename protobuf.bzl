@@ -1,4 +1,5 @@
 load("@bazel_skylib//lib:versions.bzl", "versions")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel/common:proto_info.bzl", "ProtoInfo")
@@ -75,15 +76,37 @@ def _CsharpOuts(srcs):
         for src in srcs
     ]
 
-_PROTOC_ATTRS = {}
+_PROTOC_ATTRS = toolchains.if_legacy_toolchain({
+    "_proto_compiler": attr.label(
+        cfg = "exec",
+        executable = True,
+        allow_files = True,
+        default = "//bazel/flags:proto_compiler",
+    ),
+    "_protocopt": attr.label(
+        default = "//bazel/flags:protocopt",
+    ),
+})
 _PROTOC_FRAGMENTS = ["proto"]
-_PROTOC_TOOLCHAINS = [config_common.toolchain_type(toolchains.PROTO_TOOLCHAIN, mandatory = False)]
+_PROTOC_TOOLCHAINS = toolchains.use_toolchain(toolchains.PROTO_TOOLCHAIN)
 
 def _protoc_files_to_run(ctx):
-    toolchain = ctx.toolchains[toolchains.PROTO_TOOLCHAIN]
-    if not toolchain:
-        fail("Protocol compiler toolchain could not be resolved.")
-    return toolchain.proto.proto_compiler
+    if toolchains.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION:
+        toolchain = ctx.toolchains[toolchains.PROTO_TOOLCHAIN]
+        if not toolchain:
+            fail("Protocol compiler toolchain could not be resolved.")
+        return toolchain.proto.proto_compiler
+    else:
+        return ctx.attr._proto_compiler.files_to_run
+
+def _protoc_opts(ctx):
+    if toolchains.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION:
+        toolchain = ctx.toolchains[toolchains.PROTO_TOOLCHAIN]
+        if not toolchain:
+            fail("Protocol compiler toolchain could not be resolved.")
+        return toolchain.proto.protoc_opts
+    else:
+        return ctx.attr._protocopt[BuildSettingInfo].value
 
 ProtoGenInfo = provider(
     fields = ["srcs", "import_flags", "deps"],
