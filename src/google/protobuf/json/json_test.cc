@@ -1654,6 +1654,61 @@ TEST_P(JsonTest, MalformedLengthDelimitedField) {
   ASSERT_THAT(s, StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_P(JsonTest, TruncatedLengthDelimitedFieldRejected) {
+  std::string out;
+  // Tag for field 8 (string_value, LEN) with the length varint missing.
+  absl::Status s = BinaryToJsonString(
+      resolver_.get(), "type.googleapis.com/proto3.TestMessage", "\x42", &out);
+  EXPECT_THAT(s, StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // Same, but nested inside a submessage (so an outer limit is active):
+  // 11: {3:} with the length varint of field 3 missing.
+  s = BinaryToJsonString(resolver_.get(),
+                         "type.googleapis.com/proto3.TestMessage",
+                         std::string("\x5A\x01\x1A", 3), &out);
+  EXPECT_THAT(s, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_P(JsonTest, EmptyLengthDelimitedFieldAccepted) {
+  std::string out;
+  // $ protoscope -s <<< "8: {}"
+  absl::Status s = BinaryToJsonString(resolver_.get(),
+                                      "type.googleapis.com/proto3.TestMessage",
+                                      std::string("\x42\x00", 2), &out);
+  ASSERT_OK(s);
+
+  EXPECT_EQ(out, R"({"stringValue":""})");
+
+  // $ protoscope -s <<< "11: {}"
+  out.clear();
+  s = BinaryToJsonString(resolver_.get(),
+                         "type.googleapis.com/proto3.TestMessage",
+                         std::string("\x5A\x00", 2), &out);
+  ASSERT_OK(s);
+  EXPECT_EQ(out, R"({"messageValue":{}})");
+}
+
+TEST_P(JsonTest, TruncatedSubmessageRejected) {
+  std::string out;
+  // 11: {1: 1} with a declared length of 5 but only 2 bytes of payload.
+  absl::Status s = BinaryToJsonString(resolver_.get(),
+                                      "type.googleapis.com/proto3.TestMessage",
+                                      "\x5A\x05\x08\x01", &out);
+  EXPECT_THAT(s, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_P(JsonTest, LengthDelimitedFieldExceedingParentRejected) {
+  std::string out;
+  // 11: {3: "a"} where field 3 declares length 5, which overruns the 3-byte
+  // submessage.
+  absl::Status s = BinaryToJsonString(resolver_.get(),
+                                      "type.googleapis.com/proto3.TestMessage",
+                                      "\x5A\x03\x1A\x05"
+                                      "a",
+                                      &out);
+  EXPECT_THAT(s, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST_P(JsonTest, DeeplyNestedGroupsRejected) {
   // Verify that deeply nested TYPE_GROUP fields are rejected with an error
   // rather than causing unbounded stack recursion.
