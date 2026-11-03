@@ -41,11 +41,11 @@
 #include "absl/log/absl_check.h"
 #include "absl/strings/cord.h"
 #include "google/protobuf/arena.h"
-#include "google/protobuf/arena_align.h"
 #include "google/protobuf/field_with_arena.h"
 #include "google/protobuf/generated_enum_util.h"
 #include "google/protobuf/internal_metadata_locator.h"
 #include "google/protobuf/internal_visibility.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/repeated_ptr_field.h"
@@ -1544,8 +1544,8 @@ void RepeatedField<Element>::TryShrinkToFit(internal::SerialArena* arena) {
           sizeof(Element));
 
   // We must Ceil to make sure the new tail is properly aligned.
-  Element* new_tail =
-      internal::ArenaAlignDefault::Ceil(rep->elements<Element>() + size_to_use);
+  Element* new_tail = internal::ArenaAlignDefault{}.Ceil(
+      rep->elements<Element>() + size_to_use);
 
   if (arena->TryTrimTail(tail, new_tail)) {
     rep->set_capacity(new_tail - rep->elements<Element>());
@@ -1594,10 +1594,10 @@ PROTOBUF_NOINLINE void RepeatedField<Element>::GrowNoAnnotate(
     new_size = static_cast<int>(num_available);
     new_rep = new (res.p) internal::HeapRep(new_size);
   } else {
-    if constexpr (internal::ArenaAlignDefault::Ceil(sizeof(Element)) !=
+    if constexpr (internal::ArenaAlignDefault{}.Ceil(sizeof(Element)) !=
                   sizeof(Element)) {
       // We need to manually align the allocation.
-      bytes = internal::ArenaAlignDefault::Ceil(bytes);
+      bytes = internal::ArenaAlignDefault{}.Ceil(bytes);
       new_size = (bytes - kHeapRepHeaderSize) / sizeof(Element);
     }
 

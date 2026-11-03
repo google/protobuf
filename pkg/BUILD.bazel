@@ -173,7 +173,7 @@ cc_dist_library(
     }),
     tags = ["manual"],
     deps = [
-        "//src/google/protobuf:arena_align",
+        "//src/google/protobuf:memory_align",
         "//src/google/protobuf:protobuf_lite",
     ],
 )
@@ -190,8 +190,8 @@ cc_dist_library(
     tags = ["manual"],
     deps = [
         "//src/google/protobuf",
-        "//src/google/protobuf:arena_align",
         "//src/google/protobuf:cmake_wkt_cc_proto",
+        "//src/google/protobuf:memory_align",
         "//src/google/protobuf/compiler:importer",
         "//src/google/protobuf/json",
         "//src/google/protobuf/util:delimited_message_util",
