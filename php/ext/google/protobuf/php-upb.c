@@ -218,6 +218,12 @@ Error, UINTPTR_MAX is undefined
 #define UPB_MSAN 0
 #endif
 
+#if UPB_HAS_FEATURE(type_sanitizer)
+#define UPB_TYSAN 1
+#else
+#define UPB_TYSAN 0
+#endif
+
 // An unfortunate concession to C++17 and MSVC, which don't support zero-sized
 // structs.
 #if UPB_ASAN || UPB_HWASAN || UPB_TSAN
@@ -364,6 +370,18 @@ Error, UINTPTR_MAX is undefined
 #else
 #define UPB_MAYBE_ASSUME(pred, x)
 #define UPB_ATTR_CONST
+#endif
+
+// UPB_ASSUME_SEPARATE(a, b): tells the optimizer that pointers `a` and `b`
+// point into different allocations, so a store through one cannot modify
+// memory reached through the other. This lets it keep values loaded through
+// one pointer in registers across untyped (eg. memcpy()) stores through the
+// other, which strict aliasing cannot help with. The behavior is undefined if
+// both point into the same allocation.
+#if UPB_HAS_BUILTIN(__builtin_assume_separate_storage)
+#define UPB_ASSUME_SEPARATE(a, b) __builtin_assume_separate_storage((a), (b))
+#else
+#define UPB_ASSUME_SEPARATE(a, b) ((void)(a), (void)(b))
 #endif
 
 /* UPB_ASSERT(): in release mode, we use the expression without letting it be
@@ -885,6 +903,27 @@ Error, UINTPTR_MAX is undefined
 // Must be last.
 
 extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry)* UPB_PRIVATE(upb_generated_extension_list);
+/* google.protobuf.FileDescriptorSet: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 16 bytes (0 bytes padding)
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                         | Storage     | Presence |
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                              | upb_Message |          |
+ * |      8 |    8 | file = 1         | repeated google.protobuf.FileDescriptorProto | upb_Array*  |          |
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ *
+ * 32-bit: 16 bytes (4 bytes padding)
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                         | Storage     | Presence |
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                              | upb_Message |          |
+ * |      8 |    4 | file = 1         | repeated google.protobuf.FileDescriptorProto | upb_Array*  |          |
+ * |     12 |    4 | (padding)        |                                              |             |          |
+ * +--------+------+------------------+----------------------------------------------+-------------+----------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[1];
   upb_MiniTableSubInternal subs[1];
@@ -908,6 +947,55 @@ const upb_MiniTable google__protobuf__FileDescriptorSet_msg_init = {
     {0x000800003f02000a, &upb_DecodeFast_Message_Repeated_Tag1Byte},
   })
 };
+
+/* google.protobuf.FileDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 144 bytes (3 bytes padding)
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                  | Type                                            | Storage        | Presence                  |
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)       |                                                 | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)      |                                                 | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)              |                                                 |                |                           |
+ * |     12 |    4 | edition = 14           | enum google.protobuf.Edition (closed)           | int32_t        | hasbit 69 (byte 8, bit 5) |
+ * |     16 |   16 | name = 1               | string                                          | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |   16 | package = 2            | string                                          | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     48 |   16 | syntax = 12            | string                                          | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * |     64 |    8 | dependency = 3         | repeated string                                 | upb_Array*     |                           |
+ * |     72 |    8 | message_type = 4       | repeated google.protobuf.DescriptorProto        | upb_Array*     |                           |
+ * |     80 |    8 | enum_type = 5          | repeated google.protobuf.EnumDescriptorProto    | upb_Array*     |                           |
+ * |     88 |    8 | service = 6            | repeated google.protobuf.ServiceDescriptorProto | upb_Array*     |                           |
+ * |     96 |    8 | extension = 7          | repeated google.protobuf.FieldDescriptorProto   | upb_Array*     |                           |
+ * |    104 |    8 | options = 8            | google.protobuf.FileOptions                     | upb_Message*   | hasbit 66 (byte 8, bit 2) |
+ * |    112 |    8 | source_code_info = 9   | google.protobuf.SourceCodeInfo                  | upb_Message*   | hasbit 67 (byte 8, bit 3) |
+ * |    120 |    8 | public_dependency = 10 | repeated int32                                  | upb_Array*     |                           |
+ * |    128 |    8 | weak_dependency = 11   | repeated int32                                  | upb_Array*     |                           |
+ * |    136 |    8 | option_dependency = 15 | repeated string                                 | upb_Array*     |                           |
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 80 bytes (3 bytes padding)
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                  | Type                                            | Storage        | Presence                  |
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)       |                                                 | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)      |                                                 | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)              |                                                 |                |                           |
+ * |     12 |    4 | dependency = 3         | repeated string                                 | upb_Array*     |                           |
+ * |     16 |    4 | message_type = 4       | repeated google.protobuf.DescriptorProto        | upb_Array*     |                           |
+ * |     20 |    4 | enum_type = 5          | repeated google.protobuf.EnumDescriptorProto    | upb_Array*     |                           |
+ * |     24 |    4 | service = 6            | repeated google.protobuf.ServiceDescriptorProto | upb_Array*     |                           |
+ * |     28 |    4 | extension = 7          | repeated google.protobuf.FieldDescriptorProto   | upb_Array*     |                           |
+ * |     32 |    4 | options = 8            | google.protobuf.FileOptions                     | upb_Message*   | hasbit 66 (byte 8, bit 2) |
+ * |     36 |    4 | source_code_info = 9   | google.protobuf.SourceCodeInfo                  | upb_Message*   | hasbit 67 (byte 8, bit 3) |
+ * |     40 |    4 | public_dependency = 10 | repeated int32                                  | upb_Array*     |                           |
+ * |     44 |    4 | weak_dependency = 11   | repeated int32                                  | upb_Array*     |                           |
+ * |     48 |    4 | edition = 14           | enum google.protobuf.Edition (closed)           | int32_t        | hasbit 69 (byte 8, bit 5) |
+ * |     52 |    4 | option_dependency = 15 | repeated string                                 | upb_Array*     |                           |
+ * |     56 |    8 | name = 1               | string                                          | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     64 |    8 | package = 2            | string                                          | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     72 |    8 | syntax = 12            | string                                          | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * +--------+------+------------------------+-------------------------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[14];
@@ -966,6 +1054,50 @@ const upb_MiniTable google__protobuf__FileDescriptorProto_msg_init = {
   })
 };
 
+/* google.protobuf.DescriptorProto: in-memory layout.
+ *
+ * 64-bit: 104 bytes (3 bytes padding)
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field               | Type                                                    | Storage        | Presence                  |
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)    |                                                         | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used)   |                                                         | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)           |                                                         |                |                           |
+ * |     12 |    4 | visibility = 11     | enum google.protobuf.SymbolVisibility (closed)          | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     16 |   16 | name = 1            | string                                                  | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | field = 2           | repeated google.protobuf.FieldDescriptorProto           | upb_Array*     |                           |
+ * |     40 |    8 | nested_type = 3     | repeated google.protobuf.DescriptorProto                | upb_Array*     |                           |
+ * |     48 |    8 | enum_type = 4       | repeated google.protobuf.EnumDescriptorProto            | upb_Array*     |                           |
+ * |     56 |    8 | extension_range = 5 | repeated google.protobuf.DescriptorProto.ExtensionRange | upb_Array*     |                           |
+ * |     64 |    8 | extension = 6       | repeated google.protobuf.FieldDescriptorProto           | upb_Array*     |                           |
+ * |     72 |    8 | options = 7         | google.protobuf.MessageOptions                          | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     80 |    8 | oneof_decl = 8      | repeated google.protobuf.OneofDescriptorProto           | upb_Array*     |                           |
+ * |     88 |    8 | reserved_range = 9  | repeated google.protobuf.DescriptorProto.ReservedRange  | upb_Array*     |                           |
+ * |     96 |    8 | reserved_name = 10  | repeated string                                         | upb_Array*     |                           |
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 64 bytes (7 bytes padding)
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field               | Type                                                    | Storage        | Presence                  |
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)    |                                                         | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used)   |                                                         | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)           |                                                         |                |                           |
+ * |     12 |    4 | field = 2           | repeated google.protobuf.FieldDescriptorProto           | upb_Array*     |                           |
+ * |     16 |    4 | nested_type = 3     | repeated google.protobuf.DescriptorProto                | upb_Array*     |                           |
+ * |     20 |    4 | enum_type = 4       | repeated google.protobuf.EnumDescriptorProto            | upb_Array*     |                           |
+ * |     24 |    4 | extension_range = 5 | repeated google.protobuf.DescriptorProto.ExtensionRange | upb_Array*     |                           |
+ * |     28 |    4 | extension = 6       | repeated google.protobuf.FieldDescriptorProto           | upb_Array*     |                           |
+ * |     32 |    4 | options = 7         | google.protobuf.MessageOptions                          | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     36 |    4 | oneof_decl = 8      | repeated google.protobuf.OneofDescriptorProto           | upb_Array*     |                           |
+ * |     40 |    4 | reserved_range = 9  | repeated google.protobuf.DescriptorProto.ReservedRange  | upb_Array*     |                           |
+ * |     44 |    4 | reserved_name = 10  | repeated string                                         | upb_Array*     |                           |
+ * |     48 |    4 | visibility = 11     | enum google.protobuf.SymbolVisibility (closed)          | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     52 |    8 | name = 1            | string                                                  | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     60 |    4 | (padding)           |                                                         |                |                           |
+ * +--------+------+---------------------+---------------------------------------------------------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[11];
   upb_MiniTableSubInternal subs[9];
@@ -1022,6 +1154,34 @@ const upb_MiniTable google__protobuf__DescriptorProto_msg_init = {
   })
 };
 
+/* google.protobuf.DescriptorProto.ExtensionRange: in-memory layout.
+ *
+ * 64-bit: 32 bytes (7 bytes padding)
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field             | Type                                  | Storage      | Presence                  |
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used) |                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)         |                                       |              |                           |
+ * |     12 |    4 | start = 1         | int32                                 | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32                                 | int32_t      | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)         |                                       |              |                           |
+ * |     24 |    8 | options = 3       | google.protobuf.ExtensionRangeOptions | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (3 bytes padding)
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field             | Type                                  | Storage      | Presence                  |
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used) |                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)         |                                       |              |                           |
+ * |     12 |    4 | start = 1         | int32                                 | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32                                 | int32_t      | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | options = 3       | google.protobuf.ExtensionRangeOptions | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+-------------------+---------------------------------------+--------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[3];
   upb_MiniTableSubInternal subs[1];
@@ -1050,6 +1210,33 @@ const upb_MiniTable google__protobuf__DescriptorProto__ExtensionRange_msg_init =
   })
 };
 
+/* google.protobuf.DescriptorProto.ReservedRange: in-memory layout.
+ *
+ * 64-bit: 24 bytes (7 bytes padding)
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * | Offset | Size | Field             | Type  | Storage     | Presence                  |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * |      0 |    8 | (message header)  |       | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used) |       | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)         |       |             |                           |
+ * |     12 |    4 | start = 1         | int32 | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32 | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)         |       |             |                           |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (7 bytes padding)
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * | Offset | Size | Field             | Type  | Storage     | Presence                  |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * |      0 |    8 | (message header)  |       | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used) |       | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)         |       |             |                           |
+ * |     12 |    4 | start = 1         | int32 | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32 | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)         |       |             |                           |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[2];
 } google__protobuf__DescriptorProto__ReservedRange_msg_init_Fields;
@@ -1072,6 +1259,37 @@ const upb_MiniTable google__protobuf__DescriptorProto__ReservedRange_msg_init = 
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.ExtensionRangeOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 40 bytes (3 bytes padding)
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                                  | Storage      | Presence                  |
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 2 used)          |                                                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)                  |                                                                       |              |                           |
+ * |     12 |    4 | verification = 3           | enum google.protobuf.ExtensionRangeOptions.VerificationState (closed) | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    8 | declaration = 2            | repeated google.protobuf.ExtensionRangeOptions.Declaration            | upb_Array*   |                           |
+ * |     24 |    8 | features = 50              | google.protobuf.FeatureSet                                            | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     32 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                          | upb_Array*   |                           |
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 32 bytes (7 bytes padding)
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                                  | Storage      | Presence                  |
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 2 used)          |                                                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)                  |                                                                       |              |                           |
+ * |     12 |    4 | declaration = 2            | repeated google.protobuf.ExtensionRangeOptions.Declaration            | upb_Array*   |                           |
+ * |     16 |    4 | verification = 3           | enum google.protobuf.ExtensionRangeOptions.VerificationState (closed) | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | features = 50              | google.protobuf.FeatureSet                                            | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     24 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                          | upb_Array*   |                           |
+ * |     28 |    4 | (padding)                  |                                                                       |              |                           |
+ * +--------+------+----------------------------+-----------------------------------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[4];
@@ -1133,6 +1351,37 @@ const upb_MiniTable google__protobuf__ExtensionRangeOptions_msg_init = {
   })
 };
 
+/* google.protobuf.ExtensionRangeOptions.Declaration: in-memory layout.
+ *
+ * 64-bit: 48 bytes (1 bytes padding)
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                  |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 5 used) |        | uint8_t[]      |                           |
+ * |      9 |    1 | reserved = 5      | bool   | bool           | hasbit 67 (byte 8, bit 3) |
+ * |     10 |    1 | repeated = 6      | bool   | bool           | hasbit 68 (byte 8, bit 4) |
+ * |     11 |    1 | (padding)         |        |                |                           |
+ * |     12 |    4 | number = 1        | int32  | int32_t        | hasbit 64 (byte 8, bit 0) |
+ * |     16 |   16 | full_name = 2     | string | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     32 |   16 | type = 3          | string | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ *
+ * 32-bit: 32 bytes (1 bytes padding)
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                  |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 5 used) |        | uint8_t[]      |                           |
+ * |      9 |    1 | reserved = 5      | bool   | bool           | hasbit 67 (byte 8, bit 3) |
+ * |     10 |    1 | repeated = 6      | bool   | bool           | hasbit 68 (byte 8, bit 4) |
+ * |     11 |    1 | (padding)         |        |                |                           |
+ * |     12 |    4 | number = 1        | int32  | int32_t        | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    8 | full_name = 2     | string | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     24 |    8 | type = 3          | string | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[5];
 } google__protobuf__ExtensionRangeOptions__Declaration_msg_init_Fields;
@@ -1162,6 +1411,50 @@ const upb_MiniTable google__protobuf__ExtensionRangeOptions__Declaration_msg_ini
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.FieldDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 120 bytes (5 bytes padding)
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                | Type                                                     | Storage        | Presence                  |
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)     |                                                          | upb_Message    |                           |
+ * |      8 |    2 | (hasbits: 11 used)   |                                                          | uint8_t[]      |                           |
+ * |     10 |    1 | proto3_optional = 17 | bool                                                     | bool           | hasbit 74 (byte 9, bit 2) |
+ * |     11 |    1 | (padding)            |                                                          |                |                           |
+ * |     12 |    4 | number = 3           | int32                                                    | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     16 |    4 | label = 4            | enum google.protobuf.FieldDescriptorProto.Label (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     20 |    4 | type = 5             | enum google.protobuf.FieldDescriptorProto.Type (closed)  | int32_t        | hasbit 68 (byte 8, bit 4) |
+ * |     24 |    4 | oneof_index = 9      | int32                                                    | int32_t        | hasbit 72 (byte 9, bit 0) |
+ * |     28 |    4 | (padding)            |                                                          |                |                           |
+ * |     32 |   16 | name = 1             | string                                                   | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     48 |   16 | extendee = 2         | string                                                   | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     64 |   16 | type_name = 6        | string                                                   | upb_StringView | hasbit 69 (byte 8, bit 5) |
+ * |     80 |   16 | default_value = 7    | string                                                   | upb_StringView | hasbit 70 (byte 8, bit 6) |
+ * |     96 |   16 | json_name = 10       | string                                                   | upb_StringView | hasbit 73 (byte 9, bit 1) |
+ * |    112 |    8 | options = 8          | google.protobuf.FieldOptions                             | upb_Message*   | hasbit 71 (byte 8, bit 7) |
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 72 bytes (1 bytes padding)
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                | Type                                                     | Storage        | Presence                  |
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)     |                                                          | upb_Message    |                           |
+ * |      8 |    2 | (hasbits: 11 used)   |                                                          | uint8_t[]      |                           |
+ * |     10 |    1 | proto3_optional = 17 | bool                                                     | bool           | hasbit 74 (byte 9, bit 2) |
+ * |     11 |    1 | (padding)            |                                                          |                |                           |
+ * |     12 |    4 | number = 3           | int32                                                    | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     16 |    4 | label = 4            | enum google.protobuf.FieldDescriptorProto.Label (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     20 |    4 | type = 5             | enum google.protobuf.FieldDescriptorProto.Type (closed)  | int32_t        | hasbit 68 (byte 8, bit 4) |
+ * |     24 |    4 | options = 8          | google.protobuf.FieldOptions                             | upb_Message*   | hasbit 71 (byte 8, bit 7) |
+ * |     28 |    4 | oneof_index = 9      | int32                                                    | int32_t        | hasbit 72 (byte 9, bit 0) |
+ * |     32 |    8 | name = 1             | string                                                   | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     40 |    8 | extendee = 2         | string                                                   | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     48 |    8 | type_name = 6        | string                                                   | upb_StringView | hasbit 69 (byte 8, bit 5) |
+ * |     56 |    8 | default_value = 7    | string                                                   | upb_StringView | hasbit 70 (byte 8, bit 6) |
+ * |     64 |    8 | json_name = 10       | string                                                   | upb_StringView | hasbit 73 (byte 9, bit 1) |
+ * +--------+------+----------------------+----------------------------------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[11];
@@ -1229,6 +1522,31 @@ const upb_MiniTable google__protobuf__FieldDescriptorProto_msg_init = {
   })
 };
 
+/* google.protobuf.OneofDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 40 bytes (7 bytes padding)
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                         | Storage        | Presence                  |
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                              | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                              | uint8_t[]      |                           |
+ * |      9 |    7 | (padding)         |                              |                |                           |
+ * |     16 |   16 | name = 1          | string                       | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | options = 2       | google.protobuf.OneofOptions | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (3 bytes padding)
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                         | Storage        | Presence                  |
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                              | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                              | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                              |                |                           |
+ * |     12 |    4 | options = 2       | google.protobuf.OneofOptions | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    8 | name = 1          | string                       | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * +--------+------+-------------------+------------------------------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[2];
   upb_MiniTableSubInternal subs[1];
@@ -1255,6 +1573,39 @@ const upb_MiniTable google__protobuf__OneofDescriptorProto_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.EnumDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 64 bytes (3 bytes padding)
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field              | Type                                                           | Storage        | Presence                  |
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)   |                                                                | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used)  |                                                                | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)          |                                                                |                |                           |
+ * |     12 |    4 | visibility = 6     | enum google.protobuf.SymbolVisibility (closed)                 | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     16 |   16 | name = 1           | string                                                         | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | value = 2          | repeated google.protobuf.EnumValueDescriptorProto              | upb_Array*     |                           |
+ * |     40 |    8 | options = 3        | google.protobuf.EnumOptions                                    | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     48 |    8 | reserved_range = 4 | repeated google.protobuf.EnumDescriptorProto.EnumReservedRange | upb_Array*     |                           |
+ * |     56 |    8 | reserved_name = 5  | repeated string                                                | upb_Array*     |                           |
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 40 bytes (3 bytes padding)
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field              | Type                                                           | Storage        | Presence                  |
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)   |                                                                | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used)  |                                                                | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)          |                                                                |                |                           |
+ * |     12 |    4 | value = 2          | repeated google.protobuf.EnumValueDescriptorProto              | upb_Array*     |                           |
+ * |     16 |    4 | options = 3        | google.protobuf.EnumOptions                                    | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | reserved_range = 4 | repeated google.protobuf.EnumDescriptorProto.EnumReservedRange | upb_Array*     |                           |
+ * |     24 |    4 | reserved_name = 5  | repeated string                                                | upb_Array*     |                           |
+ * |     28 |    4 | visibility = 6     | enum google.protobuf.SymbolVisibility (closed)                 | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     32 |    8 | name = 1           | string                                                         | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * +--------+------+--------------------+----------------------------------------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[6];
@@ -1294,6 +1645,33 @@ const upb_MiniTable google__protobuf__EnumDescriptorProto_msg_init = {
   })
 };
 
+/* google.protobuf.EnumDescriptorProto.EnumReservedRange: in-memory layout.
+ *
+ * 64-bit: 24 bytes (7 bytes padding)
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * | Offset | Size | Field             | Type  | Storage     | Presence                  |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * |      0 |    8 | (message header)  |       | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used) |       | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)         |       |             |                           |
+ * |     12 |    4 | start = 1         | int32 | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32 | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)         |       |             |                           |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (7 bytes padding)
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * | Offset | Size | Field             | Type  | Storage     | Presence                  |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ * |      0 |    8 | (message header)  |       | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used) |       | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)         |       |             |                           |
+ * |     12 |    4 | start = 1         | int32 | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | end = 2           | int32 | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)         |       |             |                           |
+ * +--------+------+-------------------+-------+-------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[2];
 } google__protobuf__EnumDescriptorProto__EnumReservedRange_msg_init_Fields;
@@ -1316,6 +1694,34 @@ const upb_MiniTable google__protobuf__EnumDescriptorProto__EnumReservedRange_msg
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.EnumValueDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 40 bytes (3 bytes padding)
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                             | Storage        | Presence                  |
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                  | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used) |                                  | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                  |                |                           |
+ * |     12 |    4 | number = 2        | int32                            | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     16 |   16 | name = 1          | string                           | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | options = 3       | google.protobuf.EnumValueOptions | upb_Message*   | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 32 bytes (7 bytes padding)
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                             | Storage        | Presence                  |
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                  | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 3 used) |                                  | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                  |                |                           |
+ * |     12 |    4 | number = 2        | int32                            | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    4 | options = 3       | google.protobuf.EnumValueOptions | upb_Message*   | hasbit 66 (byte 8, bit 2) |
+ * |     20 |    8 | name = 1          | string                           | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     28 |    4 | (padding)         |                                  |                |                           |
+ * +--------+------+-------------------+----------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[3];
@@ -1345,6 +1751,34 @@ const upb_MiniTable google__protobuf__EnumValueDescriptorProto_msg_init = {
   })
 };
 
+/* google.protobuf.ServiceDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 48 bytes (7 bytes padding)
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                           | Storage        | Presence                  |
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                                | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                                                | uint8_t[]      |                           |
+ * |      9 |    7 | (padding)         |                                                |                |                           |
+ * |     16 |   16 | name = 1          | string                                         | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | method = 2        | repeated google.protobuf.MethodDescriptorProto | upb_Array*     |                           |
+ * |     40 |    8 | options = 3       | google.protobuf.ServiceOptions                 | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 32 bytes (7 bytes padding)
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                           | Storage        | Presence                  |
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                                | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                                                | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                                |                |                           |
+ * |     12 |    4 | method = 2        | repeated google.protobuf.MethodDescriptorProto | upb_Array*     |                           |
+ * |     16 |    4 | options = 3       | google.protobuf.ServiceOptions                 | upb_Message*   | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    8 | name = 1          | string                                         | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     28 |    4 | (padding)         |                                                |                |                           |
+ * +--------+------+-------------------+------------------------------------------------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[3];
   upb_MiniTableSubInternal subs[2];
@@ -1373,6 +1807,39 @@ const upb_MiniTable google__protobuf__ServiceDescriptorProto_msg_init = {
     {0x002800000106001a, &upb_DecodeFast_Message_Scalar_Tag1Byte},
   })
 };
+
+/* google.protobuf.MethodDescriptorProto: in-memory layout.
+ *
+ * 64-bit: 72 bytes (5 bytes padding)
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                | Type                          | Storage        | Presence                  |
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)     |                               | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)    |                               | uint8_t[]      |                           |
+ * |      9 |    1 | client_streaming = 5 | bool                          | bool           | hasbit 68 (byte 8, bit 4) |
+ * |     10 |    1 | server_streaming = 6 | bool                          | bool           | hasbit 69 (byte 8, bit 5) |
+ * |     11 |    5 | (padding)            |                               |                |                           |
+ * |     16 |   16 | name = 1             | string                        | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |   16 | input_type = 2       | string                        | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     48 |   16 | output_type = 3      | string                        | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * |     64 |    8 | options = 4          | google.protobuf.MethodOptions | upb_Message*   | hasbit 67 (byte 8, bit 3) |
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 40 bytes (1 bytes padding)
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                | Type                          | Storage        | Presence                  |
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)     |                               | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)    |                               | uint8_t[]      |                           |
+ * |      9 |    1 | client_streaming = 5 | bool                          | bool           | hasbit 68 (byte 8, bit 4) |
+ * |     10 |    1 | server_streaming = 6 | bool                          | bool           | hasbit 69 (byte 8, bit 5) |
+ * |     11 |    1 | (padding)            |                               |                |                           |
+ * |     12 |    4 | options = 4          | google.protobuf.MethodOptions | upb_Message*   | hasbit 67 (byte 8, bit 3) |
+ * |     16 |    8 | name = 1             | string                        | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     24 |    8 | input_type = 2       | string                        | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     32 |    8 | output_type = 3      | string                        | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+----------------------+-------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[6];
@@ -1408,6 +1875,70 @@ const upb_MiniTable google__protobuf__MethodDescriptorProto_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.FileOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 200 bytes (1 bytes padding)
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ * | Offset | Size | Field                              | Type                                                   | Storage        | Presence                   |
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ * |      0 |    8 | (message header)                   |                                                        | upb_Message    |                            |
+ * |      8 |    3 | (hasbits: 20 used)                 |                                                        | uint8_t[]      |                            |
+ * |     11 |    1 | java_multiple_files = 10           | bool                                                   | bool           | hasbit 67 (byte 8, bit 3)  |
+ * |     12 |    1 | cc_generic_services = 16           | bool                                                   | bool           | hasbit 69 (byte 8, bit 5)  |
+ * |     13 |    1 | java_generic_services = 17         | bool                                                   | bool           | hasbit 70 (byte 8, bit 6)  |
+ * |     14 |    1 | py_generic_services = 18           | bool                                                   | bool           | hasbit 71 (byte 8, bit 7)  |
+ * |     15 |    1 | java_generate_equals_and_hash = 20 | bool                                                   | bool           | hasbit 72 (byte 9, bit 0)  |
+ * |     16 |    1 | deprecated = 23                    | bool                                                   | bool           | hasbit 73 (byte 9, bit 1)  |
+ * |     17 |    1 | java_string_check_utf8 = 27        | bool                                                   | bool           | hasbit 74 (byte 9, bit 2)  |
+ * |     18 |    1 | cc_enable_arenas = 31              | bool                                                   | bool           | hasbit 75 (byte 9, bit 3)  |
+ * |     19 |    1 | (padding)                          |                                                        |                |                            |
+ * |     20 |    4 | optimize_for = 9                   | enum google.protobuf.FileOptions.OptimizeMode (closed) | int32_t        | hasbit 66 (byte 8, bit 2)  |
+ * |     24 |   16 | java_package = 1                   | string                                                 | upb_StringView | hasbit 64 (byte 8, bit 0)  |
+ * |     40 |   16 | java_outer_classname = 8           | string                                                 | upb_StringView | hasbit 65 (byte 8, bit 1)  |
+ * |     56 |   16 | go_package = 11                    | string                                                 | upb_StringView | hasbit 68 (byte 8, bit 4)  |
+ * |     72 |   16 | objc_class_prefix = 36             | string                                                 | upb_StringView | hasbit 76 (byte 9, bit 4)  |
+ * |     88 |   16 | csharp_namespace = 37              | string                                                 | upb_StringView | hasbit 77 (byte 9, bit 5)  |
+ * |    104 |   16 | swift_prefix = 39                  | string                                                 | upb_StringView | hasbit 78 (byte 9, bit 6)  |
+ * |    120 |   16 | php_class_prefix = 40              | string                                                 | upb_StringView | hasbit 79 (byte 9, bit 7)  |
+ * |    136 |   16 | php_namespace = 41                 | string                                                 | upb_StringView | hasbit 80 (byte 10, bit 0) |
+ * |    152 |   16 | php_metadata_namespace = 44        | string                                                 | upb_StringView | hasbit 81 (byte 10, bit 1) |
+ * |    168 |   16 | ruby_package = 45                  | string                                                 | upb_StringView | hasbit 82 (byte 10, bit 2) |
+ * |    184 |    8 | features = 50                      | google.protobuf.FeatureSet                             | upb_Message*   | hasbit 83 (byte 10, bit 3) |
+ * |    192 |    8 | uninterpreted_option = 999         | repeated google.protobuf.UninterpretedOption           | upb_Array*     |                            |
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ *
+ * 32-bit: 112 bytes (1 bytes padding)
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ * | Offset | Size | Field                              | Type                                                   | Storage        | Presence                   |
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ * |      0 |    8 | (message header)                   |                                                        | upb_Message    |                            |
+ * |      8 |    3 | (hasbits: 20 used)                 |                                                        | uint8_t[]      |                            |
+ * |     11 |    1 | java_multiple_files = 10           | bool                                                   | bool           | hasbit 67 (byte 8, bit 3)  |
+ * |     12 |    1 | cc_generic_services = 16           | bool                                                   | bool           | hasbit 69 (byte 8, bit 5)  |
+ * |     13 |    1 | java_generic_services = 17         | bool                                                   | bool           | hasbit 70 (byte 8, bit 6)  |
+ * |     14 |    1 | py_generic_services = 18           | bool                                                   | bool           | hasbit 71 (byte 8, bit 7)  |
+ * |     15 |    1 | java_generate_equals_and_hash = 20 | bool                                                   | bool           | hasbit 72 (byte 9, bit 0)  |
+ * |     16 |    1 | deprecated = 23                    | bool                                                   | bool           | hasbit 73 (byte 9, bit 1)  |
+ * |     17 |    1 | java_string_check_utf8 = 27        | bool                                                   | bool           | hasbit 74 (byte 9, bit 2)  |
+ * |     18 |    1 | cc_enable_arenas = 31              | bool                                                   | bool           | hasbit 75 (byte 9, bit 3)  |
+ * |     19 |    1 | (padding)                          |                                                        |                |                            |
+ * |     20 |    4 | optimize_for = 9                   | enum google.protobuf.FileOptions.OptimizeMode (closed) | int32_t        | hasbit 66 (byte 8, bit 2)  |
+ * |     24 |    4 | features = 50                      | google.protobuf.FeatureSet                             | upb_Message*   | hasbit 83 (byte 10, bit 3) |
+ * |     28 |    4 | uninterpreted_option = 999         | repeated google.protobuf.UninterpretedOption           | upb_Array*     |                            |
+ * |     32 |    8 | java_package = 1                   | string                                                 | upb_StringView | hasbit 64 (byte 8, bit 0)  |
+ * |     40 |    8 | java_outer_classname = 8           | string                                                 | upb_StringView | hasbit 65 (byte 8, bit 1)  |
+ * |     48 |    8 | go_package = 11                    | string                                                 | upb_StringView | hasbit 68 (byte 8, bit 4)  |
+ * |     56 |    8 | objc_class_prefix = 36             | string                                                 | upb_StringView | hasbit 76 (byte 9, bit 4)  |
+ * |     64 |    8 | csharp_namespace = 37              | string                                                 | upb_StringView | hasbit 77 (byte 9, bit 5)  |
+ * |     72 |    8 | swift_prefix = 39                  | string                                                 | upb_StringView | hasbit 78 (byte 9, bit 6)  |
+ * |     80 |    8 | php_class_prefix = 40              | string                                                 | upb_StringView | hasbit 79 (byte 9, bit 7)  |
+ * |     88 |    8 | php_namespace = 41                 | string                                                 | upb_StringView | hasbit 80 (byte 10, bit 0) |
+ * |     96 |    8 | php_metadata_namespace = 44        | string                                                 | upb_StringView | hasbit 81 (byte 10, bit 1) |
+ * |    104 |    8 | ruby_package = 45                  | string                                                 | upb_StringView | hasbit 82 (byte 10, bit 2) |
+ * +--------+------+------------------------------------+--------------------------------------------------------+----------------+----------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[21];
@@ -1485,6 +2016,42 @@ const upb_MiniTable google__protobuf__FileOptions_msg_init = {
   })
 };
 
+/* google.protobuf.MessageOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 32 bytes (2 bytes padding)
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                                       | Type                                         | Storage      | Presence                  |
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)                            |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 6 used)                           |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | message_set_wire_format = 1                 | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | no_standard_descriptor_accessor = 2         | bool                                         | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated = 3                              | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    1 | map_entry = 7                               | bool                                         | bool         | hasbit 67 (byte 8, bit 3) |
+ * |     13 |    1 | deprecated_legacy_json_field_conflicts = 11 | bool                                         | bool         | hasbit 68 (byte 8, bit 4) |
+ * |     14 |    2 | (padding)                                   |                                              |              |                           |
+ * |     16 |    8 | features = 12                               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 69 (byte 8, bit 5) |
+ * |     24 |    8 | uninterpreted_option = 999                  | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (2 bytes padding)
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                                       | Type                                         | Storage      | Presence                  |
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)                            |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 6 used)                           |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | message_set_wire_format = 1                 | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | no_standard_descriptor_accessor = 2         | bool                                         | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated = 3                              | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    1 | map_entry = 7                               | bool                                         | bool         | hasbit 67 (byte 8, bit 3) |
+ * |     13 |    1 | deprecated_legacy_json_field_conflicts = 11 | bool                                         | bool         | hasbit 68 (byte 8, bit 4) |
+ * |     14 |    2 | (padding)                                   |                                              |              |                           |
+ * |     16 |    4 | features = 12                               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 69 (byte 8, bit 5) |
+ * |     20 |    4 | uninterpreted_option = 999                  | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+---------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[7];
   upb_MiniTableSubInternal subs[2];
@@ -1545,6 +2112,55 @@ const upb_MiniTable google__protobuf__MessageOptions_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeExtensionOrUnknown},
   })
 };
+
+/* google.protobuf.FieldOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 72 bytes (4 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                                 | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                                      | upb_Message  |                           |
+ * |      8 |    2 | (hasbits: 11 used)         |                                                                      | uint8_t[]    |                           |
+ * |     10 |    1 | packed = 2                 | bool                                                                 | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated = 3             | bool                                                                 | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    1 | lazy = 5                   | bool                                                                 | bool         | hasbit 67 (byte 8, bit 3) |
+ * |     13 |    1 | weak = 10                  | bool                                                                 | bool         | hasbit 69 (byte 8, bit 5) |
+ * |     14 |    1 | unverified_lazy = 15       | bool                                                                 | bool         | hasbit 70 (byte 8, bit 6) |
+ * |     15 |    1 | debug_redact = 16          | bool                                                                 | bool         | hasbit 71 (byte 8, bit 7) |
+ * |     16 |    4 | ctype = 1                  | enum google.protobuf.FieldOptions.CType (closed)                     | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | jstype = 6                 | enum google.protobuf.FieldOptions.JSType (closed)                    | int32_t      | hasbit 68 (byte 8, bit 4) |
+ * |     24 |    4 | retention = 17             | enum google.protobuf.FieldOptions.OptionRetention (closed)           | int32_t      | hasbit 72 (byte 9, bit 0) |
+ * |     28 |    4 | (padding)                  |                                                                      |              |                           |
+ * |     32 |    8 | targets = 19               | repeated enum google.protobuf.FieldOptions.OptionTargetType (closed) | upb_Array*   |                           |
+ * |     40 |    8 | edition_defaults = 20      | repeated google.protobuf.FieldOptions.EditionDefault                 | upb_Array*   |                           |
+ * |     48 |    8 | features = 21              | google.protobuf.FeatureSet                                           | upb_Message* | hasbit 73 (byte 9, bit 1) |
+ * |     56 |    8 | feature_support = 22       | google.protobuf.FieldOptions.FeatureSupport                          | upb_Message* | hasbit 74 (byte 9, bit 2) |
+ * |     64 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                         | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 48 bytes (0 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                                 | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                                      | upb_Message  |                           |
+ * |      8 |    2 | (hasbits: 11 used)         |                                                                      | uint8_t[]    |                           |
+ * |     10 |    1 | packed = 2                 | bool                                                                 | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated = 3             | bool                                                                 | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    1 | lazy = 5                   | bool                                                                 | bool         | hasbit 67 (byte 8, bit 3) |
+ * |     13 |    1 | weak = 10                  | bool                                                                 | bool         | hasbit 69 (byte 8, bit 5) |
+ * |     14 |    1 | unverified_lazy = 15       | bool                                                                 | bool         | hasbit 70 (byte 8, bit 6) |
+ * |     15 |    1 | debug_redact = 16          | bool                                                                 | bool         | hasbit 71 (byte 8, bit 7) |
+ * |     16 |    4 | ctype = 1                  | enum google.protobuf.FieldOptions.CType (closed)                     | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | jstype = 6                 | enum google.protobuf.FieldOptions.JSType (closed)                    | int32_t      | hasbit 68 (byte 8, bit 4) |
+ * |     24 |    4 | retention = 17             | enum google.protobuf.FieldOptions.OptionRetention (closed)           | int32_t      | hasbit 72 (byte 9, bit 0) |
+ * |     28 |    4 | targets = 19               | repeated enum google.protobuf.FieldOptions.OptionTargetType (closed) | upb_Array*   |                           |
+ * |     32 |    4 | edition_defaults = 20      | repeated google.protobuf.FieldOptions.EditionDefault                 | upb_Array*   |                           |
+ * |     36 |    4 | features = 21              | google.protobuf.FeatureSet                                           | upb_Message* | hasbit 73 (byte 9, bit 1) |
+ * |     40 |    4 | feature_support = 22       | google.protobuf.FieldOptions.FeatureSupport                          | upb_Message* | hasbit 74 (byte 9, bit 2) |
+ * |     44 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                         | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[14];
@@ -1620,6 +2236,31 @@ const upb_MiniTable google__protobuf__FieldOptions_msg_init = {
   })
 };
 
+/* google.protobuf.FieldOptions.EditionDefault: in-memory layout.
+ *
+ * 64-bit: 32 bytes (3 bytes padding)
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                  | Storage        | Presence                  |
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                                       | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                       |                |                           |
+ * |     12 |    4 | edition = 3       | enum google.protobuf.Edition (closed) | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     16 |   16 | value = 2         | string                                | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (3 bytes padding)
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                  | Storage        | Presence                  |
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used) |                                       | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                       |                |                           |
+ * |     12 |    4 | edition = 3       | enum google.protobuf.Edition (closed) | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    8 | value = 2         | string                                | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * +--------+------+-------------------+---------------------------------------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[2];
   upb_MiniTableSubInternal subs[1];
@@ -1646,6 +2287,37 @@ const upb_MiniTable google__protobuf__FieldOptions__EditionDefault_msg_init = {
     {0x000c000001030018, &upb_DecodeFast_ClosedEnum_Scalar_Tag1Byte},
   })
 };
+
+/* google.protobuf.FieldOptions.FeatureSupport: in-memory layout.
+ *
+ * 64-bit: 56 bytes (3 bytes padding)
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                   | Type                                  | Storage        | Presence                  |
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)        |                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 5 used)       |                                       | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)               |                                       |                |                           |
+ * |     12 |    4 | edition_introduced = 1  | enum google.protobuf.Edition (closed) | int32_t        | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | edition_deprecated = 2  | enum google.protobuf.Edition (closed) | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | edition_removed = 4     | enum google.protobuf.Edition (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     24 |   16 | deprecation_warning = 3 | string                                | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * |     40 |   16 | removal_error = 5       | string                                | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 40 bytes (3 bytes padding)
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                   | Type                                  | Storage        | Presence                  |
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)        |                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 5 used)       |                                       | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)               |                                       |                |                           |
+ * |     12 |    4 | edition_introduced = 1  | enum google.protobuf.Edition (closed) | int32_t        | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | edition_deprecated = 2  | enum google.protobuf.Edition (closed) | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | edition_removed = 4     | enum google.protobuf.Edition (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     24 |    8 | deprecation_warning = 3 | string                                | upb_StringView | hasbit 66 (byte 8, bit 2) |
+ * |     32 |    8 | removal_error = 5       | string                                | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * +--------+------+-------------------------+---------------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[5];
@@ -1682,6 +2354,33 @@ const upb_MiniTable google__protobuf__FieldOptions__FeatureSupport_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.OneofOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 32 bytes (7 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 1 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    7 | (padding)                  |                                              |              |                           |
+ * |     16 |    8 | features = 1               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 64 (byte 8, bit 0) |
+ * |     24 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (7 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 1 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)                  |                                              |              |                           |
+ * |     12 |    4 | features = 1               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * |     20 |    4 | (padding)                  |                                              |              |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[2];
@@ -1738,6 +2437,38 @@ const upb_MiniTable google__protobuf__OneofOptions_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeExtensionOrUnknown},
   })
 };
+
+/* google.protobuf.EnumOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 32 bytes (4 bytes padding)
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)                           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 4 used)                          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | allow_alias = 2                            | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | deprecated = 3                             | bool                                         | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated_legacy_json_field_conflicts = 6 | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    4 | (padding)                                  |                                              |              |                           |
+ * |     16 |    8 | features = 7                               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 67 (byte 8, bit 3) |
+ * |     24 |    8 | uninterpreted_option = 999                 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (4 bytes padding)
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)                           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 4 used)                          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | allow_alias = 2                            | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | deprecated = 3                             | bool                                         | bool         | hasbit 65 (byte 8, bit 1) |
+ * |     11 |    1 | deprecated_legacy_json_field_conflicts = 6 | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     12 |    4 | features = 7                               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 67 (byte 8, bit 3) |
+ * |     16 |    4 | uninterpreted_option = 999                 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * |     20 |    4 | (padding)                                  |                                              |              |                           |
+ * +--------+------+--------------------------------------------+----------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[5];
@@ -1797,6 +2528,38 @@ const upb_MiniTable google__protobuf__EnumOptions_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeExtensionOrUnknown},
   })
 };
+
+/* google.protobuf.EnumValueOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 40 bytes (5 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 4 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 1             | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | debug_redact = 3           | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     11 |    5 | (padding)                  |                                              |              |                           |
+ * |     16 |    8 | features = 2               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     24 |    8 | feature_support = 4        | google.protobuf.FieldOptions.FeatureSupport  | upb_Message* | hasbit 67 (byte 8, bit 3) |
+ * |     32 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (1 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 4 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 1             | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    1 | debug_redact = 3           | bool                                         | bool         | hasbit 66 (byte 8, bit 2) |
+ * |     11 |    1 | (padding)                  |                                              |              |                           |
+ * |     12 |    4 | features = 2               | google.protobuf.FeatureSet                   | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    4 | feature_support = 4        | google.protobuf.FieldOptions.FeatureSupport  | upb_Message* | hasbit 67 (byte 8, bit 3) |
+ * |     20 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[5];
@@ -1858,6 +2621,35 @@ const upb_MiniTable google__protobuf__EnumValueOptions_msg_init = {
   })
 };
 
+/* google.protobuf.ServiceOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 32 bytes (6 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 2 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 33            | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    6 | (padding)                  |                                              |              |                           |
+ * |     16 |    8 | features = 34              | google.protobuf.FeatureSet                   | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     24 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (6 bytes padding)
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 2 used)          |                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 33            | bool                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    2 | (padding)                  |                                              |              |                           |
+ * |     12 |    4 | features = 34              | google.protobuf.FeatureSet                   | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption | upb_Array*   |                           |
+ * |     20 |    4 | (padding)                  |                                              |              |                           |
+ * +--------+------+----------------------------+----------------------------------------------+--------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[3];
   upb_MiniTableSubInternal subs[2];
@@ -1914,6 +2706,36 @@ const upb_MiniTable google__protobuf__ServiceOptions_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeExtensionOrUnknown},
   })
 };
+
+/* google.protobuf.MethodOptions: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 32 bytes (2 bytes padding)
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used)          |                                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 33            | bool                                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    2 | (padding)                  |                                                              |              |                           |
+ * |     12 |    4 | idempotency_level = 34     | enum google.protobuf.MethodOptions.IdempotencyLevel (closed) | int32_t      | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    8 | features = 35              | google.protobuf.FeatureSet                                   | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * |     24 |    8 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                 | upb_Array*   |                           |
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (2 bytes padding)
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                      | Type                                                         | Storage      | Presence                  |
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)           |                                                              | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used)          |                                                              | uint8_t[]    |                           |
+ * |      9 |    1 | deprecated = 33            | bool                                                         | bool         | hasbit 64 (byte 8, bit 0) |
+ * |     10 |    2 | (padding)                  |                                                              |              |                           |
+ * |     12 |    4 | idempotency_level = 34     | enum google.protobuf.MethodOptions.IdempotencyLevel (closed) | int32_t      | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    4 | features = 35              | google.protobuf.FeatureSet                                   | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * |     20 |    4 | uninterpreted_option = 999 | repeated google.protobuf.UninterpretedOption                 | upb_Array*   |                           |
+ * +--------+------+----------------------------+--------------------------------------------------------------+--------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[4];
@@ -1974,6 +2796,41 @@ const upb_MiniTable google__protobuf__MethodOptions_msg_init = {
   })
 };
 
+/* google.protobuf.UninterpretedOption: in-memory layout.
+ *
+ * 64-bit: 96 bytes (7 bytes padding)
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                  | Type                                                  | Storage        | Presence                  |
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)       |                                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)      |                                                       | uint8_t[]      |                           |
+ * |      9 |    7 | (padding)              |                                                       |                |                           |
+ * |     16 |   16 | identifier_value = 3   | string                                                | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |   16 | string_value = 7       | bytes                                                 | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * |     48 |   16 | aggregate_value = 8    | string                                                | upb_StringView | hasbit 69 (byte 8, bit 5) |
+ * |     64 |    8 | name = 2               | repeated google.protobuf.UninterpretedOption.NamePart | upb_Array*     |                           |
+ * |     72 |    8 | positive_int_value = 4 | uint64                                                | uint64_t       | hasbit 65 (byte 8, bit 1) |
+ * |     80 |    8 | negative_int_value = 5 | int64                                                 | int64_t        | hasbit 66 (byte 8, bit 2) |
+ * |     88 |    8 | double_value = 6       | double                                                | double         | hasbit 67 (byte 8, bit 3) |
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 64 bytes (3 bytes padding)
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                  | Type                                                  | Storage        | Presence                  |
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)       |                                                       | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 6 used)      |                                                       | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)              |                                                       |                |                           |
+ * |     12 |    4 | name = 2               | repeated google.protobuf.UninterpretedOption.NamePart | upb_Array*     |                           |
+ * |     16 |    8 | identifier_value = 3   | string                                                | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     24 |    8 | string_value = 7       | bytes                                                 | upb_StringView | hasbit 68 (byte 8, bit 4) |
+ * |     32 |    8 | aggregate_value = 8    | string                                                | upb_StringView | hasbit 69 (byte 8, bit 5) |
+ * |     40 |    8 | positive_int_value = 4 | uint64                                                | uint64_t       | hasbit 65 (byte 8, bit 1) |
+ * |     48 |    8 | negative_int_value = 5 | int64                                                 | int64_t        | hasbit 66 (byte 8, bit 2) |
+ * |     56 |    8 | double_value = 6       | double                                                | double         | hasbit 67 (byte 8, bit 3) |
+ * +--------+------+------------------------+-------------------------------------------------------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[7];
   upb_MiniTableSubInternal subs[1];
@@ -2018,6 +2875,32 @@ const upb_MiniTable google__protobuf__UninterpretedOption_msg_init = {
   })
 };
 
+/* google.protobuf.UninterpretedOption.NamePart: in-memory layout.
+ *
+ * 64-bit: 32 bytes (6 bytes padding)
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                            |
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                                     |
+ * |      8 |    1 | (hasbits: 2 used) |        | uint8_t[]      |                                     |
+ * |      9 |    1 | is_extension = 2  | bool   | bool           | required, hasbit 65 (byte 8, bit 1) |
+ * |     10 |    6 | (padding)         |        |                |                                     |
+ * |     16 |   16 | name_part = 1     | string | upb_StringView | required, hasbit 64 (byte 8, bit 0) |
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ *
+ * 32-bit: 24 bytes (6 bytes padding)
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                            |
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                                     |
+ * |      8 |    1 | (hasbits: 2 used) |        | uint8_t[]      |                                     |
+ * |      9 |    1 | is_extension = 2  | bool   | bool           | required, hasbit 65 (byte 8, bit 1) |
+ * |     10 |    2 | (padding)         |        |                |                                     |
+ * |     12 |    8 | name_part = 1     | string | upb_StringView | required, hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | (padding)         |        |                |                                     |
+ * +--------+------+-------------------+--------+----------------+-------------------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[2];
 } google__protobuf__UninterpretedOption__NamePart_msg_init_Fields;
@@ -2040,6 +2923,46 @@ const upb_MiniTable google__protobuf__UninterpretedOption__NamePart_msg_init = {
     {0x0000000000000000, &_upb_FastDecoder_DecodeUnknown},
   })
 };
+
+/* google.protobuf.FeatureSet: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 48 bytes (2 bytes padding)
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ * | Offset | Size | Field                         | Type                                                                               | Storage     | Presence                  |
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ * |      0 |    8 | (message header)              |                                                                                    | upb_Message |                           |
+ * |      8 |    2 | (hasbits: 9 used)             |                                                                                    | uint8_t[]   |                           |
+ * |     10 |    2 | (padding)                     |                                                                                    |             |                           |
+ * |     12 |    4 | field_presence = 1            | enum google.protobuf.FeatureSet.FieldPresence (closed)                             | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | enum_type = 2                 | enum google.protobuf.FeatureSet.EnumType (closed)                                  | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | repeated_field_encoding = 3   | enum google.protobuf.FeatureSet.RepeatedFieldEncoding (closed)                     | int32_t     | hasbit 66 (byte 8, bit 2) |
+ * |     24 |    4 | utf8_validation = 4           | enum google.protobuf.FeatureSet.Utf8Validation (closed)                            | int32_t     | hasbit 67 (byte 8, bit 3) |
+ * |     28 |    4 | message_encoding = 5          | enum google.protobuf.FeatureSet.MessageEncoding (closed)                           | int32_t     | hasbit 68 (byte 8, bit 4) |
+ * |     32 |    4 | json_format = 6               | enum google.protobuf.FeatureSet.JsonFormat (closed)                                | int32_t     | hasbit 69 (byte 8, bit 5) |
+ * |     36 |    4 | enforce_naming_style = 7      | enum google.protobuf.FeatureSet.EnforceNamingStyle (closed)                        | int32_t     | hasbit 70 (byte 8, bit 6) |
+ * |     40 |    4 | default_symbol_visibility = 8 | enum google.protobuf.FeatureSet.VisibilityFeature.DefaultSymbolVisibility (closed) | int32_t     | hasbit 71 (byte 8, bit 7) |
+ * |     44 |    4 | enforce_proto_limits = 9      | enum google.protobuf.FeatureSet.ProtoLimitsFeature.EnforceProtoLimits (closed)     | int32_t     | hasbit 72 (byte 9, bit 0) |
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ *
+ * 32-bit: 48 bytes (2 bytes padding)
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ * | Offset | Size | Field                         | Type                                                                               | Storage     | Presence                  |
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ * |      0 |    8 | (message header)              |                                                                                    | upb_Message |                           |
+ * |      8 |    2 | (hasbits: 9 used)             |                                                                                    | uint8_t[]   |                           |
+ * |     10 |    2 | (padding)                     |                                                                                    |             |                           |
+ * |     12 |    4 | field_presence = 1            | enum google.protobuf.FeatureSet.FieldPresence (closed)                             | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | enum_type = 2                 | enum google.protobuf.FeatureSet.EnumType (closed)                                  | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | repeated_field_encoding = 3   | enum google.protobuf.FeatureSet.RepeatedFieldEncoding (closed)                     | int32_t     | hasbit 66 (byte 8, bit 2) |
+ * |     24 |    4 | utf8_validation = 4           | enum google.protobuf.FeatureSet.Utf8Validation (closed)                            | int32_t     | hasbit 67 (byte 8, bit 3) |
+ * |     28 |    4 | message_encoding = 5          | enum google.protobuf.FeatureSet.MessageEncoding (closed)                           | int32_t     | hasbit 68 (byte 8, bit 4) |
+ * |     32 |    4 | json_format = 6               | enum google.protobuf.FeatureSet.JsonFormat (closed)                                | int32_t     | hasbit 69 (byte 8, bit 5) |
+ * |     36 |    4 | enforce_naming_style = 7      | enum google.protobuf.FeatureSet.EnforceNamingStyle (closed)                        | int32_t     | hasbit 70 (byte 8, bit 6) |
+ * |     40 |    4 | default_symbol_visibility = 8 | enum google.protobuf.FeatureSet.VisibilityFeature.DefaultSymbolVisibility (closed) | int32_t     | hasbit 71 (byte 8, bit 7) |
+ * |     44 |    4 | enforce_proto_limits = 9      | enum google.protobuf.FeatureSet.ProtoLimitsFeature.EnforceProtoLimits (closed)     | int32_t     | hasbit 72 (byte 9, bit 0) |
+ * +--------+------+-------------------------------+------------------------------------------------------------------------------------+-------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[9];
@@ -2095,6 +3018,23 @@ const upb_MiniTable google__protobuf__FeatureSet_msg_init = {
   })
 };
 
+/* google.protobuf.FeatureSet.VisibilityFeature: in-memory layout.
+ *
+ * 64-bit: 8 bytes (0 bytes padding)
+ * +--------+------+------------------+------+-------------+----------+
+ * | Offset | Size | Field            | Type | Storage     | Presence |
+ * +--------+------+------------------+------+-------------+----------+
+ * |      0 |    8 | (message header) |      | upb_Message |          |
+ * +--------+------+------------------+------+-------------+----------+
+ *
+ * 32-bit: 8 bytes (0 bytes padding)
+ * +--------+------+------------------+------+-------------+----------+
+ * | Offset | Size | Field            | Type | Storage     | Presence |
+ * +--------+------+------------------+------+-------------+----------+
+ * |      0 |    8 | (message header) |      | upb_Message |          |
+ * +--------+------+------------------+------+-------------+----------+
+ */
+
 const upb_MiniTable google__protobuf__FeatureSet__VisibilityFeature_msg_init = {
   NULL,
   8, 0, kUpb_ExtMode_NonExtendable, 0, UPB_FASTTABLE_MASK(255), 0,
@@ -2103,6 +3043,23 @@ const upb_MiniTable google__protobuf__FeatureSet__VisibilityFeature_msg_init = {
 #endif
 };
 
+/* google.protobuf.FeatureSet.ProtoLimitsFeature: in-memory layout.
+ *
+ * 64-bit: 8 bytes (0 bytes padding)
+ * +--------+------+------------------+------+-------------+----------+
+ * | Offset | Size | Field            | Type | Storage     | Presence |
+ * +--------+------+------------------+------+-------------+----------+
+ * |      0 |    8 | (message header) |      | upb_Message |          |
+ * +--------+------+------------------+------+-------------+----------+
+ *
+ * 32-bit: 8 bytes (0 bytes padding)
+ * +--------+------+------------------+------+-------------+----------+
+ * | Offset | Size | Field            | Type | Storage     | Presence |
+ * +--------+------+------------------+------+-------------+----------+
+ * |      0 |    8 | (message header) |      | upb_Message |          |
+ * +--------+------+------------------+------+-------------+----------+
+ */
+
 const upb_MiniTable google__protobuf__FeatureSet__ProtoLimitsFeature_msg_init = {
   NULL,
   8, 0, kUpb_ExtMode_NonExtendable, 0, UPB_FASTTABLE_MASK(255), 0,
@@ -2110,6 +3067,34 @@ const upb_MiniTable google__protobuf__FeatureSet__ProtoLimitsFeature_msg_init = 
   "google.protobuf.FeatureSet.ProtoLimitsFeature",
 #endif
 };
+
+/* google.protobuf.FeatureSetDefaults: in-memory layout.
+ *
+ * 64-bit: 32 bytes (7 bytes padding)
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ * | Offset | Size | Field               | Type                                                                 | Storage     | Presence                  |
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ * |      0 |    8 | (message header)    |                                                                      | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used)   |                                                                      | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)           |                                                                      |             |                           |
+ * |     12 |    4 | minimum_edition = 4 | enum google.protobuf.Edition (closed)                                | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | maximum_edition = 5 | enum google.protobuf.Edition (closed)                                | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | (padding)           |                                                                      |             |                           |
+ * |     24 |    8 | defaults = 1        | repeated google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault | upb_Array*  |                           |
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (3 bytes padding)
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ * | Offset | Size | Field               | Type                                                                 | Storage     | Presence                  |
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ * |      0 |    8 | (message header)    |                                                                      | upb_Message |                           |
+ * |      8 |    1 | (hasbits: 2 used)   |                                                                      | uint8_t[]   |                           |
+ * |      9 |    3 | (padding)           |                                                                      |             |                           |
+ * |     12 |    4 | defaults = 1        | repeated google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault | upb_Array*  |                           |
+ * |     16 |    4 | minimum_edition = 4 | enum google.protobuf.Edition (closed)                                | int32_t     | hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | maximum_edition = 5 | enum google.protobuf.Edition (closed)                                | int32_t     | hasbit 65 (byte 8, bit 1) |
+ * +--------+------+---------------------+----------------------------------------------------------------------+-------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[3];
@@ -2145,6 +3130,33 @@ const upb_MiniTable google__protobuf__FeatureSetDefaults_msg_init = {
   })
 };
 
+/* google.protobuf.FeatureSetDefaults.FeatureSetEditionDefault: in-memory layout.
+ *
+ * 64-bit: 32 bytes (3 bytes padding)
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                    | Type                                  | Storage      | Presence                  |
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)         |                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used)        |                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)                |                                       |              |                           |
+ * |     12 |    4 | edition = 3              | enum google.protobuf.Edition (closed) | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    8 | overridable_features = 4 | google.protobuf.FeatureSet            | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     24 |    8 | fixed_features = 5       | google.protobuf.FeatureSet            | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (3 bytes padding)
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ * | Offset | Size | Field                    | Type                                  | Storage      | Presence                  |
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ * |      0 |    8 | (message header)         |                                       | upb_Message  |                           |
+ * |      8 |    1 | (hasbits: 3 used)        |                                       | uint8_t[]    |                           |
+ * |      9 |    3 | (padding)                |                                       |              |                           |
+ * |     12 |    4 | edition = 3              | enum google.protobuf.Edition (closed) | int32_t      | hasbit 64 (byte 8, bit 0) |
+ * |     16 |    4 | overridable_features = 4 | google.protobuf.FeatureSet            | upb_Message* | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | fixed_features = 5       | google.protobuf.FeatureSet            | upb_Message* | hasbit 66 (byte 8, bit 2) |
+ * +--------+------+--------------------------+---------------------------------------+--------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[3];
   upb_MiniTableSubInternal subs[3];
@@ -2179,6 +3191,27 @@ const upb_MiniTable google__protobuf__FeatureSetDefaults__FeatureSetEditionDefau
   })
 };
 
+/* google.protobuf.SourceCodeInfo: in-memory layout.
+ * Extensions are stored out-of-line in upb_Message_Internal.
+ *
+ * 64-bit: 16 bytes (0 bytes padding)
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                             | Storage     | Presence |
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                                  | upb_Message |          |
+ * |      8 |    8 | location = 1     | repeated google.protobuf.SourceCodeInfo.Location | upb_Array*  |          |
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ *
+ * 32-bit: 16 bytes (4 bytes padding)
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                             | Storage     | Presence |
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                                  | upb_Message |          |
+ * |      8 |    4 | location = 1     | repeated google.protobuf.SourceCodeInfo.Location | upb_Array*  |          |
+ * |     12 |    4 | (padding)        |                                                  |             |          |
+ * +--------+------+------------------+--------------------------------------------------+-------------+----------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[1];
   upb_MiniTableSubInternal subs[1];
@@ -2202,6 +3235,37 @@ const upb_MiniTable google__protobuf__SourceCodeInfo_msg_init = {
     {0x000800003f02000a, &upb_DecodeFast_Message_Repeated_Tag1Byte},
   })
 };
+
+/* google.protobuf.SourceCodeInfo.Location: in-memory layout.
+ *
+ * 64-bit: 72 bytes (7 bytes padding)
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                         | Type                    | Storage        | Presence                  |
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)              |                         | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used)             |                         | uint8_t[]      |                           |
+ * |      9 |    7 | (padding)                     |                         |                |                           |
+ * |     16 |   16 | leading_comments = 3          | string                  | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |   16 | trailing_comments = 4         | string                  | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * |     48 |    8 | path = 1                      | repeated int32 [packed] | upb_Array*     |                           |
+ * |     56 |    8 | span = 2                      | repeated int32 [packed] | upb_Array*     |                           |
+ * |     64 |    8 | leading_detached_comments = 6 | repeated string         | upb_Array*     |                           |
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 40 bytes (3 bytes padding)
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ * | Offset | Size | Field                         | Type                    | Storage        | Presence                  |
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)              |                         | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 2 used)             |                         | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)                     |                         |                |                           |
+ * |     12 |    4 | path = 1                      | repeated int32 [packed] | upb_Array*     |                           |
+ * |     16 |    4 | span = 2                      | repeated int32 [packed] | upb_Array*     |                           |
+ * |     20 |    4 | leading_detached_comments = 6 | repeated string         | upb_Array*     |                           |
+ * |     24 |    8 | leading_comments = 3          | string                  | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     32 |    8 | trailing_comments = 4         | string                  | upb_StringView | hasbit 65 (byte 8, bit 1) |
+ * +--------+------+-------------------------------+-------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[5];
@@ -2233,6 +3297,26 @@ const upb_MiniTable google__protobuf__SourceCodeInfo__Location_msg_init = {
   })
 };
 
+/* google.protobuf.GeneratedCodeInfo: in-memory layout.
+ *
+ * 64-bit: 16 bytes (0 bytes padding)
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                                  | Storage     | Presence |
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                                       | upb_Message |          |
+ * |      8 |    8 | annotation = 1   | repeated google.protobuf.GeneratedCodeInfo.Annotation | upb_Array*  |          |
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ *
+ * 32-bit: 16 bytes (4 bytes padding)
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ * | Offset | Size | Field            | Type                                                  | Storage     | Presence |
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ * |      0 |    8 | (message header) |                                                       | upb_Message |          |
+ * |      8 |    4 | annotation = 1   | repeated google.protobuf.GeneratedCodeInfo.Annotation | upb_Array*  |          |
+ * |     12 |    4 | (padding)        |                                                       |             |          |
+ * +--------+------+------------------+-------------------------------------------------------+-------------+----------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[1];
   upb_MiniTableSubInternal subs[1];
@@ -2256,6 +3340,38 @@ const upb_MiniTable google__protobuf__GeneratedCodeInfo_msg_init = {
     {0x000800003f02000a, &upb_DecodeFast_Message_Repeated_Tag1Byte},
   })
 };
+
+/* google.protobuf.GeneratedCodeInfo.Annotation: in-memory layout.
+ *
+ * 64-bit: 48 bytes (3 bytes padding)
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                                                | Storage        | Presence                  |
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                                                     | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 4 used) |                                                                     | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                                                     |                |                           |
+ * |     12 |    4 | begin = 3         | int32                                                               | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     16 |    4 | end = 4           | int32                                                               | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     20 |    4 | semantic = 5      | enum google.protobuf.GeneratedCodeInfo.Annotation.Semantic (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     24 |   16 | source_file = 2   | string                                                              | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     40 |    8 | path = 1          | repeated int32 [packed]                                             | upb_Array*     |                           |
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ *
+ * 32-bit: 40 bytes (7 bytes padding)
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type                                                                | Storage        | Presence                  |
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |                                                                     | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 4 used) |                                                                     | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |                                                                     |                |                           |
+ * |     12 |    4 | path = 1          | repeated int32 [packed]                                             | upb_Array*     |                           |
+ * |     16 |    4 | begin = 3         | int32                                                               | int32_t        | hasbit 65 (byte 8, bit 1) |
+ * |     20 |    4 | end = 4           | int32                                                               | int32_t        | hasbit 66 (byte 8, bit 2) |
+ * |     24 |    4 | semantic = 5      | enum google.protobuf.GeneratedCodeInfo.Annotation.Semantic (closed) | int32_t        | hasbit 67 (byte 8, bit 3) |
+ * |     28 |    8 | source_file = 2   | string                                                              | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     36 |    4 | (padding)         |                                                                     |                |                           |
+ * +--------+------+-------------------+---------------------------------------------------------------------+----------------+---------------------------+
+ */
 
 typedef struct {
   upb_MiniTableField fields[5];
@@ -3773,6 +4889,30 @@ _upb_DefPool_Init google_protobuf_descriptor_proto_upbdefinit = {
 // Must be last.
 
 extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry)* UPB_PRIVATE(upb_generated_extension_list);
+/* pb.enumvalue.JsonEnumValueOptions: in-memory layout.
+ *
+ * 64-bit: 32 bytes (7 bytes padding)
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                  |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 1 used) |        | uint8_t[]      |                           |
+ * |      9 |    7 | (padding)         |        |                |                           |
+ * |     16 |   16 | string = 1        | string | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ *
+ * 32-bit: 24 bytes (7 bytes padding)
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * | Offset | Size | Field             | Type   | Storage        | Presence                  |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ * |      0 |    8 | (message header)  |        | upb_Message    |                           |
+ * |      8 |    1 | (hasbits: 1 used) |        | uint8_t[]      |                           |
+ * |      9 |    3 | (padding)         |        |                |                           |
+ * |     12 |    8 | string = 1        | string | upb_StringView | hasbit 64 (byte 8, bit 0) |
+ * |     20 |    4 | (padding)         |        |                |                           |
+ * +--------+------+-------------------+--------+----------------+---------------------------+
+ */
+
 typedef struct {
   upb_MiniTableField fields[1];
 } pb__enumvalue__JsonEnumValueOptions_msg_init_Fields;
@@ -4566,6 +5706,10 @@ bool upb_strtable_insert(upb_strtable* t, const char* k, size_t len,
 
 bool upb_strtable_insert_or_replace(upb_strtable* t, const char* k, size_t len,
                                     upb_value v, bool* replaced, upb_Arena* a) {
+  // Store to `*replaced` before reading the table: the compiler cannot prove
+  // that `replaced` does not point into `*t`, so storing it after the lookup
+  // would force it to reload the table fields.
+  *replaced = false;
   uint32_t hash = _upb_Hash_NoSeed(k, len);
   upb_tabent* e = findentry_mutable(&t->t, strkey2(k, len), hash, &streql);
   if (e) {
@@ -4573,7 +5717,6 @@ bool upb_strtable_insert_or_replace(upb_strtable* t, const char* k, size_t len,
     *replaced = true;
     return true;
   }
-  *replaced = false;
   if (UPB_UNLIKELY(t->t.entries == NULL) && !init(&t->t, 3, a)) return false;
   return strtable_insert(t, k, len, v, hash, a);
 }
@@ -4827,27 +5970,30 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
   size_t old_bytes = old_size * sizeof(upb_tabent);
   size_t new_size = (size_t)1 << size_lg2;
   size_t new_bytes = new_size * sizeof(upb_tabent);
-  if (new_bytes <= old_bytes || !t->t.entries) {
+  // The entries never overlap `*t`, but the compiler cannot prove that, so
+  // without this local every store to an entry would force `t->t.entries` to
+  // be reloaded.
+  upb_tabent* entries = t->t.entries;
+  if (new_bytes <= old_bytes || !entries) {
     return false;
   }
 
-  if (!upb_Arena_TryExtend(a, t->t.entries, old_bytes, new_bytes)) {
+  if (!upb_Arena_TryExtend(a, entries, old_bytes, new_bytes)) {
     return false;
   }
 
   // Zero out the newly extended region of the table buffer.
-  memset(t->t.entries + old_size, 0,
-         (new_size - old_size) * sizeof(upb_tabent));
+  memset(entries + old_size, 0, (new_size - old_size) * sizeof(upb_tabent));
 
   // This one-past-the-end pointer is guaranteed to be distinct from NULL and
   // any valid internal collision chain pointer in the entire table.
-  upb_tabent* unhashed_marker = t->t.entries + new_size;
+  upb_tabent* unhashed_marker = entries + new_size;
 
   // Mark all existing occupied entries as UNHASHED using the distinct
   // marker. Because e->next != NULL, these pending slots are fully protected
   // from being claimed by emptyent() during collision chain formation.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* e = &t->t.entries[i];
+    upb_tabent* e = &entries[i];
     if (!upb_tabent_isempty(e)) {
       upb_tabent_setnext(e, unhashed_marker);
     }
@@ -4859,7 +6005,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
 
   // Trace and resolve all destinations.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* current = &t->t.entries[i];
+    upb_tabent* current = &entries[i];
     if (!upb_tabent_hasnext(current) ||
         upb_tabent_next(current) != unhashed_marker) {
       continue;  // Slot is already hashed or empty.
@@ -4874,7 +6020,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
     // total O(n) time across the whole rehash.
     while (true) {
       uint32_t hash = inthash(tabkey, val);
-      upb_tabent* target_bucket = &t->t.entries[hash & mask];
+      upb_tabent* target_bucket = &entries[hash & mask];
 
       if (upb_tabent_hasnext(target_bucket) &&
           upb_tabent_next(target_bucket) == unhashed_marker) {
@@ -4944,6 +6090,8 @@ bool upb_inttable_insert(upb_inttable* t, uintptr_t key, upb_value val,
 bool upb_inttable_insert_or_replace_slow(upb_inttable* t, uintptr_t key,
                                          upb_value val, bool* replaced,
                                          upb_Arena* a) {
+  // See upb_strtable_insert_or_replace() for why this is stored first.
+  *replaced = false;
   upb_tabent* e =
       findentry_mutable(&t->t, intkey(key), upb_inthash(key), &inteql);
   if (e) {
@@ -4951,7 +6099,6 @@ bool upb_inttable_insert_or_replace_slow(upb_inttable* t, uintptr_t key,
     *replaced = true;
     return true;
   }
-  *replaced = false;
   if (UPB_UNLIKELY(t->t.entries == NULL) && !upb_inttable_init(t, a)) {
     return false;
   }
@@ -6961,7 +8108,7 @@ static void jsonenc_wrapper(jsonenc* e, const upb_Message* msg,
 static const upb_MessageDef* jsonenc_getanymsg(jsonenc* e,
                                                upb_StringView type_url) {
   /* Find last '/', if any. */
-  const char* end = type_url.data + type_url.size;
+  const char* end = UPB_PTRADD(type_url.data, type_url.size);
   const char* ptr = end;
   const upb_MessageDef* ret;
 
@@ -7040,7 +8187,7 @@ static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
 
 static void jsonenc_fieldpath(jsonenc* e, upb_StringView path) {
   const char* ptr = path.data;
-  const char* end = ptr + path.size;
+  const char* end = UPB_PTRADD(ptr, path.size);
 
   while (ptr < end) {
     char ch = *ptr;
@@ -8192,6 +9339,7 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
 #ifndef NDEBUG
   a->body.refs = NULL;
 #endif
+  UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->head));
   UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->body));
 
   UPB_PRIVATE(_upb_Arena_AddBlock)(&a->head, block);
@@ -8214,6 +9362,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     size_t delta = (uintptr_t)aligned - (uintptr_t)mem;
     n = delta <= n ? n - delta : 0;
     mem = aligned;
+#if UPB_HWASAN
+    // HWASAN tags whole granules; never tag past the end of the caller's
+    // buffer.
+    n = UPB_ALIGN_DOWN(n, UPB_MALLOC_ALIGN);
+#endif
   }
   if (UPB_UNLIKELY(n < sizeof(upb_ArenaState) || !mem)) {
     upb_Arena* ret = _upb_Arena_InitSlow(alloc, mem ? 0 : n);
@@ -8223,7 +9376,20 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     return ret;
   }
 
-  a = mem;
+  // upb now owns the whole block, so treat it like freshly allocated arena
+  // memory: poison all of it (which also makes MSAN treat the previous contents
+  // as uninitialized and TYSAN forget their types), then allocate the arena
+  // state at the front like any other region. With HWASAN it gets the first tag
+  // of the arena's sequence, so the caller's pointer to the block cannot be
+  // used to access it, and later allocations continue the sequence.
+  upb_Xsan xsan;
+  UPB_PRIVATE(upb_Xsan_Init)(&xsan);
+  UPB_PRIVATE(upb_Xsan_PoisonRegion)(mem, n);
+  a = UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(&xsan, mem,
+                                                sizeof(upb_ArenaState));
+#if UPB_XSAN_STRUCT_SIZE
+  a->head.xsan = xsan;
+#endif
 
   upb_Atomic_Init(&a->body.parent_or_count, _upb_Arena_TaggedFromRefcount(1));
   upb_Atomic_Init(&a->body.next, NULL);
@@ -8237,7 +9403,9 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
   a->body.size_hint = 128;
   a->body.last_block_size = 128;
   a->body.block_alloc = _upb_Arena_MakeBlockAlloc(alloc, 1);
-  a->head.UPB_PRIVATE(ptr) = (void*)UPB_ALIGN_MALLOC((uintptr_t)(a + 1));
+  // Derive both bounds from `mem` so that they carry the same HWASAN tag.
+  a->head.UPB_PRIVATE(ptr) =
+      (void*)UPB_ALIGN_MALLOC((uintptr_t)mem + sizeof(upb_ArenaState));
   a->head.UPB_PRIVATE(end) = UPB_PTR_AT(mem, n, char);
   a->head.UPB_ONLYBITS(pool) =
       (UPB_PRIVATE(_upb_ArenaPool)*)&UPB_PRIVATE(_upb_Arena_EmptyPool);
@@ -8248,8 +9416,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
   return &a->head;
 }
 
+static upb_ArenaInternal* _upb_Arena_DecRef(const upb_Arena* a);
+
 static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
   UPB_ASSERT(_upb_Arena_RefCountFromTagged(ai->parent_or_count) == 1);
+  upb_ArenaInternal* roots_to_free = NULL;
   while (ai != NULL) {
     UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(ai));
     // Load first since arena itself is likely from one of its blocks. Relaxed
@@ -8271,7 +9442,19 @@ static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
         // If the block is an arena ref, then we need to release our ref on the
         // referenced arena.
         upb_ArenaRef* ref = (upb_ArenaRef*)block;
-        upb_Arena_DecRefFor((upb_Arena*)ref->arena, ai);
+        upb_ArenaInternal* to_free = _upb_Arena_DecRef(ref->arena);
+        if (to_free != NULL) {
+          // The arena is ready to be freed, but we want to avoid a recursive
+          // free to avoid stack overflow in the case of long ref chains.
+          // To that end, we prepend it to a linked list for later processing.
+          // We pick an arbitrary member `previous_or_tail` as the "next"
+          // pointer -- any member would work as long as it is not read during
+          // deletion.
+          UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(to_free));
+          upb_Atomic_Store(&to_free->previous_or_tail, (uintptr_t)roots_to_free,
+                           memory_order_relaxed);
+          roots_to_free = to_free;
+        }
       } else {
         upb_free_sized(block_alloc, block, block->size);
       }
@@ -8280,11 +9463,23 @@ static void _upb_Arena_DoFree(upb_ArenaInternal* ai) {
     if (block_alloc && block_alloc->cleanup != NULL) {
       block_alloc->cleanup(block_alloc);
     }
+    if (next_arena == NULL && roots_to_free != NULL) {
+      next_arena = roots_to_free;
+      roots_to_free = (upb_ArenaInternal*)upb_Atomic_Load(
+          &next_arena->previous_or_tail, memory_order_relaxed);
+    }
     ai = next_arena;
   }
 }
 
 void upb_Arena_Free(upb_Arena* a) {
+  upb_ArenaInternal* ai = _upb_Arena_DecRef(a);
+  if (ai != NULL) {
+    _upb_Arena_DoFree(ai);
+  }
+}
+
+static upb_ArenaInternal* _upb_Arena_DecRef(const upb_Arena* a) {
   upb_ArenaInternal* ai = upb_Arena_Internal(a);
   // Cannot be replaced with _upb_Arena_FindRoot, as that provides only a
   // relaxed read of the refcount if ai is already the root.
@@ -8303,8 +9498,7 @@ retry:
 #ifdef UPB_TRACING_ENABLED
     upb_Arena_LogFree(a);
 #endif
-    _upb_Arena_DoFree(ai);
-    return;
+    return ai;
   }
 
   if (upb_Atomic_CompareExchangeWeak(
@@ -8312,7 +9506,7 @@ retry:
           _upb_Arena_TaggedFromRefcount(_upb_Arena_RefCountFromTagged(poc) - 1),
           memory_order_release, memory_order_acquire)) {
     // We were >1 and we decremented it successfully, so we are done.
-    return;
+    return NULL;
   }
 
   // We failed our update, so someone has done something, retry the whole
@@ -8961,6 +10155,24 @@ const upb_MiniTableExtension* upb_Message_FindExtensionByNumber(
   return NULL;
 }
 
+bool upb_Message_NextExtensionFieldReverse(const upb_Message* msg,
+                                           const upb_MiniTableField** result,
+                                           uintptr_t* iter) {
+  upb_MessageValue val;
+  return UPB_PRIVATE(_upb_Message_NextExtensionFieldReverse)(msg, result, &val,
+                                                             iter);
+}
+
+const upb_MiniTableField* upb_Message_FindExtensionFieldByNumber(
+    const upb_Message* msg, uint32_t field_number) {
+  uintptr_t iter = kUpb_Message_ExtensionBegin;
+  const upb_MiniTableField* result;
+  while (upb_Message_NextExtensionFieldReverse(msg, &result, &iter)) {
+    if (upb_MiniTableField_Number(result) == field_number) return result;
+  }
+  return NULL;
+}
+
 
 #include <stdint.h>
 #include <string.h>
@@ -9470,11 +10682,11 @@ void _upb_Message_DiscardUnknown_shallow(upb_Message* msg) {
 size_t upb_Message_ExtensionCount(const upb_Message* msg) {
   upb_Message_Internal* in = UPB_PRIVATE(_upb_Message_GetInternal)(msg);
   if (!in) return 0;
-  const upb_MiniTableExtension* ext;
+  const upb_MiniTableField* f;
   upb_MessageValue val;
   uintptr_t iter = kUpb_Message_ExtensionBegin;
   size_t count = 0;
-  while (upb_Message_NextExtension(msg, &ext, &val, &iter)) {
+  while (upb_Message_NextExtensionField(msg, &f, &val, &iter)) {
     count++;
   }
   return count;
@@ -9757,7 +10969,6 @@ upb_Message_DeleteUnknownStatus upb_Message_DeleteUnknown(
 
 // Must be last.
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -9923,23 +11134,21 @@ static bool _upb_Message_ExtensionsAreEqual(const upb_Message* msg1,
                                             const upb_Message* msg2,
                                             const upb_MiniTable* m,
                                             int options) {
-  const upb_MiniTableExtension* e;
+  const upb_MiniTableField* f;
   upb_MessageValue val2;
 
   // Iterate over all extensions for msg2, and search msg1 for each extension.
   size_t count1 = 0;
   size_t iter2 = kUpb_Message_ExtensionBegin;
-  while (upb_Message_NextExtension(msg2, &e, &val2, &iter2)) {
-    const upb_Extension* ext1 = UPB_PRIVATE(_upb_Message_Getext)(msg1, e);
+  while (upb_Message_NextExtensionField(msg2, &f, &val2, &iter2)) {
+    const upb_Extension* ext1 = UPB_PRIVATE(_upb_Message_GetExtension)(msg1, f);
     if (!ext1) return false;
 
     count1++;
 
     const upb_MessageValue val1 = upb_Extension_GetValue(ext1);
-    const upb_MiniTableField* f = &e->UPB_PRIVATE(field);
-    const upb_MiniTable* subm = upb_MiniTableField_IsSubMessage(f)
-                                    ? upb_MiniTableExtension_GetSubMessage(e)
-                                    : NULL;
+    const upb_MiniTable* subm =
+        upb_MiniTableField_IsSubMessage(f) ? upb_MiniTable_SubMessage(f) : NULL;
     const upb_CType ctype = upb_MiniTableField_CType(f);
 
     bool eq;
@@ -10741,8 +11950,11 @@ upb_Message* upb_Message_DeepClone(const upb_Message* msg,
 bool upb_Message_ShallowCopy(upb_Message* dst, const upb_Message* src,
                              const upb_MiniTable* m, upb_Arena* arena) {
   UPB_ASSERT(!upb_Message_IsFrozen(dst));
-  memcpy(dst, src, m->UPB_PRIVATE(size));
-
+  // Skip the leading struct upb_Message header (dst + 1 / src + 1), which
+  // stores the tagged upb_Message_Internal* pointer and frozen bit, and copy
+  // only the trailing hasbits and field storage.
+  memcpy(dst + 1, src + 1, m->UPB_PRIVATE(size) - sizeof(upb_Message));
+  UPB_PRIVATE(_upb_Message_SetInternal)(dst, NULL);
   return UPB_PRIVATE(_upb_Message_CopyInternal)(dst, src, arena);
 }
 
@@ -10755,6 +11967,7 @@ upb_Message* upb_Message_ShallowClone(const upb_Message* msg,
   if (!upb_Message_ShallowCopy(clone, msg, m, arena)) return NULL;
   return clone;
 }
+
 
 #include "stddef.h"
 
@@ -10788,13 +12001,14 @@ bool upb_Message_MergeFrom(upb_Message* dst, const upb_Message* src,
 }
 
 
+#include <stddef.h>
 #include <stdint.h>
 
 
 // Must be last.
 
-const upb_Extension* UPB_PRIVATE(_upb_Message_Getext)(
-    const struct upb_Message* msg, const upb_MiniTableExtension* e) {
+const upb_Extension* UPB_PRIVATE(_upb_Message_GetExtension)(
+    const struct upb_Message* msg, const upb_MiniTableField* f) {
   upb_Message_Internal* in = UPB_PRIVATE(_upb_Message_GetInternal)(msg);
   if (!in) return NULL;
 
@@ -10803,13 +12017,19 @@ const upb_Extension* UPB_PRIVATE(_upb_Message_Getext)(
     if (upb_TaggedAuxPtr_IsCanonicalExtension(tagged_ptr)) {
       const upb_Extension* ext =
           upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
-      if (upb_Extension_MiniTableExtension(ext) == e) {
+      if (upb_Extension_MiniTableField(ext) == f) {
         return ext;
       }
     }
   }
 
   return NULL;
+}
+
+const upb_Extension* UPB_PRIVATE(_upb_Message_Getext)(
+    const struct upb_Message* msg, const upb_MiniTableExtension* e) {
+  return UPB_PRIVATE(_upb_Message_GetExtension)(
+      msg, upb_MiniTableExtension_ToField(e));
 }
 
 upb_Extension* UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
@@ -11536,6 +12756,10 @@ static const char* upb_MtDecoder_DecodeOneofField(upb_MtDecoder* d,
   } else {
     UPB_ASSERT(current_align >= new_align);
   }
+  if ((size_t)(f - d->fields) + kOneofBase >=
+      kUpb_OneOfLayoutItem_IndexSentinel) {
+    upb_MdDecoder_ErrorJmp(&d->base, "Too many fields for oneof layout");
+  }
   // Prepend this field to the linked list.
   f->UPB_PRIVATE(offset) = item->field_index;
   item->field_index = (f - d->fields) + kOneofBase;
@@ -11989,7 +13213,10 @@ done:
   upb_DecodeFast_TableEntry fasttable[32];
   int fasttable_size = 0;
   if (decoder->platform == kUpb_MiniTablePlatform_64Bit) {
-    fasttable_size = upb_DecodeFast_BuildTable(&decoder->table, fasttable);
+    // The table is not linked yet, so map fields cannot be identified; they
+    // are updated when linked (see upb_MiniTable_SetSubMessage()).
+    fasttable_size =
+        upb_DecodeFast_BuildTable(&decoder->table, NULL, fasttable);
     mt_size += fasttable_size * sizeof(fasttable[0]);
   }
 #endif
@@ -12403,40 +13630,16 @@ const int8_t _kUpb_FromBase92[] = {
 
 // Must be last.
 
-typedef struct {
-  uint64_t present_values_mask;
-  uint32_t last_written_value;
-} upb_MtDataEncoderInternal_EnumState;
-
-typedef struct {
-  uint64_t msg_modifiers;
-  uint32_t last_field_num;
-  enum {
-    kUpb_OneofState_NotStarted,
-    kUpb_OneofState_StartedOneof,
-    kUpb_OneofState_EmittedOneofField,
-  } oneof_state;
-} upb_MtDataEncoderInternal_MsgState;
-
-typedef struct {
-  char* buf_start;  // Only for checking kUpb_MtDataEncoder_MinSize.
-  union {
-    upb_MtDataEncoderInternal_EnumState enum_state;
-    upb_MtDataEncoderInternal_MsgState msg_state;
-  } state;
-} upb_MtDataEncoderInternal;
-
 static upb_MtDataEncoderInternal* upb_MtDataEncoder_GetInternal(
     upb_MtDataEncoder* e, char* buf_start) {
-  UPB_ASSERT(sizeof(upb_MtDataEncoderInternal) <= sizeof(e->internal));
-  upb_MtDataEncoderInternal* ret = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* ret = &e->internal;
   ret->buf_start = buf_start;
   return ret;
 }
 
 static char* upb_MtDataEncoder_PutRaw(upb_MtDataEncoder* e, char* ptr,
                                       char ch) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   UPB_ASSERT(ptr - in->buf_start < kUpb_MtDataEncoder_MinSize);
   if (ptr == e->end) return NULL;
   *ptr++ = ch;
@@ -12524,7 +13727,7 @@ char* upb_MtDataEncoder_StartMessage(upb_MtDataEncoder* e, char* ptr,
 static char* _upb_MtDataEncoder_MaybePutFieldSkip(upb_MtDataEncoder* e,
                                                   char* ptr,
                                                   uint32_t field_num) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   if (field_num <= in->state.msg_state.last_field_num) return NULL;
   if (in->state.msg_state.last_field_num + 1 != field_num) {
     // Put skip.
@@ -12581,7 +13784,7 @@ static char* _upb_MtDataEncoder_PutFieldType(upb_MtDataEncoder* e, char* ptr,
 static char* _upb_MtDataEncoder_MaybePutModifiers(upb_MtDataEncoder* e,
                                                   char* ptr, upb_FieldType type,
                                                   uint64_t field_mod) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   uint32_t encoded_modifiers = 0;
   if ((field_mod & kUpb_FieldModifier_IsRepeated) &&
       upb_FieldType_IsPackable(type)) {
@@ -12667,7 +13870,7 @@ char* upb_MtDataEncoder_StartEnum(upb_MtDataEncoder* e, char* ptr) {
 
 static char* upb_MtDataEncoder_FlushDenseEnumMask(upb_MtDataEncoder* e,
                                                   char* ptr) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   ptr = upb_MtDataEncoder_Put(e, ptr, in->state.enum_state.present_values_mask);
   in->state.enum_state.present_values_mask = 0;
   in->state.enum_state.last_written_value += 5;
@@ -14617,7 +15820,7 @@ static str_t* unescape(upb_DefBuilder* ctx, const upb_FieldDef* f,
   str_t* ret = _upb_DefBuilder_Alloc(ctx, sizeof(*ret) + len);
   char* dst = &ret->str[0];
   const char* src = data;
-  const char* end = data + len;
+  const char* end = UPB_PTRADD(data, len);
 
   while (src < end) {
     if (*src == '\\') {
@@ -14931,6 +16134,18 @@ static void _upb_FieldDef_Create(upb_DefBuilder* ctx, const char* prefix,
   if (f->label_ < kUpb_Label_Optional || f->label_ > kUpb_Label_Repeated) {
     _upb_DefBuilder_Errf(ctx, "invalid label for field %s (%d)", f->full_name,
                          f->label_);
+  }
+
+  // A repeated field cannot be required.  protoc and the C++ DescriptorPool
+  // reject this ("Repeated fields can't specify field presence"), but it can
+  // still be expressed in a raw descriptor by setting
+  // features.field_presence = LEGACY_REQUIRED on a repeated field.  Such a
+  // field would be both required and repeated, which violates the invariant
+  // (relied on elsewhere in upb) that every required field has presence, so we
+  // reject it here rather than build an inconsistent def.
+  if (upb_FieldDef_IsRepeated(f) && upb_FieldDef_IsRequired(f)) {
+    _upb_DefBuilder_Errf(ctx, "repeated field %s cannot be required",
+                         f->full_name);
   }
 
   /* We can't resolve the subdef or (in the case of extensions) the containing
@@ -18775,20 +19990,6 @@ bool _upb_Decoder_TryDecodeMessageFast(upb_Decoder* d, const char** ptr,
   return false;
 }
 
-UPB_FORCEINLINE
-const char* _upb_Decoder_DecodeField(upb_Decoder* d, const char* ptr,
-                                     upb_Message* msg, const upb_MiniTable* mt,
-                                     uint64_t last_field_index, uint64_t data) {
-  if (_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, last_field_index,
-                                        data)) {
-    return ptr;
-  } else if (upb_EpsCopyInputStream_IsDone(EPS(d), &ptr)) {
-    return _upb_Decoder_EndMessage(d, ptr);
-  }
-
-  return _upb_Decoder_DecodeFieldNoFast(d, ptr, msg, mt);
-}
-
 UPB_NOINLINE
 static const char* _upb_Decoder_DecodeEmptyMessage(upb_Decoder* d,
                                                    const char* ptr,
@@ -18852,9 +20053,19 @@ const char* _upb_Decoder_DecodeMessage(upb_Decoder* d, const char* ptr,
     return _upb_Decoder_DecodeEmptyMessage(d, ptr, msg);
   }
 
-  do {
-    ptr = _upb_Decoder_DecodeField(d, ptr, msg, mt, 0, 0);
-  } while (!d->message_is_done);
+  if (UPB_LIKELY(_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, 0, 0))) {
+    d->message_is_done = false;
+    return ptr;
+  }
+
+  while (!upb_EpsCopyInputStream_IsDone(EPS(d), &ptr)) {
+    ptr = _upb_Decoder_DecodeFieldNoFast(d, ptr, msg, mt);
+    if (d->message_is_done) break;
+    if (_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, 0, 0)) {
+      d->message_is_done = false;
+      return ptr;
+    }
+  }
   d->message_is_done = false;
 
   return UPB_UNLIKELY(mt && mt->UPB_PRIVATE(required_count))
@@ -19574,7 +20785,7 @@ static char* encode_scalar(char* ptr, upb_encstate* e, const void* field_mem,
       if (submsg == 0) {
         return ptr;
       }
-      if (--e->depth == 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
+      if (--e->depth < 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
       ptr = encode_tag(ptr, e, upb_MiniTableField_Number(f),
                        kUpb_WireType_EndGroup);
       ptr = encode_message(ptr, e, submsg, subm, &size);
@@ -19589,7 +20800,7 @@ static char* encode_scalar(char* ptr, upb_encstate* e, const void* field_mem,
       if (submsg == 0) {
         return ptr;
       }
-      if (--e->depth == 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
+      if (--e->depth < 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
       ptr = encode_message(ptr, e, submsg, subm, &size);
       e->depth++;
       size_t max_size = UPB_PB_VARINT32_MAX_LEN + UPB_PB_VARINT32_MAX_LEN;
@@ -19687,7 +20898,7 @@ static char* encode_array(char* ptr, upb_encstate* e, const upb_Message* msg,
       const upb_Message* const* start = upb_Array_DataPtr(arr);
       const upb_Message* const* arr_ptr = start + upb_Array_Size(arr);
       const upb_MiniTable* subm = upb_MiniTable_GetSubMessageTable(f);
-      if (--e->depth == 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
+      if (--e->depth < 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
       do {
         size_t size;
         arr_ptr--;
@@ -19704,7 +20915,7 @@ static char* encode_array(char* ptr, upb_encstate* e, const upb_Message* msg,
       const upb_Message* const* start = upb_Array_DataPtr(arr);
       const upb_Message* const* arr_ptr = start + upb_Array_Size(arr);
       const upb_MiniTable* subm = upb_MiniTable_GetSubMessageTable(f);
-      if (--e->depth == 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
+      if (--e->depth < 0) encode_err(e, kUpb_EncodeStatus_MaxDepthExceeded);
       do {
         size_t size;
         arr_ptr--;
@@ -19815,33 +21026,31 @@ static char* encode_field(char* ptr, upb_encstate* e, const upb_Message* msg,
 }
 
 static char* encode_msgset_item(char* ptr, upb_encstate* e,
-                                const upb_MiniTableExtension* ext,
+                                const upb_MiniTableField* f,
                                 const upb_MessageValue ext_val) {
   // MessageSet items are always singular submessages. This holds for canonical
   // extensions of a MessageSet, but must also hold for any non-canonical
   // extension that is encoded as a MessageSet item.
-  UPB_ASSERT(upb_MiniTableField_IsScalar(upb_MiniTableExtension_ToField(ext)));
-  UPB_ASSERT(upb_MiniTableExtension_CType(ext) == kUpb_CType_Message);
+  UPB_ASSERT(upb_MiniTableField_IsScalar(f));
+  UPB_ASSERT(upb_MiniTableField_CType(f) == kUpb_CType_Message);
   size_t size;
   ptr = encode_tag(ptr, e, kUpb_MsgSet_Item, kUpb_WireType_EndGroup);
-  ptr = encode_message(ptr, e, ext_val.msg_val,
-                       upb_MiniTableExtension_GetSubMessage(ext), &size);
+  ptr = encode_message(ptr, e, ext_val.msg_val, upb_MiniTable_SubMessage(f),
+                       &size);
   ptr = encode_varint(ptr, e, size);
   ptr = encode_tag(ptr, e, kUpb_MsgSet_Message, kUpb_WireType_Delimited);
-  ptr = encode_varint(ptr, e, upb_MiniTableExtension_Number(ext));
+  ptr = encode_varint(ptr, e, upb_MiniTableField_Number(f));
   ptr = encode_tag(ptr, e, kUpb_MsgSet_TypeId, kUpb_WireType_Varint);
   ptr = encode_tag(ptr, e, kUpb_MsgSet_Item, kUpb_WireType_StartGroup);
   return ptr;
 }
 
-static char* encode_ext(char* ptr, upb_encstate* e,
-                        const upb_MiniTableExtension* ext,
+static char* encode_ext(char* ptr, upb_encstate* e, const upb_MiniTableField* f,
                         upb_MessageValue ext_val, bool is_message_set) {
   if (UPB_UNLIKELY(is_message_set)) {
-    ptr = encode_msgset_item(ptr, e, ext, ext_val);
+    ptr = encode_msgset_item(ptr, e, f, ext_val);
   } else {
-    ptr = encode_field(ptr, e, &ext_val.UPB_PRIVATE(ext_msg_val),
-                       &ext->UPB_PRIVATE(field));
+    ptr = encode_field(ptr, e, &ext_val.UPB_PRIVATE(ext_msg_val), f);
   }
   return ptr;
 }
@@ -19858,10 +21067,10 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
    * keep these in field number order relative to normal fields or even to each
    * other. */
   uintptr_t iter = kUpb_Message_ExtensionBegin;
-  const upb_MiniTableExtension* ext;
+  const upb_MiniTableField* f;
   upb_MessageValue ext_val;
-  if (!UPB_PRIVATE(_upb_Message_NextExtensionReverse)(msg, &ext, &ext_val,
-                                                      &iter)) {
+  if (!UPB_PRIVATE(_upb_Message_NextExtensionFieldReverse)(msg, &f, &ext_val,
+                                                           &iter)) {
     // Message has no extensions.
     return ptr;
   }
@@ -19873,7 +21082,7 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     }
     const upb_Extension* ext;
     while (_upb_sortedmap_nextext(&e->sorter, &sorted, &ext)) {
-      ptr = encode_ext(ptr, e, upb_Extension_MiniTableExtension(ext),
+      ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                        upb_Extension_GetValue(ext),
                        UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) ==
                            kUpb_ExtMode_IsMessageSet);
@@ -19881,10 +21090,10 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     _upb_mapsorter_popmap(&e->sorter, &sorted);
   } else {
     do {
-      ptr = encode_ext(ptr, e, ext, ext_val,
+      ptr = encode_ext(ptr, e, f, ext_val,
                        m->UPB_PRIVATE(ext) == kUpb_ExtMode_IsMessageSet);
-    } while (UPB_PRIVATE(_upb_Message_NextExtensionReverse)(msg, &ext, &ext_val,
-                                                            &iter));
+    } while (UPB_PRIVATE(_upb_Message_NextExtensionFieldReverse)(
+        msg, &f, &ext_val, &iter));
   }
   return ptr;
 }
@@ -19918,7 +21127,7 @@ char* encode_message(char* ptr, upb_encstate* e, const upb_Message* msg,
       } else if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
         const upb_Extension* ext =
             upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
-        ptr = encode_ext(ptr, e, upb_Extension_MiniTableExtension(ext),
+        ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                          upb_Extension_GetValue(ext),
                          UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) ==
                              kUpb_ExtMode_IsMessageSet);
@@ -20017,7 +21226,8 @@ upb_EncodeStatus UPB_PRIVATE(_upb_Encode_Extension)(
   e->options = options;
   e->depth = upb_EncodeOptions_GetEffectiveMaxDepth(options);
   char* ptr = *buf;
-  ptr = encode_ext(ptr, e, ext, ext_val, is_message_set);
+  ptr = encode_ext(ptr, e, upb_MiniTableExtension_ToField(ext), ext_val,
+                   is_message_set);
   *size = upb_BackAlloc_Finish(&e->alloc, ptr);
   *buf = ptr;
   return e->status;
@@ -20188,6 +21398,7 @@ const char* UPB_PRIVATE(_upb_WireReader_SkipGroup)(
 #undef UPB_HWASAN
 #undef UPB_HWASAN_POISON_TAG
 #undef UPB_MSAN
+#undef UPB_TYSAN
 #undef UPB_MALLOC_ALIGN
 #undef UPB_TSAN
 #undef UPB_DEPRECATED
@@ -20221,6 +21432,7 @@ const char* UPB_PRIVATE(_upb_WireReader_SkipGroup)(
 #undef UPB_ARM64_BTI_DEFAULT
 #undef UPB_DEPRECATE_AND_INLINE
 #undef UPB_MAYBE_ASSUME
+#undef UPB_ASSUME_SEPARATE
 #undef UPB_ATTR_CONST
 #undef _UPB_STRINGIFY
 #undef _UPB_STRINGIFY2

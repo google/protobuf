@@ -399,7 +399,7 @@ static str_t* unescape(upb_DefBuilder* ctx, const upb_FieldDef* f,
   str_t* ret = _upb_DefBuilder_Alloc(ctx, sizeof(*ret) + len);
   char* dst = &ret->str[0];
   const char* src = data;
-  const char* end = data + len;
+  const char* end = UPB_PTRADD(data, len);
 
   while (src < end) {
     if (*src == '\\') {
@@ -713,6 +713,18 @@ static void _upb_FieldDef_Create(upb_DefBuilder* ctx, const char* prefix,
   if (f->label_ < kUpb_Label_Optional || f->label_ > kUpb_Label_Repeated) {
     _upb_DefBuilder_Errf(ctx, "invalid label for field %s (%d)", f->full_name,
                          f->label_);
+  }
+
+  // A repeated field cannot be required.  protoc and the C++ DescriptorPool
+  // reject this ("Repeated fields can't specify field presence"), but it can
+  // still be expressed in a raw descriptor by setting
+  // features.field_presence = LEGACY_REQUIRED on a repeated field.  Such a
+  // field would be both required and repeated, which violates the invariant
+  // (relied on elsewhere in upb) that every required field has presence, so we
+  // reject it here rather than build an inconsistent def.
+  if (upb_FieldDef_IsRepeated(f) && upb_FieldDef_IsRequired(f)) {
+    _upb_DefBuilder_Errf(ctx, "repeated field %s cannot be required",
+                         f->full_name);
   }
 
   /* We can't resolve the subdef or (in the case of extensions) the containing

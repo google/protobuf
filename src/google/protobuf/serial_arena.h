@@ -23,6 +23,7 @@
 #include "absl/log/absl_check.h"
 #include "absl/numeric/bits.h"
 #include "google/protobuf/arena_align.h"
+#include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/string_block.h"
@@ -36,7 +37,7 @@ namespace internal {
 
 // Arena blocks are variable length malloc-ed objects.  The following structure
 // describes the common header for all blocks.
-struct ArenaBlock {
+struct alignas(ArenaAlignDefault::align) ArenaBlock {
   // For the sentry block with zero-size where ptr_/limit_ both point to `this`.
   constexpr ArenaBlock() : next(nullptr), size(0) {}
 
@@ -147,15 +148,17 @@ class PROTOBUF_EXPORT SerialArena {
   }
 
  public:
+  static constexpr size_t kMinimumReturnedArraySize = 16;
+
   // See comments on `cached_blocks_` member for details.
   void ReturnArrayMemory(void* p, size_t size) {
     // We only need to check for 32-bit platforms.
     // In 64-bit platforms the minimum allocation size from Repeated*Field will
     // be 16 guaranteed.
     if (sizeof(void*) < 8) {
-      if (ABSL_PREDICT_FALSE(size < 16)) return;
+      if (ABSL_PREDICT_FALSE(size < kMinimumReturnedArraySize)) return;
     } else {
-      PROTOBUF_ASSUME(size >= 16);
+      PROTOBUF_ASSUME(size >= kMinimumReturnedArraySize);
     }
 
     // We round down to the next smaller block in case the memory doesn't match
@@ -304,9 +307,8 @@ class PROTOBUF_EXPORT SerialArena {
   // Constructor is private as only New() should be used.
   inline SerialArena(ArenaBlock* b, ThreadSafeArena& parent);
 
-  // Constructors to handle the first SerialArena.
-  inline explicit SerialArena(ThreadSafeArena& parent);
-  inline SerialArena(FirstSerialArena, ArenaBlock* b, ThreadSafeArena& parent);
+  inline SerialArena(FirstSerialArena, SizedPtr mem,
+                     const AllocationPolicy& policy, ThreadSafeArena& parent);
 
   bool MaybeAllocateString(void*& p);
   ABSL_ATTRIBUTE_RETURNS_NONNULL void* AllocateFromStringBlockFallback();
