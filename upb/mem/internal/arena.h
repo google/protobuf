@@ -164,10 +164,18 @@ UPB_NODISCARD UPB_API_INLINE void* upb_Arena_Realloc(struct upb_Arena* a,
   void* ret;
 
   if (ptr && (size <= oldsize || upb_Arena_TryExtend(a, ptr, oldsize, size))) {
-    // We can extend or shrink in place.
-    if (size <= oldsize &&
-        UPB_PRIVATE(_upb_Arena_WasLastAllocFromCurrentBlock)(a, ptr, oldsize)) {
-      upb_Arena_ShrinkLast(a, ptr, oldsize, size);
+    // We can extend or shrink in place. (upb_Arena_TryExtend() already
+    // resized the region if it succeeded.)
+    if (size <= oldsize) {
+      if (UPB_PRIVATE(_upb_Arena_WasLastAllocFromCurrentBlock)(a, ptr,
+                                                               oldsize)) {
+        upb_Arena_ShrinkLast(a, ptr, oldsize, size);
+      } else {
+        // We can't reclaim the tail, but it is freed. The kept part is retagged
+        // below.
+        UPB_PRIVATE(upb_Xsan_PoisonRegion)(UPB_PTR_AT(ptr, size, char),
+                                           oldsize - size);
+      }
     }
     ret = ptr;
   } else {
@@ -179,10 +187,10 @@ UPB_NODISCARD UPB_API_INLINE void* upb_Arena_Realloc(struct upb_Arena* a,
   }
 
   if (ret) {
-    // We want to invalidate pointers to the old region if hwasan is enabled, so
-    // we poison and unpoison even if ptr == ret. However, if reallocation fails
-    // we do not want to poison the old memory, or attempt to poison null.
-    UPB_PRIVATE(upb_Xsan_PoisonRegion)(ptr, oldsize);
+    // If we moved, the old region is freed. If we resized in place, the
+    // contents are kept and the region was already resized above. If
+    // reallocation fails we do not want to poison the old memory.
+    if (ret != ptr) UPB_PRIVATE(upb_Xsan_PoisonRegion)(ptr, oldsize);
     return UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(UPB_XSAN(a), ret, size);
   }
   return ret;
@@ -248,6 +256,8 @@ UPB_NODISCARD UPB_API_INLINE void* upb_Arena_TryAllocPool(struct upb_Arena* a,
     UPB_PRIVATE(_upb_ArenaFreeBlock)* block = pool->UPB_PRIVATE(bins)[bin];
     if (UPB_LIKELY(block != NULL)) {
       pool->UPB_PRIVATE(bins)[bin] = block->UPB_PRIVATE(next);
+      // The free-list link is dead now that the block is being reused.
+      UPB_PRIVATE(upb_Xsan_PoisonRegion)(block, sizeof(*block));
       return UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(UPB_XSAN(a), block,
                                                        pool_size);
     }
