@@ -1775,6 +1775,24 @@ inline auto FileDescriptorTables::FindNestedSymbol(
                                         : K::IterToSymbol(it, flat_buffer_);
 }
 
+namespace {
+class ABSL_SCOPED_LOCKABLE ReaderMutexLockMaybe {
+ public:
+  explicit ReaderMutexLockMaybe(absl::Mutex* mu) ABSL_SHARED_LOCK_FUNCTION(mu)
+      : mu_(mu) {
+    if (mu_ != nullptr) mu_->lock_shared();
+  }
+  ReaderMutexLockMaybe(const ReaderMutexLockMaybe&) = delete;
+  ReaderMutexLockMaybe& operator=(const ReaderMutexLockMaybe&) = delete;
+  ~ReaderMutexLockMaybe() ABSL_UNLOCK_FUNCTION() {
+    if (mu_ != nullptr) mu_->unlock_shared();
+  }
+
+ private:
+  absl::Mutex* const mu_;
+};
+}  // namespace
+
 template <typename FindInTable, typename FindInUnderlay,
           typename TryFindInFallbackDb>
 auto DescriptorPool::LookupWithFallback(
@@ -2443,6 +2461,7 @@ const FieldDescriptor* DescriptorPool::FindExtensionByNumber(
 
 const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
     const Descriptor* extendee, int number) const {
+  AssertReaderHeld();
   if (extendee->extension_range_count() == 0) return nullptr;
 
   const FieldDescriptor* result = tables_->FindExtension(extendee, number);
@@ -2451,6 +2470,7 @@ const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
   }
 
   if (underlay_ != nullptr) {
+    ReaderMutexLockMaybe lock(underlay_->mutex_);
     result = underlay_->InternalFindExtensionByNumberNoLock(extendee, number);
     if (result != nullptr) return result;
   }
@@ -2777,6 +2797,7 @@ bool DescriptorPool::TryFindFileInFallbackDatabase(
 }
 
 bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
+  AssertReaderHeld();
   for (size_t pos = name.find('.'); pos != name.npos;
        pos = name.find('.', pos + 1)) {
     auto prefix = name.substr(0, pos);
@@ -2792,6 +2813,7 @@ bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
   }
   if (underlay_ != nullptr) {
     // Check to see if any prefix of this symbol exists in the underlay.
+    ReaderMutexLockMaybe lock(underlay_->mutex_);
     return underlay_->IsSubSymbolOfBuiltType(name);
   }
   return false;
@@ -4281,7 +4303,7 @@ const FileDescriptor* DescriptorPool::BuildFileCollectingErrors(
 
 const FileDescriptor* DescriptorPool::BuildFileFromDatabase(
     const FileDescriptorProto& proto) const {
-  mutex_->AssertHeld();
+  AssertHeld();
   build_started_ = true;
   if (tables_->IsKnownBadFile(proto.name())) {
     return nullptr;
@@ -4718,9 +4740,7 @@ Symbol DescriptorPool::NewPlaceholder(absl::string_view name,
 
 Symbol DescriptorPool::NewPlaceholderWithMutexHeld(
     absl::string_view name, PlaceholderType placeholder_type) const {
-  if (mutex_) {
-    mutex_->AssertHeld();
-  }
+  AssertHeld();
   // Compute names.
   absl::string_view placeholder_full_name;
   absl::string_view placeholder_name;
@@ -4856,9 +4876,7 @@ FileDescriptor* DescriptorPool::NewPlaceholderFile(
 
 FileDescriptor* DescriptorPool::NewPlaceholderFileWithMutexHeld(
     const absl::string_view name, internal::FlatAllocator& alloc) const {
-  if (mutex_) {
-    mutex_->AssertHeld();
-  }
+  AssertHeld();
   FileDescriptor* placeholder = alloc.AllocateArray<FileDescriptor>(1);
   memset(static_cast<void*>(placeholder), 0, sizeof(*placeholder));
 
