@@ -178,6 +178,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
        {"static", IsOwnFile(descriptor, immutable_api) ? " " : " static "},
        {"deprecation",
         descriptor->options().deprecated() ? "@java.lang.Deprecated" : ""},
+       {"unrecognized_value", GetUnrecognizedValue(descriptor)},
        {"unrecognized_index", descriptor->value_count()},
        {"proto_enum_class", context->EnforceLite()
                                 ? "com.google.protobuf.Internal.EnumLite"
@@ -230,6 +231,36 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
           printer->Emit(R"(
             return value;
           )");
+        }},
+       {"to_string_func",
+        [&] {
+          if (context->EnforceLite() && !google::protobuf::internal::IsOss()) {
+            printer->Emit(R"(
+              StringBuilder result = new StringBuilder("<");
+              result.append(getClass().getName()).append('@')
+                  .append(java.lang.Integer.toHexString(
+                    java.lang.System.identityHashCode(this)));
+            )");
+            if (!descriptor->is_closed()) {
+              printer->Emit(R"(
+                if (this != UNRECOGNIZED) {
+                  result.append(" number=").append(getNumber());
+                }
+              )");
+            } else {
+              printer->Emit(R"(
+                result.append(" number=").append(getNumber());
+              )");
+            }
+            printer->Emit(R"(
+              return result.append(" name=")
+                  .append(name()).append('>').toString();
+            )");
+          } else {
+            printer->Emit(R"(
+              return name;
+            )");
+          }
         }},
        {"deprecated_value_of_func",
         [&] {
@@ -304,6 +335,28 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
               values[$unrecognized_index$] = UNRECOGNIZED;
               return values;
           )");
+        }},
+       {"read_resolve_func",
+        [&] {
+          if (!context->EnforceLite()) {
+            // Only emit readResolve for full runtime enums. Even though large
+            // lite enums also implement Serializable for consistency with
+            // regular lite enums (which must be Serializable because they
+            // inherit from java.lang.Enum), Java serialization should be
+            // avoided for lite enums. AppReduce will retain the readResolve
+            // method due to common proguard rules. Retaining readResolve will
+            // prevent large lite enums from being optimized by AppReduce (which
+            // is particularly important for large enum).
+            printer->Emit(R"(
+              private java.lang.Object readResolve() throws java.io.ObjectStreamException {
+                if ("UNRECOGNIZED".equals(name)) {
+                  return UNRECOGNIZED;
+                }
+                $classname$ result = forNumber(value);
+                return result != null ? result : UNRECOGNIZED;
+              }
+            )");
+          }
         }},
        {"enum_verifier_func",
         [&] {
@@ -428,7 +481,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
             $gen_code_version_validator$
           }
 
-          public static final $classname$ UNRECOGNIZED = new $classname$(-1, $unrecognized_index$, "UNRECOGNIZED");
+          public static final $classname$ UNRECOGNIZED = new $classname$($unrecognized_value$, $unrecognized_index$, "UNRECOGNIZED");
 
           $deprecated_value_of_func$
 
@@ -488,8 +541,10 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
 
           @java.lang.Override
           public String toString() {
-            return name;
+            $to_string_func$
           }
+
+          $read_resolve_func$
 
           public static com.google.protobuf.Internal.EnumLiteMap<$classname$> internalGetValueMap() {
             return internalValueMap;
