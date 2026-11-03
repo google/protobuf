@@ -178,6 +178,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
        {"static", IsOwnFile(descriptor, immutable_api) ? " " : " static "},
        {"deprecation",
         descriptor->options().deprecated() ? "@java.lang.Deprecated" : ""},
+       {"unrecognized_value", GetUnrecognizedValue(descriptor)},
        {"unrecognized_index", descriptor->value_count()},
        {"proto_enum_class", context->EnforceLite()
                                 ? "com.google.protobuf.Internal.EnumLite"
@@ -458,7 +459,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
             $gen_code_version_validator$
           }
 
-          public static final $classname$ UNRECOGNIZED = new $classname$(-1, $unrecognized_index$, "UNRECOGNIZED");
+          public static final $classname$ UNRECOGNIZED = new $classname$($unrecognized_value$, $unrecognized_index$, "UNRECOGNIZED");
 
           $deprecated_value_of_func$
 
