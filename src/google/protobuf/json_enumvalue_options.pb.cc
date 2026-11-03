@@ -153,8 +153,9 @@ static_assert(alignof(JsonEnumValueOptionsGlobalsTypeInternal) ==
               ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const JsonEnumValueOptionsGlobalsTypeInternal JsonEnumValueOptions_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const JsonEnumValueOptionsGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) JsonEnumValueOptions_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 }  // namespace enumvalue
 }  // namespace pb
 static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE

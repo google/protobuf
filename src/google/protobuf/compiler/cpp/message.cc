@@ -5423,8 +5423,9 @@ void MessageGenerator::GenerateSourceDefaultInstance(io::Printer* p) {
                       ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
         PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT$ dllexport_decl$
-            PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 $const $$globals_type$ $globals$
-                $SECTION$;
+            PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 $const $$globals_type$
+                PROTOBUF_ALIGNAS(
+                    ::_pbi::kClassDataAlignment) $globals$ $SECTION$;
       )cc");
 
   if (options_.lite_implicit_weak_fields) {
