@@ -231,6 +231,36 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
             return value;
           )");
         }},
+       {"to_string_func",
+        [&] {
+          if (context->EnforceLite() && !google::protobuf::internal::IsOss()) {
+            printer->Emit(R"(
+              StringBuilder result = new StringBuilder("<");
+              result.append(getClass().getName()).append('@')
+                  .append(java.lang.Integer.toHexString(
+                    java.lang.System.identityHashCode(this)));
+            )");
+            if (!descriptor->is_closed()) {
+              printer->Emit(R"(
+                if (this != UNRECOGNIZED) {
+                  result.append(" number=").append(getNumber());
+                }
+              )");
+            } else {
+              printer->Emit(R"(
+                result.append(" number=").append(getNumber());
+              )");
+            }
+            printer->Emit(R"(
+              return result.append(" name=")
+                  .append(name()).append('>').toString();
+            )");
+          } else {
+            printer->Emit(R"(
+              return name;
+            )");
+          }
+        }},
        {"deprecated_value_of_func",
         [&] {
           if (google::protobuf::internal::IsOss()) {
@@ -488,7 +518,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
 
           @java.lang.Override
           public String toString() {
-            return name;
+            $to_string_func$
           }
 
           public static com.google.protobuf.Internal.EnumLiteMap<$classname$> internalGetValueMap() {

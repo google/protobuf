@@ -98,6 +98,12 @@ public class LargeEnumTest {
   }
 
   @Test
+  public void testToString() throws Exception {
+    assertThat(LargeOpenEnum.LARGE_ENUM1.toString()).isEqualTo("LARGE_ENUM1");
+    assertThat(LargeOpenEnum.UNRECOGNIZED.toString()).isEqualTo("UNRECOGNIZED");
+  }
+
+  @Test
   public void testValuesHasAllCanonicals() throws Exception {
     // The values() method returns only the canonical values, sorted in index order.
     assertThat(LargeOpenEnum.values())
