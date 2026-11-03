@@ -590,51 +590,50 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
 
     auto v = p->WithVars(FieldVars(field, options_));
     auto t = p->WithVars(MakeTrackerCalls(field, options_));
-    p->Emit({{"field_comment", FieldComment(field, options_)},
-             Sub("const_impl", "const;").WithSuffix(";"),
-             Sub("impl", ";").WithSuffix(";"),
-             {"sizer",
-              [&] {
-                if (!field->is_repeated()) return;
-                p->Emit(
-                    {Sub("name_size", absl::StrCat(name, "_size"))
+    p->Emit(
+        {{"field_comment", FieldComment(field, options_)},
+         Sub("const_impl", "const;").WithSuffix(";"),
+         Sub("impl", ";").WithSuffix(";"),
+         {"sizer",
+          [&] {
+            if (!field->is_repeated()) return;
+            p->Emit({Sub("name_size", absl::StrCat(name, "_size"))
                          .AnnotatedAs(field)},
                     R"cc(
                       [[nodiscard]] $DEPRECATED $int $name_size$() $const_impl$;
                     )cc");
-              }},
-             {"hazzer",
-              [&] {
-                if (!field->has_presence()) return;
-                p->Emit(
-                    {Sub("has_name", absl::StrCat("has_", name))
+          }},
+         {"hazzer",
+          [&] {
+            if (!field->has_presence()) return;
+            p->Emit({Sub("has_name", absl::StrCat("has_", name))
                          .AnnotatedAs(field)},
                     R"cc(
                       [[nodiscard]] $DEPRECATED $bool $has_name$() $const_impl$;
                     )cc");
-              }},
-             {"clearer",
-              [&] {
-                p->Emit({Sub("clear_name", absl::StrCat("clear_", name))
-                             .AnnotatedAs({
-                                 field,
-                                 Semantic::kSet,
-                             })},
-                        R"cc(
-                          $DEPRECATED $void $clear_name$() $impl$;
-                        )cc");
-              }},
-             {"accessors",
-              [&] {
-                field_generators_.get(field).GenerateAccessorDeclarations(p);
-              }}},
-            R"cc(
-              // $field_comment$
-              $sizer$;
-              $hazzer$;
-              $clearer$;
-              $accessors$;
-            )cc");
+          }},
+         {"clearer",
+          [&] {
+            p->Emit({Sub("clear_name", absl::StrCat("clear_", name))
+                         .AnnotatedAs({
+                             field,
+                             Semantic::kSet,
+                         })},
+                    R"cc(
+                      $DEPRECATED $void $clear_name$() $impl$;
+                    )cc");
+          }},
+         {"accessors",
+          [&] {
+            field_generators_.get(field).GenerateAccessorDeclarations(p);
+          }}},
+        R"cc(
+          // $field_comment$
+          $sizer$;
+          $hazzer$;
+          $clearer$;
+          $accessors$;
+        )cc");
   }
 
   if (descriptor_->extension_range_count() > 0) {
@@ -947,29 +946,29 @@ void MessageGenerator::GenerateSingularFieldHasBits(
 
   if (GetFieldHasbitMode(field, options_) == HasbitMode::kTrueHasbit) {
     auto v = p->WithVars(HasBitVars(field));
-    p->Emit(
-        {Sub{"ASSUME",
-             [&] {
-               if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
-                   !ShouldSplit(field, options_) && !IsLazy(field, options_)) {
-                 // We maintain the invariant that for a submessage x, has_x()
-                 // returning true implies that x_ is not null. By giving this
-                 // information to the compiler, we allow it to eliminate
-                 // unnecessary null checks later on.
-                 p->Emit(
-                     R"cc(PROTOBUF_ASSUME(!value || $field_$ != nullptr);)cc");
-               }
-             }}
-             .WithSuffix(";")},
-        R"cc(
-          inline bool $Msg$::has_$name$() const {
-            $WeakDescriptorSelfPin$;
-            $annotate_has$;
-            bool value = CheckHasBit($has_bits$[$has_array_index$], $has_mask$);
-            $ASSUME$;
-            return value;
-          }
-        )cc");
+    p->Emit({Sub{"ASSUME",
+                 [&] {
+                   if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
+                       !ShouldSplit(field, options_) &&
+                       !IsLazy(field, options_)) {
+                     // We maintain the invariant that for a submessage x,
+                     // has_x() returning true implies that x_ is not null. By
+                     // giving this information to the compiler, we allow it to
+                     // eliminate unnecessary null checks later on.
+                     p->Emit(R"cc(PROTOBUF_ASSUME(!value ||
+                                                  $field_$ != nullptr);)cc");
+                   }
+                 }}
+                 .WithSuffix(";")},
+            R"cc(
+              inline bool $Msg$::has_$name$() const {
+                $WeakDescriptorSelfPin$;
+                $annotate_has$;
+                bool value = CheckHasBit($has_bits$[$has_array_index$], $has_mask$);
+                $ASSUME$;
+                return value;
+              }
+            )cc");
   }
 }
 
@@ -3481,11 +3480,11 @@ void MessageGenerator::GenerateSwap(io::Printer* p) {
     }
 
     // If possible, we swap several fields at once, including padding.
-    const RunMap runs = FindRuns(
-        field_layout_.optimized_order(), [this](const FieldDescriptor* field) {
-          return !ShouldSplit(field, options_) &&
-                 HasTrivialSwap(field, options_);
-        });
+    const RunMap runs = FindRuns(field_layout_.optimized_order(),
+                                 [this](const FieldDescriptor* field) {
+                                   return !ShouldSplit(field, options_) &&
+                                          HasTrivialSwap(field, options_);
+                                 });
 
     const auto optimized_order = field_layout_.optimized_order();
     for (size_t i = 0; i < optimized_order.size(); ++i) {
@@ -3858,47 +3857,47 @@ bool MessageGenerator::EmitMergeChunks(io::Printer* p, bool is_split) {
   //   cached_has_bits = from._has_bits_[cached_has_word_index]
   // for cached_has_word_index >= 0
   int cached_has_word_index = -1;
-  auto emit_merge_chunk = [&](const std::vector<const FieldDescriptor*>&
-                                  fields) {
-    const absl::optional<int> has_word_index =
-        field_layout_.GetHasWordIndex(fields.front());
-    const bool cache_has_bits = has_word_index.has_value();
-    const bool check_has_word = cache_has_bits && fields.size() > 1;
+  auto emit_merge_chunk =
+      [&](const std::vector<const FieldDescriptor*>& fields) {
+        const absl::optional<int> has_word_index =
+            field_layout_.GetHasWordIndex(fields.front());
+        const bool cache_has_bits = has_word_index.has_value();
+        const bool check_has_word = cache_has_bits && fields.size() > 1;
 
-    if (cache_has_bits && cached_has_word_index != has_word_index.value()) {
-      cached_has_word_index = has_word_index.value();
-      p->Emit({{"cached_has_word_index", cached_has_word_index}},
-              R"cc(
-                cached_has_bits = from.$has_bits$[$cached_has_word_index$];
-              )cc");
-    }
-
-    if (check_has_word) {
-      // Emit an if() that will let us skip the whole chunk if none are set.
-      uint32_t chunk_mask = GenChunkMask(fields, field_layout_);
-
-      ABSL_DCHECK_GE(absl::popcount(chunk_mask), 2);
-
-      p->Emit({{"condition", GenerateConditionMaybeWithProbabilityForGroup(
-                                 chunk_mask, fields, options_)}},
-              R"cc(
-                if ($condition$) {
-              )cc");
-      p->Indent();
-    }
-
-    // Go back and emit merging code for each of the fields we processed.
-    for (const auto* field : fields) {
-      GenerateMergeImplForField(p, field, is_split, cached_has_word_index);
-    }
-
-    if (check_has_word) {
-      p->Outdent();
-      p->Emit(R"cc(
+        if (cache_has_bits && cached_has_word_index != has_word_index.value()) {
+          cached_has_word_index = has_word_index.value();
+          p->Emit({{"cached_has_word_index", cached_has_word_index}},
+                  R"cc(
+                    cached_has_bits = from.$has_bits$[$cached_has_word_index$];
+                  )cc");
         }
-      )cc");
-    }
-  };
+
+        if (check_has_word) {
+          // Emit an if() that will let us skip the whole chunk if none are set.
+          uint32_t chunk_mask = GenChunkMask(fields, field_layout_);
+
+          ABSL_DCHECK_GE(absl::popcount(chunk_mask), 2);
+
+          p->Emit({{"condition", GenerateConditionMaybeWithProbabilityForGroup(
+                                     chunk_mask, fields, options_)}},
+                  R"cc(
+                    if ($condition$) {
+                  )cc");
+          p->Indent();
+        }
+
+        // Go back and emit merging code for each of the fields we processed.
+        for (const auto* field : fields) {
+          GenerateMergeImplForField(p, field, is_split, cached_has_word_index);
+        }
+
+        if (check_has_word) {
+          p->Outdent();
+          p->Emit(R"cc(
+            }
+          )cc");
+        }
+      };
 
   std::vector<FieldChunk> chunks = CollectFields(
       field_layout_.optimized_order(), options_,
