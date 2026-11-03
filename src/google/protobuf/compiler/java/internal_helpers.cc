@@ -336,6 +336,28 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
               return values;
           )");
         }},
+       {"read_resolve_func",
+        [&] {
+          if (!context->EnforceLite()) {
+            // Only emit readResolve for full runtime enums. Even though large
+            // lite enums also implement Serializable for consistency with
+            // regular lite enums (which must be Serializable because they
+            // inherit from java.lang.Enum), Java serialization should be
+            // avoided for lite enums. AppReduce will retain the readResolve
+            // method due to common proguard rules. Retaining readResolve will
+            // prevent large lite enums from being optimized by AppReduce (which
+            // is particularly important for large enum).
+            printer->Emit(R"(
+              private java.lang.Object readResolve() throws java.io.ObjectStreamException {
+                if ("UNRECOGNIZED".equals(name)) {
+                  return UNRECOGNIZED;
+                }
+                $classname$ result = forNumber(value);
+                return result != null ? result : UNRECOGNIZED;
+              }
+            )");
+          }
+        }},
        {"enum_verifier_func",
         [&] {
           if (context->EnforceLite()) {
@@ -521,6 +543,8 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
           public String toString() {
             $to_string_func$
           }
+
+          $read_resolve_func$
 
           public static com.google.protobuf.Internal.EnumLiteMap<$classname$> internalGetValueMap() {
             return internalValueMap;
