@@ -46,6 +46,7 @@
 #include "google/protobuf/class_data.h"
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_traits.h"
 #include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/port.h"
@@ -258,12 +259,12 @@ struct MessageGlobalsBase {
   static constexpr size_t RoundUpTo(size_t n) {
     static_assert(absl::has_single_bit(R), "Must be power of two");
     if constexpr (KnownAlignment != 0) {
-      ABSL_DCHECK_EQ(n % KnownAlignment, 0u);
+      ABSL_DCHECK(MemoryAlign{KnownAlignment}.IsAligned(n));
     }
     if constexpr (KnownAlignment >= R) {
       return n;
     } else {
-      return (n + (R - 1)) & ~(R - 1);
+      return MemoryAlign{R}.Ceil(n);
     }
   }
 
