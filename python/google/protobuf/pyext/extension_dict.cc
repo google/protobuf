@@ -20,6 +20,7 @@
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/message.h"
+#include "google/protobuf/pyext/container_base.h"
 #include "google/protobuf/pyext/descriptor.h"
 #include "google/protobuf/pyext/descriptor_pool.h"
 #include "google/protobuf/pyext/message.h"
@@ -135,8 +136,7 @@ PyObject* subscript(ExtensionDict* self, PyObject* key) {
   if (!descriptor->is_repeated() &&
       descriptor->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
     // TODO: consider building the class on the fly!
-    ContainerBase* sub_message =
-        cmessage::InternalGetSubMessage(self->parent, descriptor);
+    ContainerBase* sub_message = self->parent->GetSubMessage(descriptor);
     if (sub_message == nullptr) {
       return nullptr;
     }

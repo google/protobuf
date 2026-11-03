@@ -218,6 +218,12 @@ Error, UINTPTR_MAX is undefined
 #define UPB_MSAN 0
 #endif
 
+#if UPB_HAS_FEATURE(type_sanitizer)
+#define UPB_TYSAN 1
+#else
+#define UPB_TYSAN 0
+#endif
+
 // An unfortunate concession to C++17 and MSVC, which don't support zero-sized
 // structs.
 #if UPB_ASAN || UPB_HWASAN || UPB_TSAN
@@ -364,6 +370,18 @@ Error, UINTPTR_MAX is undefined
 #else
 #define UPB_MAYBE_ASSUME(pred, x)
 #define UPB_ATTR_CONST
+#endif
+
+// UPB_ASSUME_SEPARATE(a, b): tells the optimizer that pointers `a` and `b`
+// point into different allocations, so a store through one cannot modify
+// memory reached through the other. This lets it keep values loaded through
+// one pointer in registers across untyped (eg. memcpy()) stores through the
+// other, which strict aliasing cannot help with. The behavior is undefined if
+// both point into the same allocation.
+#if UPB_HAS_BUILTIN(__builtin_assume_separate_storage)
+#define UPB_ASSUME_SEPARATE(a, b) __builtin_assume_separate_storage((a), (b))
+#else
+#define UPB_ASSUME_SEPARATE(a, b) ((void)(a), (void)(b))
 #endif
 
 /* UPB_ASSERT(): in release mode, we use the expression without letting it be
@@ -5688,6 +5706,10 @@ bool upb_strtable_insert(upb_strtable* t, const char* k, size_t len,
 
 bool upb_strtable_insert_or_replace(upb_strtable* t, const char* k, size_t len,
                                     upb_value v, bool* replaced, upb_Arena* a) {
+  // Store to `*replaced` before reading the table: the compiler cannot prove
+  // that `replaced` does not point into `*t`, so storing it after the lookup
+  // would force it to reload the table fields.
+  *replaced = false;
   uint32_t hash = _upb_Hash_NoSeed(k, len);
   upb_tabent* e = findentry_mutable(&t->t, strkey2(k, len), hash, &streql);
   if (e) {
@@ -5695,7 +5717,6 @@ bool upb_strtable_insert_or_replace(upb_strtable* t, const char* k, size_t len,
     *replaced = true;
     return true;
   }
-  *replaced = false;
   if (UPB_UNLIKELY(t->t.entries == NULL) && !init(&t->t, 3, a)) return false;
   return strtable_insert(t, k, len, v, hash, a);
 }
@@ -5949,27 +5970,30 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
   size_t old_bytes = old_size * sizeof(upb_tabent);
   size_t new_size = (size_t)1 << size_lg2;
   size_t new_bytes = new_size * sizeof(upb_tabent);
-  if (new_bytes <= old_bytes || !t->t.entries) {
+  // The entries never overlap `*t`, but the compiler cannot prove that, so
+  // without this local every store to an entry would force `t->t.entries` to
+  // be reloaded.
+  upb_tabent* entries = t->t.entries;
+  if (new_bytes <= old_bytes || !entries) {
     return false;
   }
 
-  if (!upb_Arena_TryExtend(a, t->t.entries, old_bytes, new_bytes)) {
+  if (!upb_Arena_TryExtend(a, entries, old_bytes, new_bytes)) {
     return false;
   }
 
   // Zero out the newly extended region of the table buffer.
-  memset(t->t.entries + old_size, 0,
-         (new_size - old_size) * sizeof(upb_tabent));
+  memset(entries + old_size, 0, (new_size - old_size) * sizeof(upb_tabent));
 
   // This one-past-the-end pointer is guaranteed to be distinct from NULL and
   // any valid internal collision chain pointer in the entire table.
-  upb_tabent* unhashed_marker = t->t.entries + new_size;
+  upb_tabent* unhashed_marker = entries + new_size;
 
   // Mark all existing occupied entries as UNHASHED using the distinct
   // marker. Because e->next != NULL, these pending slots are fully protected
   // from being claimed by emptyent() during collision chain formation.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* e = &t->t.entries[i];
+    upb_tabent* e = &entries[i];
     if (!upb_tabent_isempty(e)) {
       upb_tabent_setnext(e, unhashed_marker);
     }
@@ -5981,7 +6005,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
 
   // Trace and resolve all destinations.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* current = &t->t.entries[i];
+    upb_tabent* current = &entries[i];
     if (!upb_tabent_hasnext(current) ||
         upb_tabent_next(current) != unhashed_marker) {
       continue;  // Slot is already hashed or empty.
@@ -5996,7 +6020,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
     // total O(n) time across the whole rehash.
     while (true) {
       uint32_t hash = inthash(tabkey, val);
-      upb_tabent* target_bucket = &t->t.entries[hash & mask];
+      upb_tabent* target_bucket = &entries[hash & mask];
 
       if (upb_tabent_hasnext(target_bucket) &&
           upb_tabent_next(target_bucket) == unhashed_marker) {
@@ -6066,6 +6090,8 @@ bool upb_inttable_insert(upb_inttable* t, uintptr_t key, upb_value val,
 bool upb_inttable_insert_or_replace_slow(upb_inttable* t, uintptr_t key,
                                          upb_value val, bool* replaced,
                                          upb_Arena* a) {
+  // See upb_strtable_insert_or_replace() for why this is stored first.
+  *replaced = false;
   upb_tabent* e =
       findentry_mutable(&t->t, intkey(key), upb_inthash(key), &inteql);
   if (e) {
@@ -6073,7 +6099,6 @@ bool upb_inttable_insert_or_replace_slow(upb_inttable* t, uintptr_t key,
     *replaced = true;
     return true;
   }
-  *replaced = false;
   if (UPB_UNLIKELY(t->t.entries == NULL) && !upb_inttable_init(t, a)) {
     return false;
   }
@@ -9314,6 +9339,7 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
 #ifndef NDEBUG
   a->body.refs = NULL;
 #endif
+  UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->head));
   UPB_PRIVATE(upb_Xsan_Init)(UPB_XSAN(&a->body));
 
   UPB_PRIVATE(_upb_Arena_AddBlock)(&a->head, block);
@@ -9336,6 +9362,11 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     size_t delta = (uintptr_t)aligned - (uintptr_t)mem;
     n = delta <= n ? n - delta : 0;
     mem = aligned;
+#if UPB_HWASAN
+    // HWASAN tags whole granules; never tag past the end of the caller's
+    // buffer.
+    n = UPB_ALIGN_DOWN(n, UPB_MALLOC_ALIGN);
+#endif
   }
   if (UPB_UNLIKELY(n < sizeof(upb_ArenaState) || !mem)) {
     upb_Arena* ret = _upb_Arena_InitSlow(alloc, mem ? 0 : n);
@@ -9345,7 +9376,20 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
     return ret;
   }
 
-  a = mem;
+  // upb now owns the whole block, so treat it like freshly allocated arena
+  // memory: poison all of it (which also makes MSAN treat the previous contents
+  // as uninitialized and TYSAN forget their types), then allocate the arena
+  // state at the front like any other region. With HWASAN it gets the first tag
+  // of the arena's sequence, so the caller's pointer to the block cannot be
+  // used to access it, and later allocations continue the sequence.
+  upb_Xsan xsan;
+  UPB_PRIVATE(upb_Xsan_Init)(&xsan);
+  UPB_PRIVATE(upb_Xsan_PoisonRegion)(mem, n);
+  a = UPB_PRIVATE(upb_Xsan_NewUnpoisonedRegion)(&xsan, mem,
+                                                sizeof(upb_ArenaState));
+#if UPB_XSAN_STRUCT_SIZE
+  a->head.xsan = xsan;
+#endif
 
   upb_Atomic_Init(&a->body.parent_or_count, _upb_Arena_TaggedFromRefcount(1));
   upb_Atomic_Init(&a->body.next, NULL);
@@ -9359,7 +9403,9 @@ upb_Arena* upb_Arena_Init(void* mem, size_t n, upb_alloc* alloc) {
   a->body.size_hint = 128;
   a->body.last_block_size = 128;
   a->body.block_alloc = _upb_Arena_MakeBlockAlloc(alloc, 1);
-  a->head.UPB_PRIVATE(ptr) = (void*)UPB_ALIGN_MALLOC((uintptr_t)(a + 1));
+  // Derive both bounds from `mem` so that they carry the same HWASAN tag.
+  a->head.UPB_PRIVATE(ptr) =
+      (void*)UPB_ALIGN_MALLOC((uintptr_t)mem + sizeof(upb_ArenaState));
   a->head.UPB_PRIVATE(end) = UPB_PTR_AT(mem, n, char);
   a->head.UPB_ONLYBITS(pool) =
       (UPB_PRIVATE(_upb_ArenaPool)*)&UPB_PRIVATE(_upb_Arena_EmptyPool);
@@ -12710,6 +12756,10 @@ static const char* upb_MtDecoder_DecodeOneofField(upb_MtDecoder* d,
   } else {
     UPB_ASSERT(current_align >= new_align);
   }
+  if ((size_t)(f - d->fields) + kOneofBase >=
+      kUpb_OneOfLayoutItem_IndexSentinel) {
+    upb_MdDecoder_ErrorJmp(&d->base, "Too many fields for oneof layout");
+  }
   // Prepend this field to the linked list.
   f->UPB_PRIVATE(offset) = item->field_index;
   item->field_index = (f - d->fields) + kOneofBase;
@@ -13580,40 +13630,16 @@ const int8_t _kUpb_FromBase92[] = {
 
 // Must be last.
 
-typedef struct {
-  uint64_t present_values_mask;
-  uint32_t last_written_value;
-} upb_MtDataEncoderInternal_EnumState;
-
-typedef struct {
-  uint64_t msg_modifiers;
-  uint32_t last_field_num;
-  enum {
-    kUpb_OneofState_NotStarted,
-    kUpb_OneofState_StartedOneof,
-    kUpb_OneofState_EmittedOneofField,
-  } oneof_state;
-} upb_MtDataEncoderInternal_MsgState;
-
-typedef struct {
-  char* buf_start;  // Only for checking kUpb_MtDataEncoder_MinSize.
-  union {
-    upb_MtDataEncoderInternal_EnumState enum_state;
-    upb_MtDataEncoderInternal_MsgState msg_state;
-  } state;
-} upb_MtDataEncoderInternal;
-
 static upb_MtDataEncoderInternal* upb_MtDataEncoder_GetInternal(
     upb_MtDataEncoder* e, char* buf_start) {
-  UPB_ASSERT(sizeof(upb_MtDataEncoderInternal) <= sizeof(e->internal));
-  upb_MtDataEncoderInternal* ret = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* ret = &e->internal;
   ret->buf_start = buf_start;
   return ret;
 }
 
 static char* upb_MtDataEncoder_PutRaw(upb_MtDataEncoder* e, char* ptr,
                                       char ch) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   UPB_ASSERT(ptr - in->buf_start < kUpb_MtDataEncoder_MinSize);
   if (ptr == e->end) return NULL;
   *ptr++ = ch;
@@ -13701,7 +13727,7 @@ char* upb_MtDataEncoder_StartMessage(upb_MtDataEncoder* e, char* ptr,
 static char* _upb_MtDataEncoder_MaybePutFieldSkip(upb_MtDataEncoder* e,
                                                   char* ptr,
                                                   uint32_t field_num) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   if (field_num <= in->state.msg_state.last_field_num) return NULL;
   if (in->state.msg_state.last_field_num + 1 != field_num) {
     // Put skip.
@@ -13758,7 +13784,7 @@ static char* _upb_MtDataEncoder_PutFieldType(upb_MtDataEncoder* e, char* ptr,
 static char* _upb_MtDataEncoder_MaybePutModifiers(upb_MtDataEncoder* e,
                                                   char* ptr, upb_FieldType type,
                                                   uint64_t field_mod) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   uint32_t encoded_modifiers = 0;
   if ((field_mod & kUpb_FieldModifier_IsRepeated) &&
       upb_FieldType_IsPackable(type)) {
@@ -13844,7 +13870,7 @@ char* upb_MtDataEncoder_StartEnum(upb_MtDataEncoder* e, char* ptr) {
 
 static char* upb_MtDataEncoder_FlushDenseEnumMask(upb_MtDataEncoder* e,
                                                   char* ptr) {
-  upb_MtDataEncoderInternal* in = (upb_MtDataEncoderInternal*)e->internal;
+  upb_MtDataEncoderInternal* in = &e->internal;
   ptr = upb_MtDataEncoder_Put(e, ptr, in->state.enum_state.present_values_mask);
   in->state.enum_state.present_values_mask = 0;
   in->state.enum_state.last_written_value += 5;
@@ -19964,20 +19990,6 @@ bool _upb_Decoder_TryDecodeMessageFast(upb_Decoder* d, const char** ptr,
   return false;
 }
 
-UPB_FORCEINLINE
-const char* _upb_Decoder_DecodeField(upb_Decoder* d, const char* ptr,
-                                     upb_Message* msg, const upb_MiniTable* mt,
-                                     uint64_t last_field_index, uint64_t data) {
-  if (_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, last_field_index,
-                                        data)) {
-    return ptr;
-  } else if (upb_EpsCopyInputStream_IsDone(EPS(d), &ptr)) {
-    return _upb_Decoder_EndMessage(d, ptr);
-  }
-
-  return _upb_Decoder_DecodeFieldNoFast(d, ptr, msg, mt);
-}
-
 UPB_NOINLINE
 static const char* _upb_Decoder_DecodeEmptyMessage(upb_Decoder* d,
                                                    const char* ptr,
@@ -20041,9 +20053,19 @@ const char* _upb_Decoder_DecodeMessage(upb_Decoder* d, const char* ptr,
     return _upb_Decoder_DecodeEmptyMessage(d, ptr, msg);
   }
 
-  do {
-    ptr = _upb_Decoder_DecodeField(d, ptr, msg, mt, 0, 0);
-  } while (!d->message_is_done);
+  if (UPB_LIKELY(_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, 0, 0))) {
+    d->message_is_done = false;
+    return ptr;
+  }
+
+  while (!upb_EpsCopyInputStream_IsDone(EPS(d), &ptr)) {
+    ptr = _upb_Decoder_DecodeFieldNoFast(d, ptr, msg, mt);
+    if (d->message_is_done) break;
+    if (_upb_Decoder_TryDecodeMessageFast(d, &ptr, msg, mt, 0, 0)) {
+      d->message_is_done = false;
+      return ptr;
+    }
+  }
   d->message_is_done = false;
 
   return UPB_UNLIKELY(mt && mt->UPB_PRIVATE(required_count))
@@ -21376,6 +21398,7 @@ const char* UPB_PRIVATE(_upb_WireReader_SkipGroup)(
 #undef UPB_HWASAN
 #undef UPB_HWASAN_POISON_TAG
 #undef UPB_MSAN
+#undef UPB_TYSAN
 #undef UPB_MALLOC_ALIGN
 #undef UPB_TSAN
 #undef UPB_DEPRECATED
@@ -21409,6 +21432,7 @@ const char* UPB_PRIVATE(_upb_WireReader_SkipGroup)(
 #undef UPB_ARM64_BTI_DEFAULT
 #undef UPB_DEPRECATE_AND_INLINE
 #undef UPB_MAYBE_ASSUME
+#undef UPB_ASSUME_SEPARATE
 #undef UPB_ATTR_CONST
 #undef _UPB_STRINGIFY
 #undef _UPB_STRINGIFY2
