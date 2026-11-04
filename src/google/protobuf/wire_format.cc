@@ -659,8 +659,9 @@ struct WireFormat::MessageSetParser {
             // into account that `payload` came from a subfield.
             ParseContext tmp_ctx(ParseContext::Spawn<1>{}, *ctx, &p, payload);
             GOOGLE_PROTOBUF_PARSER_ASSERT(p);
-            GOOGLE_PROTOBUF_PARSER_ASSERT(value->_InternalParse(p, &tmp_ctx) &&
-                                           tmp_ctx.EndedAtLimit());
+            GOOGLE_PROTOBUF_PARSER_ASSERT(
+                tmp_ctx.InternalParseMessage(value, p) &&
+                tmp_ctx.EndedAtLimit());
           }
           state = State::kDone;
         }

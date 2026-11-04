@@ -208,7 +208,8 @@ TEST(FastVarints, NameHere) {
         const char* ptr = nullptr;
         const char* end_ptr = nullptr;
         ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                         /* aliasing= */ false, &ptr, serialized);
+                         /* aliasing= */ false, /*arena=*/nullptr, &ptr,
+                         serialized);
 #if 0  // FOR_DEBUGGING
       ABSL_LOG(ERROR) << "size=" << size << " i=" << i << " ptr points to "  //
                       << +ptr[0] << "," << +ptr[1] << ","                    //

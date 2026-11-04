@@ -56,9 +56,6 @@
 #include "absl/log/absl_check.h"
 #include "absl/numeric/bits.h"
 
-// Must be included last.
-#include "google/protobuf/port_def.inc"
-
 namespace google {
 namespace protobuf {
 namespace internal {
@@ -133,7 +130,5 @@ inline T* MemoryAlign::CeilDefaultAligned(T* ptr) const {
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
-
-#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_MEMORY_ALIGN_H__

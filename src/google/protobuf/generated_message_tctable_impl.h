@@ -20,11 +20,12 @@
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/class_data.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
 #include "google/protobuf/map.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
-#include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/raw_ptr.h"
@@ -379,6 +380,11 @@ class PROTOBUF_EXPORT TcParser final {
   static PROTOBUF_ALWAYS_INLINE const char* ParseMessage(
       MessageLite* msg, const char* ptr, ParseContext* ctx,
       const TcParseTableBase* tc_table) {
+    // An existing extension can be on a different arena than its parent.
+    if (ABSL_PREDICT_FALSE(msg->GetArena() != ctx->arena())) {
+      return ParseCrossArenaSubmessage</*group_coding=*/false>(
+          msg, ptr, ctx, tc_table->class_data, 0);
+    }
     return ctx->ParseLengthDelimitedInlined(ptr, [&](const char* ptr) {
       return ParseLoop(msg, ptr, ctx, tc_table);
     });
@@ -387,6 +393,11 @@ class PROTOBUF_EXPORT TcParser final {
   static PROTOBUF_ALWAYS_INLINE const char* ParseGroup(
       MessageLite* msg, const char* ptr, ParseContext* ctx,
       const TcParseTableBase* tc_table, uint32_t start_tag) {
+    // An existing extension can be on a different arena than its parent.
+    if (ABSL_PREDICT_FALSE(msg->GetArena() != ctx->arena())) {
+      return ParseCrossArenaSubmessage</*group_coding=*/true>(
+          msg, ptr, ctx, tc_table->class_data, start_tag);
+    }
     return ctx->ParseGroupInlined(ptr, start_tag, [&](const char* ptr) {
       return ParseLoop(msg, ptr, ctx, tc_table);
     });
@@ -699,8 +710,7 @@ class PROTOBUF_EXPORT TcParser final {
 #if !defined(NDEBUG) && !(defined(_MSC_VER) && defined(_M_IX86))
     // Check the alignment in debug mode, except in 32-bit msvc because it does
     // not respect the alignment as expressed by `alignof(T)`
-    if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(target) % alignof(T) !=
-                           0)) {
+    if (ABSL_PREDICT_FALSE(!MemoryAlign{alignof(T)}.IsAligned(target))) {
       AlignFail(std::integral_constant<size_t, alignof(T)>(),
                 reinterpret_cast<uintptr_t>(target));
     }
@@ -715,8 +725,7 @@ class PROTOBUF_EXPORT TcParser final {
 #if !defined(NDEBUG) && !(defined(_MSC_VER) && defined(_M_IX86))
     // Check the alignment in debug mode, except in 32-bit msvc because it does
     // not respect the alignment as expressed by `alignof(T)`
-    if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(target) % alignof(T) !=
-                           0)) {
+    if (ABSL_PREDICT_FALSE(!MemoryAlign{alignof(T)}.IsAligned(target))) {
       AlignFail(std::integral_constant<size_t, alignof(T)>(),
                 reinterpret_cast<uintptr_t>(target));
     }
@@ -911,6 +920,15 @@ class PROTOBUF_EXPORT TcParser final {
 
   class ScopedArenaSwap;
 
+  // Parses an already-allocated submessage which is on a different arena than
+  // its parent. This method temporarily switches `ctx->arena()` to
+  // `inner_msg`'s arena. This is expected to be very cold, as multi-arena
+  // messages are rare (and an antipattern).
+  template <bool group_coding>
+  PROTOBUF_NOINLINE static const char* ParseCrossArenaSubmessage(
+      MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+      const ClassData* inner_class_data, uint32_t start_tag);
+
   static void WriteVarintToUnknown(MessageLite* msg,
                                    const ClassData* class_data, int number,
                                    int value);
@@ -1032,7 +1050,7 @@ class PROTOBUF_EXPORT TcParser final {
                          const TcParseTableBase::FieldEntry*);
   static void InitOneof(const TcParseTableBase* table,
                         const ClassData* class_data,
-                        const TcParseTableBase::FieldEntry& entry,
+                        const TcParseTableBase::FieldEntry& entry, Arena* arena,
                         MessageLite* msg);
   static void ChangeOneof(const TcParseTableBase* table,
                           const ClassData* class_data,
@@ -1137,6 +1155,8 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::ToParseLoop(
 PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseLoop(
     MessageLite* msg, const char* ptr, ParseContext* ctx,
     const TcParseTableBase* table) {
+  // Callers must keep the arena cached in `ctx` in sync with `msg`.
+  ABSL_DCHECK_EQ(ctx->arena(), msg->GetArena());
   // Note: TagDispatch uses a dispatch table at "&table->fast_entries".
   // For fast dispatch, we'd like to have a pointer to that, but if we use
   // that expression, there's no easy way to get back to "table", which we also
@@ -1165,6 +1185,13 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseLoop(
   }
   return ptr;
 }
+
+extern template const char* TcParser::ParseCrossArenaSubmessage<false>(
+    MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+    const ClassData* inner_class_data, uint32_t start_tag);
+extern template const char* TcParser::ParseCrossArenaSubmessage<true>(
+    MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+    const ClassData* inner_class_data, uint32_t start_tag);
 
 // Prints the type card as or of labels, using known higher level labels.
 // Used for code generation, but also useful for debugging.

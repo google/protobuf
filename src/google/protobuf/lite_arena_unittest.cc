@@ -6,9 +6,9 @@
 // https://developers.google.com/open-source/licenses/bsd
 
 #include "absl/log/absl_check.h"
-#include "google/protobuf/arena_test_util.h"
 #include "google/protobuf/map_lite_unittest.pb.h"
 #include "google/protobuf/map_test_util.h"
+#include "google/protobuf/unittest_lite.pb.h"
 
 #include <gtest/gtest.h>
 
@@ -16,6 +16,9 @@
 namespace google {
 namespace protobuf {
 namespace {
+
+using proto2_unittest::TestAllTypesLite;
+using proto2_unittest::TestParsingMergeLite;
 
 class LiteArenaTest : public testing::Test {
  protected:
@@ -63,6 +66,29 @@ TEST_F(LiteArenaTest, UnknownFieldMemLeak) {
   }
   data[1] = data.size() - 2;
   ABSL_CHECK(message->ParseFromString(data));
+}
+
+// Parsing into an existing extension on a different arena than its parent must
+// allocate the extension's new fields on its own arena, and then resume
+// allocating on the parent's arena for the parent's subsequent fields.
+TEST_F(LiteArenaTest, ParseIntoExtensionOnOtherArena) {
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestParsingMergeLite>(&parent_arena);
+  auto* child = Arena::Create<TestAllTypesLite>(&child_arena);
+  parent->UnsafeArenaSetAllocatedExtension(TestParsingMergeLite::optional_ext,
+                                           child);
+
+  TestParsingMergeLite data;
+  data.MutableExtension(TestParsingMergeLite::optional_ext)
+      ->mutable_optional_nested_message();
+  TestParsingMergeLite after;
+  after.mutable_required_all_types();
+  ASSERT_TRUE(parent->MergeFromString(data.SerializePartialAsString() +
+                                      after.SerializeAsString()));
+
+  EXPECT_EQ(child->optional_nested_message().GetArena(), &child_arena);
+  EXPECT_EQ(parent->required_all_types().GetArena(), &parent_arena);
 }
 
 }  // namespace
