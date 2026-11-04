@@ -102,7 +102,8 @@ MessageLite* MessageLite::New(Arena* arena) const {
 
 bool MessageLite::IsInitialized() const {
   auto* data = GetClassData();
-  return data->is_initialized != nullptr ? data->is_initialized(*this) : true;
+  auto fn = data->is_initialized_func();
+  return fn != nullptr ? fn(*this) : true;
 }
 
 const char* MessageLite::_InternalParse(const char* ptr,

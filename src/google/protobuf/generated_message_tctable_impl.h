@@ -890,7 +890,7 @@ class PROTOBUF_EXPORT TcParser final {
       // In that case we would be doing `|= 0` so the target just need to be
       // some valid space in the message.
       if (static_cast<uint32_t>(hasbits) != 0) {
-        ABSL_DCHECK_NE(has_bits_offset, table->class_data->cached_size_offset);
+        ABSL_DCHECK_NE(has_bits_offset, +table->class_data->cached_size_offset);
       }
     }
     // Only the first 32 has-bits are updated. Nothing above those is stored,

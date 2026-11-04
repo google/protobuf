@@ -295,8 +295,12 @@ struct MessageGlobalsBase {
       : class_data(class_data) {}
 
   size_t OffsetToParseTable() const {
-    return OffsetToDefault() +
-           RoundUpTo<8, alignof(void*)>(class_data.allocation_size());
+    return RoundUpTo<8>(
+        OffsetToDefault() +
+        RoundUpTo<8, alignof(void*)>(class_data.allocation_size()) +
+        (static_cast<int>(class_data.message_creator.tag()) < 0 ? sizeof(void*)
+                                                                : 0) +
+        (class_data.has_is_initialized ? sizeof(void*) : 0));
   }
   static const TcParseTableBase* ToParseTableBase(const void* g) {
     const auto* globals = static_cast<const MessageGlobalsBase*>(g);
@@ -327,6 +331,17 @@ struct GeneratedMessageTraitsT {
 inline const MessageLite* ClassData::default_instance() const {
   static_assert(PROTOBUF_FIELD_OFFSET(MessageGlobalsBase, class_data) == 0);
   return MessageGlobalsBase::ToDefaultInstance(this);
+}
+
+inline ClassData::IsInitializedFunc ClassData::is_initialized_func() const {
+  if (!has_is_initialized) return nullptr;
+  const char* ptr =
+      reinterpret_cast<const char*>(default_instance()) +
+      MessageGlobalsBase::RoundUpTo<8, alignof(void*)>(allocation_size()) +
+      (static_cast<int>(message_creator.tag()) < 0 ? sizeof(void*) : 0);
+  IsInitializedFunc fn;
+  memcpy(&fn, ptr, sizeof(fn));
+  return fn;
 }
 
 inline const TcParseTableBase* ClassData::GetTcParseTable() const {
@@ -1159,13 +1174,18 @@ template <typename MessageLite>
 PROTOBUF_ALWAYS_INLINE MessageLite* MessageCreator::PlacementNew(
     const MessageLite* prototype_for_func,
     const MessageLite* prototype_for_copy, void* mem, Arena* arena) const {
-  ABSL_DCHECK_EQ(reinterpret_cast<uintptr_t>(mem) % alignment_, 0u);
+  ABSL_DCHECK_EQ(reinterpret_cast<uintptr_t>(mem) % alignment(), 0u);
   const Tag as_tag = tag();
   static_assert(kFunc < 0 && !(kZeroInit < 0) && !(kMemcpy < 0),
                 "Only kFunc must be the only negative value");
   if (ABSL_PREDICT_FALSE(static_cast<int8_t>(as_tag) < 0)) {
     PROTOBUF_DEBUG_COUNTER("MessageCreator.Func").Inc();
-    return static_cast<MessageLite*>(func_(prototype_for_func, mem, arena));
+    const char* func_ptr =
+        reinterpret_cast<const char*>(prototype_for_copy) +
+        MessageGlobalsBase::RoundUpTo<8, alignof(void*)>(allocation_size_);
+    Func func;
+    memcpy(&func, func_ptr, sizeof(func));
+    return static_cast<MessageLite*>(func(prototype_for_func, mem, arena));
   }
 
   char* dst = static_cast<char*>(mem);
