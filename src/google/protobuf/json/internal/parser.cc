@@ -46,6 +46,22 @@
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 
+// Like ABSL one, but it scoped the StatusOr to allow early destruction.
+// It reduces stack spills.
+// Only useful if `lhs` is a trivial type. Otherwise the assignment might cost
+// more stack than just having the StatusOr. This is statically checked.
+#define PB_ASSIGN_OR_RETURN(lhs, expr)                                \
+  do {                                                                \
+    if (auto s_or = (expr); ABSL_PREDICT_TRUE(s_or.ok())) {           \
+      static_assert(std::is_trivial_v<decltype(lhs)>);                \
+      static_assert(                                                  \
+          std::is_same_v<decltype(lhs), decltype(s_or)::value_type>); \
+      lhs = *s_or;                                                    \
+    } else {                                                          \
+      return std::move(s_or).status();                                \
+    }                                                                 \
+  } while (0)
+
 namespace google {
 namespace protobuf {
 namespace json_internal {
@@ -460,10 +476,10 @@ PROTOBUF_NOINLINE absl::Status ParseSingular(JsonLexer& lex,
       break;
     }
     case FieldDescriptor::TYPE_BOOL: {
-      absl::StatusOr<JsonLexer::Kind> kind = lex.PeekKind();
-      RETURN_IF_ERROR(kind.status());
+      JsonLexer::Kind kind;
+      PB_ASSIGN_OR_RETURN(kind, lex.PeekKind());
 
-      switch (*kind) {
+      switch (kind) {
         case JsonLexer::kTrue:
           RETURN_IF_ERROR(lex.Expect("true"));
           Traits::SetBool(field, msg, true);
@@ -522,8 +538,7 @@ PROTOBUF_NOINLINE absl::Status ParseSingular(JsonLexer& lex,
           });
     }
     default:
-      return lex.Invalid(
-          absl::StrCat("unsupported field type: ", Traits::FieldType(field)));
+      return lex.UnsupportedType(Traits::FieldType(field));
   }
 
   return absl::OkStatus();
@@ -573,8 +588,7 @@ absl::Status EmitNull(JsonLexer& lex, Field<Traits> field, Msg<Traits>& msg) {
                               return absl::OkStatus();
                             });
     default:
-      return lex.Invalid(
-          absl::StrCat("unsupported field type: ", Traits::FieldType(field)));
+      return lex.UnsupportedType(Traits::FieldType(field));
   }
   return absl::OkStatus();
 }
@@ -1118,12 +1132,12 @@ template <typename Traits>
 PROTOBUF_NOINLINE absl::Status ParseValue(JsonLexer& lex,
                                           const Desc<Traits>& desc,
                                           Msg<Traits>& msg) {
-  auto kind = lex.PeekKind();
-  RETURN_IF_ERROR(kind.status());
+  JsonLexer::Kind kind;
+  PB_ASSIGN_OR_RETURN(kind, lex.PeekKind());
   // NOTE: The field numbers 1 through 6 are the numbers of the oneof fields
   // in google.protobuf.Value. Conformance tests verify the correctness of
   // these numbers.
-  switch (*kind) {
+  switch (kind) {
     case JsonLexer::kNull: {
       auto field = Traits::MustHaveField(desc, 1);
       auto pop =
@@ -1165,7 +1179,7 @@ PROTOBUF_NOINLINE absl::Status ParseValue(JsonLexer& lex,
 
       // "Quoted" bools, including non-standard Abseil Atob bools, are not
       // supported, because all strings are treated as genuine JSON strings.
-      if (*kind == JsonLexer::kTrue) {
+      if (kind == JsonLexer::kTrue) {
         RETURN_IF_ERROR(lex.Expect("true"));
         Traits::SetBool(field, msg, true);
       } else {

@@ -103,6 +103,11 @@ absl::Status JsonLocation::Invalid(absl::string_view message,
   return absl::InvalidArgumentError(std::move(status_message));
 }
 
+absl::Status JsonLocation::UnsupportedType(FieldDescriptor::Type type,
+                                           SourceLocation sl) const {
+  return Invalid(absl::StrCat("unsupported field type: ", type), sl);
+}
+
 absl::StatusOr<JsonLexer::Kind> JsonLexer::PeekKind() {
   RETURN_IF_ERROR(SkipToToken());
   char c = stream_.PeekChar();

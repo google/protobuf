@@ -70,6 +70,10 @@ struct JsonLocation {
   // Creates an absl::InvalidArgumentError with line/column information.
   absl::Status Invalid(absl::string_view message,
                        SourceLocation sl = SourceLocation::current()) const;
+  // Shortcut function to avoid a StrCat on the caller.
+  absl::Status UnsupportedType(
+      FieldDescriptor::Type type,
+      SourceLocation sl = SourceLocation::current()) const;
 };
 
 template <typename T>
@@ -108,6 +112,11 @@ class JsonLexer {
   absl::Status Invalid(absl::string_view message,
                        SourceLocation sl = SourceLocation::current()) {
     return json_loc_.Invalid(message, sl);
+  }
+
+  absl::Status UnsupportedType(FieldDescriptor::Type type,
+                               SourceLocation sl = SourceLocation::current()) {
+    return json_loc_.UnsupportedType(type, sl);
   }
 
   // Expects the next bytes to be parsed (after consuming whitespace) to be
