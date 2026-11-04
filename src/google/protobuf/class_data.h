@@ -40,10 +40,14 @@ class EpsCopyOutputStream;
 
 namespace internal {
 
+struct ClassData;
 struct DescriptorTable;
 class LazyField;
 struct TcParseTableBase;
 struct DescriptorMethods;
+
+extern PROTOBUF_EXPORT PROTOBUF_ATTRIBUTE_WEAK const DescriptorMethods
+    kDescriptorMethods;
 
 inline constexpr size_t kClassDataAlignment = 64;
 
@@ -116,37 +120,48 @@ class MessageCreator {
   Func func_;
 };
 
-// ClassData* can and should be placed on read-only section to maximize sharing.
-// However, !LITE has mutable fields for lazy initialization of reflection
-// related data. We move these fields to a separate struct to keep the main
-// ClassData read-only. Extra indirection should be tolerable considering that
-// reflection isn't performance critical.
-struct PROTOBUF_EXPORT ReflectionData {
-  constexpr ReflectionData(
-      const DescriptorMethods* PROTOBUF_NONNULL descriptor_methods,
-      const internal::DescriptorTable* PROTOBUF_NULLABLE descriptor_table,
-      void (*PROTOBUF_NULLABLE get_metadata_tracker)())
-      : reflection(nullptr),
-        descriptor(nullptr),
-        descriptor_table(descriptor_table),
-        descriptor_methods(descriptor_methods),
-        get_metadata_tracker(get_metadata_tracker) {}
-
+// Mutable reflection pointers are stored in a zero-initialized .bss array so
+// ReflectionData itself is immutable and can reside in .data.rel.ro instead of
+// writable .data.
+struct ReflectionState {
   // Accesses are protected by the once_flag in `descriptor_table`. When the
-  // table is null these are populated from the beginning and need to
+  // table is null these are populated from the beginning and need no
   // protection.
-  const Reflection* PROTOBUF_NULLABLE reflection;
-  const Descriptor* PROTOBUF_NULLABLE descriptor;
+  const Reflection* PROTOBUF_NULLABLE reflection = nullptr;
+  const Descriptor* PROTOBUF_NULLABLE descriptor = nullptr;
+};
+
+struct PROTOBUF_EXPORT ReflectionData {
+  constexpr ReflectionData(ReflectionState* PROTOBUF_NONNULL state,
+                           const internal::DescriptorTable* PROTOBUF_NULLABLE
+                               descriptor_table)
+      : state(state), descriptor_table(descriptor_table) {}
+
+  ReflectionState* PROTOBUF_NONNULL state;
 
   // Codegen types will provide a DescriptorTable to do lazy
   // registration/initialization of the reflection objects.
   // Other types, like DynamicMessage, keep the table as null but eagerly
   // populate `reflection`/`descriptor` fields.
   const internal::DescriptorTable* PROTOBUF_NULLABLE descriptor_table;
-  const DescriptorMethods* PROTOBUF_NONNULL descriptor_methods;
+};
+
+struct PROTOBUF_EXPORT ReflectionDataWithTracker {
+  constexpr ReflectionDataWithTracker(
+      ReflectionState* PROTOBUF_NONNULL state,
+      const internal::DescriptorTable* PROTOBUF_NULLABLE descriptor_table,
+      void (*PROTOBUF_NULLABLE get_metadata_tracker)(),
+      const DescriptorMethods* PROTOBUF_NONNULL descriptor_methods =
+          &kDescriptorMethods)
+      : data(state, descriptor_table),
+        get_metadata_tracker(get_metadata_tracker),
+        descriptor_methods(descriptor_methods) {}
+
+  ReflectionData data;
   // When an access tracker is installed, this function notifies the tracker
   // that GetMetadata was called.
   void (*PROTOBUF_NULLABLE get_metadata_tracker)();
+  const DescriptorMethods* PROTOBUF_NONNULL descriptor_methods;
 };
 
 // Note: The order of arguments in the functions is chosen so that it has
@@ -185,32 +200,42 @@ struct PROTOBUF_EXPORT ClassData {
   // char[] just beyond the ClassData.
   bool is_lite;
   bool is_dynamic = false;
+  bool has_get_metadata_tracker_ = false;
+
+  using ReflectionOrName =
+      std::variant<const ReflectionData*, const ReflectionDataWithTracker*,
+                   const char*>;
 
   // In normal mode we have the small constructor to avoid the cost in
   // codegen.
 #if !defined(PROTOBUF_CUSTOM_VTABLE)
-  constexpr ClassData(
-      IsInitializedFunc is_initialized, MergeToFromFunc merge_to_from,
-      internal::MessageCreator message_creator, uint32_t cached_size_offset,
-      std::variant<ReflectionData*, const char*> reflection_or_name)
+  constexpr ClassData(IsInitializedFunc is_initialized,
+                      MergeToFromFunc merge_to_from,
+                      internal::MessageCreator message_creator,
+                      uint32_t cached_size_offset,
+                      ReflectionOrName reflection_or_name)
       : is_initialized(is_initialized),
         merge_to_from(merge_to_from),
         message_creator(message_creator),
         cached_size_offset(cached_size_offset),
         is_lite(std::holds_alternative<const char*>(reflection_or_name)),
+        has_get_metadata_tracker_(
+            std::holds_alternative<const ReflectionDataWithTracker*>(
+                reflection_or_name)),
         aux_data(GetAuxFromVariant(reflection_or_name)) {}
 #endif  // !PROTOBUF_CUSTOM_VTABLE
 
   // But we always provide the full constructor even in normal mode to make
   // helper code simpler.
-  constexpr ClassData(
-      IsInitializedFunc is_initialized, MergeToFromFunc merge_to_from,
-      internal::MessageCreator message_creator,
-      [[maybe_unused]] DestroyMessageFunc destroy_message,
-      [[maybe_unused]] ClearFunc clear,
-      [[maybe_unused]] ByteSizeLongFunc byte_size_long,
-      [[maybe_unused]] SerializeFunc serialize, uint32_t cached_size_offset,
-      std::variant<ReflectionData*, const char*> reflection_or_name)
+  constexpr ClassData(IsInitializedFunc is_initialized,
+                      MergeToFromFunc merge_to_from,
+                      internal::MessageCreator message_creator,
+                      [[maybe_unused]] DestroyMessageFunc destroy_message,
+                      [[maybe_unused]] ClearFunc clear,
+                      [[maybe_unused]] ByteSizeLongFunc byte_size_long,
+                      [[maybe_unused]] SerializeFunc serialize,
+                      uint32_t cached_size_offset,
+                      ReflectionOrName reflection_or_name)
       : is_initialized(is_initialized),
         merge_to_from(merge_to_from),
         message_creator(message_creator),
@@ -222,6 +247,9 @@ struct PROTOBUF_EXPORT ClassData {
 #endif  // PROTOBUF_CUSTOM_VTABLE
         cached_size_offset(cached_size_offset),
         is_lite(std::holds_alternative<const char*>(reflection_or_name)),
+        has_get_metadata_tracker_(
+            std::holds_alternative<const ReflectionDataWithTracker*>(
+                reflection_or_name)),
         aux_data(GetAuxFromVariant(reflection_or_name)) {
   }
 
@@ -257,33 +285,40 @@ struct PROTOBUF_EXPORT ClassData {
 
   // Accessors for reflection related data (!LITE only).
   const Reflection* PROTOBUF_NULLABLE reflection() const {
-    return reflection_data()->reflection;
+    return reflection_data()->state->reflection;
   }
   const Descriptor* PROTOBUF_NULLABLE descriptor() const {
-    return reflection_data()->descriptor;
+    return reflection_data()->state->descriptor;
   }
 
   void set_reflection(const Reflection* PROTOBUF_NULLABLE reflection) const {
-    reflection_data()->reflection = reflection;
+    reflection_data()->state->reflection = reflection;
   }
   void set_descriptor(const Descriptor* PROTOBUF_NULLABLE descriptor) const {
-    reflection_data()->descriptor = descriptor;
+    reflection_data()->state->descriptor = descriptor;
   }
 
   const DescriptorTable* PROTOBUF_NULLABLE descriptor_table() const {
     return reflection_data()->descriptor_table;
   }
   const DescriptorMethods* PROTOBUF_NONNULL descriptor_methods() const {
-    return reflection_data()->descriptor_methods;
+    ABSL_DCHECK(!is_lite);
+    if (has_get_metadata_tracker_) {
+      return reinterpret_cast<const ReflectionDataWithTracker*>(
+                 reflection_data())
+          ->descriptor_methods;
+    }
+    return &kDescriptorMethods;
   }
-  bool has_get_metadata_tracker() const {
-    return reflection_data()->get_metadata_tracker != nullptr;
-  }
+  bool has_get_metadata_tracker() const { return has_get_metadata_tracker_; }
   void get_metadata_tracker() const {
-    reflection_data()->get_metadata_tracker();
+    auto* fn =
+        reinterpret_cast<const ReflectionDataWithTracker*>(reflection_data())
+            ->get_metadata_tracker;
+    if (fn != nullptr) fn();
   }
 
-  ReflectionData* PROTOBUF_NONNULL reflection_data() const {
+  const ReflectionData* PROTOBUF_NONNULL reflection_data() const {
     ABSL_DCHECK(!is_lite);
     return aux_data.reflection_data;
   }
@@ -296,23 +331,28 @@ struct PROTOBUF_EXPORT ClassData {
 
   union ReflectionDataOrTypeName {
     explicit constexpr ReflectionDataOrTypeName(
-        ReflectionData* PROTOBUF_NONNULL reflection_data)
+        const ReflectionData* PROTOBUF_NONNULL reflection_data)
         : reflection_data(reflection_data) {}
     explicit constexpr ReflectionDataOrTypeName(
         const char* PROTOBUF_NONNULL type_name)
         : type_name(type_name) {}
-    ReflectionData* PROTOBUF_NONNULL reflection_data;
+    const ReflectionData* PROTOBUF_NONNULL reflection_data;
     const char* PROTOBUF_NONNULL type_name;
   } aux_data;
 
   static constexpr ReflectionDataOrTypeName GetAuxFromVariant(
-      std::variant<ReflectionData*, const char*> reflection_or_name) {
+      ReflectionOrName reflection_or_name) {
     if (std::holds_alternative<const char*>(reflection_or_name)) {
       return ReflectionDataOrTypeName(
           std::get<const char*>(reflection_or_name));
+    } else if (std::holds_alternative<const ReflectionDataWithTracker*>(
+                   reflection_or_name)) {
+      return ReflectionDataOrTypeName(
+          &std::get<const ReflectionDataWithTracker*>(reflection_or_name)
+               ->data);
     } else {
       return ReflectionDataOrTypeName(
-          std::get<ReflectionData*>(reflection_or_name));
+          std::get<const ReflectionData*>(reflection_or_name));
     }
   }
 };

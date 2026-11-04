@@ -239,8 +239,6 @@ class ReflectionSchema {
     return static_cast<uint32_t>(sizeof_split_);
   }
 
-
-
  private:
   ReflectionSchema() = default;
 
@@ -277,16 +275,22 @@ class ReflectionSchema {
   int sizeof_split_;
 };
 
+// Pairs the once_flag with the pre-main AddDescriptors initialization bit in
+// .bss so DescriptorTable itself has no mutable fields and can live in
+// read-only .data.rel.ro instead of writable .data.
+struct DescriptorTableOnce : absl::once_flag {
+  bool is_initialized = false;
+};
+
 // This struct tries to reduce unnecessary padding.
 // The num_xxx might not be close to their respective pointer, but this saves
 // padding.
 struct PROTOBUF_EXPORT DescriptorTable {
-  mutable bool is_initialized;
   bool is_eager;
   int size;  // of serialized descriptor
   const char* descriptor;
   const char* filename;
-  absl::once_flag* once;
+  DescriptorTableOnce* once;
   const DescriptorTable* const* deps;
   int num_deps;
   int num_messages;
@@ -295,8 +299,10 @@ struct PROTOBUF_EXPORT DescriptorTable {
   const uint32_t* offsets;
   // update the following descriptor arrays.
   const EnumDescriptor** file_level_enum_descriptors;
-  const ServiceDescriptor** file_level_service_descriptors;
 };
+
+PROTOBUF_EXPORT const ServiceDescriptor* GetServiceDescriptor(
+    const DescriptorTable* table, int index);
 
 // AssignDescriptors() pulls the compiled FileDescriptor from the DescriptorPool
 // and uses it to populate all of the global variables which store pointers to

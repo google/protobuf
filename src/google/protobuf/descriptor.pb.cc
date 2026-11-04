@@ -33,79 +33,80 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 #define PROTOBUF_NO_CUSTOM_VTABLE_INLINE PROTOBUF_ALWAYS_INLINE
 #endif
 namespace {
-PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
+static ::google::protobuf::internal::ReflectionState file_reflection_state[35];
+static constexpr ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::google::protobuf::FileDescriptorSet
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[0], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FileDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[1], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::DescriptorProto_ExtensionRange
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[2], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::DescriptorProto_ReservedRange
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[3], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::DescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[4], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::ExtensionRangeOptions_Declaration
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[5], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::ExtensionRangeOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[6], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FieldDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[7], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::OneofDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[8], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::EnumDescriptorProto_EnumReservedRange
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[9], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::EnumDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[10], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::EnumValueDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[11], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::ServiceDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[12], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::MethodDescriptorProto
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[13], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FileOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[14], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::MessageOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[15], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FieldOptions_EditionDefault
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[16], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FieldOptions_FeatureSupport
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[17], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FieldOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[18], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::OneofOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[19], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::EnumOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[20], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::EnumValueOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[21], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::ServiceOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[22], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::MethodOptions
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[23], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::UninterpretedOption_NamePart
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[24], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::UninterpretedOption
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[25], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FeatureSet_VisibilityFeature
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[26], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FeatureSet_ProtoLimitsFeature
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[27], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FeatureSet
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[28], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FeatureSetDefaults_FeatureSetEditionDefault
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[29], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::FeatureSetDefaults
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[30], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::SourceCodeInfo_Location
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[31], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::SourceCodeInfo
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[32], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::GeneratedCodeInfo_Annotation
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[33], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
         // ::google::protobuf::GeneratedCodeInfo
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto, /* tracker*/ nullptr,},
-};
+        {&file_reflection_state[34], &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto},
+    };
 }  // namespace
 namespace google {
 namespace protobuf {
@@ -5716,8 +5717,6 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
 }  // namespace google
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
     file_level_enum_descriptors_google_2fprotobuf_2fdescriptor_2eproto[21];
-static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
-    file_level_service_descriptors_google_2fprotobuf_2fdescriptor_2eproto = nullptr;
 const ::uint32_t
     TableStruct_google_2fprotobuf_2fdescriptor_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
@@ -6188,7 +6187,7 @@ const ::uint32_t
         4, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::google::protobuf::GeneratedCodeInfo, _impl_.annotation_),
         0,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
@@ -6227,7 +6226,7 @@ static const ::_pbi::MigrationSchema
         {443, sizeof(::google::protobuf::SourceCodeInfo)},
         {449, sizeof(::google::protobuf::GeneratedCodeInfo_Annotation)},
         {462, sizeof(::google::protobuf::GeneratedCodeInfo)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::google::protobuf::FileDescriptorSet_globals_,
@@ -6265,7 +6264,7 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::google::protobuf::SourceCodeInfo_globals_,
         &::google::protobuf::GeneratedCodeInfo_Annotation_globals_,
         &::google::protobuf::GeneratedCodeInfo_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fdescriptor_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n google/protobuf/descriptor.proto\022\017goog"
@@ -6563,9 +6562,8 @@ const char descriptor_table_protodef_google_2fprotobuf_2fdescriptor_2eproto[] AB
     "org/protobuf/types/descriptorpb\370\001\001\242\002\003GPB"
     "\252\002\032Google.Protobuf.Reflection"
 };
-static ::absl::once_flag descriptor_table_google_2fprotobuf_2fdescriptor_2eproto_once;
+static ::_pbi::DescriptorTableOnce descriptor_table_google_2fprotobuf_2fdescriptor_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fdescriptor_2eproto = {
-    false,
     false,
     11749,
     descriptor_table_protodef_google_2fprotobuf_2fdescriptor_2eproto,
@@ -6578,7 +6576,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fproto
     file_message_globals,
     TableStruct_google_2fprotobuf_2fdescriptor_2eproto::offsets,
     file_level_enum_descriptors_google_2fprotobuf_2fdescriptor_2eproto,
-    file_level_service_descriptors_google_2fprotobuf_2fdescriptor_2eproto,
 };
 namespace google {
 namespace protobuf {

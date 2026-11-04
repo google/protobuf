@@ -33,17 +33,18 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 #define PROTOBUF_NO_CUSTOM_VTABLE_INLINE PROTOBUF_ALWAYS_INLINE
 #endif
 namespace {
-PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
+static ::google::protobuf::internal::ReflectionState file_reflection_state[4];
+static constexpr ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::google::protobuf::compiler::Version
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[0], &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto},
         // ::google::protobuf::compiler::CodeGeneratorRequest
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[1], &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto},
         // ::google::protobuf::compiler::CodeGeneratorResponse_File
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto, /* tracker*/ nullptr,},
+        {&file_reflection_state[2], &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto},
         // ::google::protobuf::compiler::CodeGeneratorResponse
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto, /* tracker*/ nullptr,},
-};
+        {&file_reflection_state[3], &::descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto},
+    };
 }  // namespace
 namespace google {
 namespace protobuf {
@@ -628,8 +629,6 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOC_EXPORT
 }  // namespace google
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
     file_level_enum_descriptors_google_2fprotobuf_2fcompiler_2fplugin_2eproto[1];
-static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
-    file_level_service_descriptors_google_2fprotobuf_2fcompiler_2fplugin_2eproto = nullptr;
 const ::uint32_t
     TableStruct_google_2fprotobuf_2fcompiler_2fplugin_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
@@ -681,7 +680,7 @@ const ::uint32_t
         3,
         4,
         0,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
@@ -689,14 +688,14 @@ static const ::_pbi::MigrationSchema
         {11, sizeof(::google::protobuf::compiler::CodeGeneratorRequest)},
         {24, sizeof(::google::protobuf::compiler::CodeGeneratorResponse_File)},
         {35, sizeof(::google::protobuf::compiler::CodeGeneratorResponse)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::google::protobuf::compiler::Version_globals_,
         &::google::protobuf::compiler::CodeGeneratorRequest_globals_,
         &::google::protobuf::compiler::CodeGeneratorResponse_File_globals_,
         &::google::protobuf::compiler::CodeGeneratorResponse_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fplugin_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n%google/protobuf/compiler/plugin.proto\022"
@@ -727,10 +726,9 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fplugin_2epro
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
-static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto_once;
+    };
+static ::_pbi::DescriptorTableOnce descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcompiler_2fplugin_2eproto = {
-    false,
     false,
     952,
     descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fplugin_2eproto,
@@ -743,7 +741,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fproto
     file_message_globals,
     TableStruct_google_2fprotobuf_2fcompiler_2fplugin_2eproto::offsets,
     file_level_enum_descriptors_google_2fprotobuf_2fcompiler_2fplugin_2eproto,
-    file_level_service_descriptors_google_2fprotobuf_2fcompiler_2fplugin_2eproto,
 };
 namespace google {
 namespace protobuf {
