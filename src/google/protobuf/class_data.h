@@ -61,14 +61,14 @@ class MessageCreator {
   };
 
   constexpr MessageCreator()
-      : allocation_size_(), tag_(), alignment_(), func_(nullptr) {}
+      : allocation_size_(0), tag_(kZeroInit), log2_alignment_(0) {}
 
   static constexpr MessageCreator ZeroInit(uint32_t allocation_size,
                                            uint8_t alignment) {
     MessageCreator out;
     out.allocation_size_ = allocation_size;
     out.tag_ = kZeroInit;
-    out.alignment_ = alignment;
+    out.log2_alignment_ = EncodeAlignment(alignment);
     return out;
   }
   static constexpr MessageCreator CopyInit(uint32_t allocation_size,
@@ -76,15 +76,14 @@ class MessageCreator {
     MessageCreator out;
     out.allocation_size_ = allocation_size;
     out.tag_ = kMemcpy;
-    out.alignment_ = alignment;
+    out.log2_alignment_ = EncodeAlignment(alignment);
     return out;
   }
-  constexpr MessageCreator(Func func, uint32_t allocation_size,
+  constexpr MessageCreator(Func /*func*/, uint32_t allocation_size,
                            uint8_t alignment)
       : allocation_size_(allocation_size),
         tag_(kFunc),
-        alignment_(alignment),
-        func_(func) {}
+        log2_alignment_(EncodeAlignment(alignment)) {}
 
   // Template for testing.
   template <typename MessageLite>
@@ -103,17 +102,25 @@ class MessageCreator {
     }
   }
 
-  Tag tag() const { return tag_; }
+  constexpr Tag tag() const { return static_cast<Tag>(tag_); }
 
-  uint32_t allocation_size() const { return allocation_size_; }
+  constexpr uint32_t allocation_size() const { return allocation_size_; }
 
-  uint8_t alignment() const { return alignment_; }
+  constexpr uint8_t alignment() const {
+    return log2_alignment_ == 0
+               ? 0
+               : static_cast<uint8_t>(1u << (log2_alignment_ - 1));
+  }
 
  private:
-  uint32_t allocation_size_;
-  Tag tag_;
-  uint8_t alignment_;
-  Func func_;
+  static constexpr uint8_t EncodeAlignment(uint8_t alignment) {
+    return alignment == 0 ? 0
+                          : static_cast<uint8_t>(__builtin_ctz(alignment) + 1);
+  }
+
+  uint32_t allocation_size_ : 24;
+  int32_t tag_ : 3;
+  uint32_t log2_alignment_ : 5;
 };
 
 // ClassData* can and should be placed on read-only section to maximize sharing.
@@ -169,22 +176,21 @@ struct PROTOBUF_EXPORT ClassData {
       const MessageLite& msg, uint8_t* PROTOBUF_NULLABLE ptr,
       io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
 
-  IsInitializedFunc is_initialized;
   MergeToFromFunc merge_to_from;
   internal::MessageCreator message_creator;
+  // Offset of the CachedSize member.
+  uint32_t cached_size_offset : 29;
+  // LITE objects (ie !descriptor_methods) collocate their name as a
+  // char[] just beyond the ClassData.
+  uint32_t is_lite : 1;
+  uint32_t is_dynamic : 1;
+  uint32_t has_is_initialized : 1;
 #if defined(PROTOBUF_CUSTOM_VTABLE)
   DestroyMessageFunc destroy_message;
   ClearFunc clear;
   ByteSizeLongFunc byte_size_long;
   SerializeFunc serialize;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-
-  // Offset of the CachedSize member.
-  uint32_t cached_size_offset;
-  // LITE objects (ie !descriptor_methods) collocate their name as a
-  // char[] just beyond the ClassData.
-  bool is_lite;
-  bool is_dynamic = false;
 
   // In normal mode we have the small constructor to avoid the cost in
   // codegen.
@@ -193,11 +199,12 @@ struct PROTOBUF_EXPORT ClassData {
       IsInitializedFunc is_initialized, MergeToFromFunc merge_to_from,
       internal::MessageCreator message_creator, uint32_t cached_size_offset,
       std::variant<ReflectionData*, const char*> reflection_or_name)
-      : is_initialized(is_initialized),
-        merge_to_from(merge_to_from),
+      : merge_to_from(merge_to_from),
         message_creator(message_creator),
         cached_size_offset(cached_size_offset),
         is_lite(std::holds_alternative<const char*>(reflection_or_name)),
+        is_dynamic(0),
+        has_is_initialized(is_initialized != nullptr),
         aux_data(GetAuxFromVariant(reflection_or_name)) {}
 #endif  // !PROTOBUF_CUSTOM_VTABLE
 
@@ -211,19 +218,23 @@ struct PROTOBUF_EXPORT ClassData {
       [[maybe_unused]] ByteSizeLongFunc byte_size_long,
       [[maybe_unused]] SerializeFunc serialize, uint32_t cached_size_offset,
       std::variant<ReflectionData*, const char*> reflection_or_name)
-      : is_initialized(is_initialized),
-        merge_to_from(merge_to_from),
+      : merge_to_from(merge_to_from),
         message_creator(message_creator),
+        cached_size_offset(cached_size_offset),
+        is_lite(std::holds_alternative<const char*>(reflection_or_name)),
+        is_dynamic(0),
+        has_is_initialized(is_initialized != nullptr),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
         destroy_message(destroy_message),
         clear(clear),
         byte_size_long(byte_size_long),
         serialize(serialize),
 #endif  // PROTOBUF_CUSTOM_VTABLE
-        cached_size_offset(cached_size_offset),
-        is_lite(std::holds_alternative<const char*>(reflection_or_name)),
         aux_data(GetAuxFromVariant(reflection_or_name)) {
   }
+
+  // Defined in message_lite.h.
+  IsInitializedFunc is_initialized_func() const;
 
   const TcParseTableBase* PROTOBUF_NONNULL GetTcParseTable() const;
 

@@ -22,6 +22,30 @@ struct ClassData;
 class ExtensionSet;
 class ThreadSafeArena;
 
+template <bool kHasCreatorFunc, bool kHasIsInitialized>
+struct MessageGlobalsOptionalFuncs {};
+
+template <>
+struct MessageGlobalsOptionalFuncs<true, false> {
+  void* (*creator_func)(const void*, void*, Arena*);
+};
+
+template <>
+struct MessageGlobalsOptionalFuncs<false, true> {
+  bool (*is_initialized)(const MessageLite&);
+};
+
+template <>
+struct MessageGlobalsOptionalFuncs<true, true> {
+  void* (*creator_func)(const void*, void*, Arena*);
+  bool (*is_initialized)(const MessageLite&);
+};
+
+template <typename ParseTableT, bool kHasCreatorFunc, bool kHasIsInitialized>
+struct MessageGlobalsParseTableWrapper
+    : MessageGlobalsOptionalFuncs<kHasCreatorFunc, kHasIsInitialized>,
+      ParseTableT {};
+
 // The struct PrivateAccess is used to provide access to private members of
 // message classes without making them public. This is useful for highly
 // optimized code paths that need to access internals.
@@ -66,7 +90,29 @@ struct PrivateAccess {
   template <typename T>
   static constexpr auto GenerateParseTable(
       const ::google::protobuf::internal::ClassData* class_data) {
-    return T::_Internal::GenerateParseTable(class_data);
+    constexpr auto cd = GenerateClassData<T>();
+    constexpr bool kHasCreatorFunc =
+        static_cast<int>(cd.message_creator.tag()) < 0;
+    constexpr bool kHasIsInit = cd.has_is_initialized != 0;
+    using ParseTableT = decltype(T::_Internal::GenerateParseTable(class_data));
+    if constexpr (!kHasCreatorFunc && !kHasIsInit) {
+      return T::_Internal::GenerateParseTable(class_data);
+    } else if constexpr (kHasCreatorFunc && !kHasIsInit) {
+      return MessageGlobalsParseTableWrapper<ParseTableT, true, false>{
+          {&T::_Internal::PlacementNew},
+          T::_Internal::GenerateParseTable(class_data),
+      };
+    } else if constexpr (!kHasCreatorFunc && kHasIsInit) {
+      return MessageGlobalsParseTableWrapper<ParseTableT, false, true>{
+          {&T::IsInitializedImpl},
+          T::_Internal::GenerateParseTable(class_data),
+      };
+    } else {
+      return MessageGlobalsParseTableWrapper<ParseTableT, true, true>{
+          {&T::_Internal::PlacementNew, &T::IsInitializedImpl},
+          T::_Internal::GenerateParseTable(class_data),
+      };
+    }
   }
 
   template <typename T>

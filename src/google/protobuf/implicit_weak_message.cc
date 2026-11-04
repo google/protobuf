@@ -74,11 +74,13 @@ struct ImplicitWeakMessageDefaultType : MessageGlobalsBase {
   constexpr ImplicitWeakMessageDefaultType()
       : MessageGlobalsBase(ImplicitWeakPrivateAccess::GenerateClassData()),
         _default(ConstantInitialized{}),
+        _creator_func(&ImplicitWeakMessage::NewImpl<ImplicitWeakMessage>),
         _table(ImplicitWeakPrivateAccess::GenerateParseTable(&class_data)) {}
   ~ImplicitWeakMessageDefaultType() {}
   union {
     alignas(kMaxMessageAlignment) ImplicitWeakMessage _default;  // NOLINT
   };
+  MessageCreator::Func _creator_func;
   TcParseTable<0> _table;  // NOLINT
 };
 static_assert(PROTOBUF_FIELD_OFFSET(ImplicitWeakMessageDefaultType, _default) ==

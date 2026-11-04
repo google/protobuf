@@ -373,8 +373,10 @@ struct DynamicMessageGlobalsInternalType : MessageGlobalsBase {
 
 namespace {
 inline uint32_t MsgSizeToGlobalsSize(uint32_t size) {
-  return size +
-         PROTOBUF_FIELD_OFFSET(DynamicMessageGlobalsInternalType, _default);
+  return static_cast<uint32_t>(
+      internal::MessageGlobalsBase::RoundUpTo<8, alignof(void*)>(size) +
+      PROTOBUF_FIELD_OFFSET(DynamicMessageGlobalsInternalType, _default) +
+      2 * sizeof(void*));
 }
 inline void* DynamicMessageGlobalsToDefaultInstance(void* globals) {
   return &(
@@ -1008,6 +1010,16 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
   });
   type_info->globals->class_data.set_descriptor(type);
   type_info->globals->class_data.is_dynamic = true;
+  {
+    char* opt_slot =
+        reinterpret_cast<char*>(msg_base) +
+        internal::MessageGlobalsBase::RoundUpTo<8, alignof(void*)>(size);
+    const internal::MessageCreator::Func creator_fn = &DynamicMessage::NewImpl;
+    const internal::ClassData::IsInitializedFunc is_init_fn =
+        &DynamicMessage::IsInitializedImpl;
+    memcpy(opt_slot, &creator_fn, sizeof(creator_fn));
+    memcpy(opt_slot + sizeof(creator_fn), &is_init_fn, sizeof(is_init_fn));
+  }
 
   // We have already locked the factory so we should not lock in the constructor
   // of dynamic message to avoid dead lock.
