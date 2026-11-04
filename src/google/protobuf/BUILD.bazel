@@ -549,7 +549,6 @@ cc_library(
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":port",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
@@ -932,6 +931,7 @@ cc_library(
     deps = [
         ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",

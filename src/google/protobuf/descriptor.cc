@@ -86,6 +86,7 @@
 #include "google/protobuf/io/tokenizer.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/json_enumvalue_options.pb.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/naming_style.h"
@@ -137,7 +138,7 @@ bool IsLegacyJsonFieldConflictEnabled(const OptionsT& options) {
 template <int R>
 constexpr size_t RoundUpTo(size_t n) {
   static_assert((R & (R - 1)) == 0, "Must be power of two");
-  return (n + (R - 1)) & ~(R - 1);
+  return internal::MemoryAlign{R}.Ceil(n);
 }
 
 constexpr size_t Max(size_t a, size_t b) { return a > b ? a : b; }

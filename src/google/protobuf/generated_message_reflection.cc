@@ -57,6 +57,7 @@
 #include "google/protobuf/inlined_string_field.h"
 #include "google/protobuf/json_enumvalue_options.pb.h"
 #include "google/protobuf/map_field.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/message_traits.h"
@@ -3739,7 +3740,7 @@ const MapFieldBase* Reflection::GetMapData(const Message& message,
 
 template <typename T>
 static uint32_t AlignTo(uint32_t v) {
-  return (v + alignof(T) - 1) & ~(alignof(T) - 1);
+  return static_cast<uint32_t>(internal::MemoryAlign{alignof(T)}.Ceil(v));
 }
 
 static internal::TailCallParseFunc GetFastParseFunction(

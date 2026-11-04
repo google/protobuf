@@ -317,28 +317,36 @@ class PROTOBUF_EXPORT SerialArena {
 
   // Prefetch the next prefetch_degree bytes after `prefetch_ptr` and
   // up to `limit`, if `next` is within prefetch_degree bytes of `prefetch_ptr`.
+  //
+  // Returns the next prefetch pointer, or nullptr if no prefetching was done.
   PROTOBUF_ALWAYS_INLINE
   static const char* MaybePrefetchImpl(const ptrdiff_t prefetch_degree,
                                        const char* next, const char* limit,
                                        const char* prefetch_ptr) {
-    if (ABSL_PREDICT_TRUE(prefetch_ptr - next > prefetch_degree))
-      return prefetch_ptr;
-    if (ABSL_PREDICT_TRUE(prefetch_ptr < limit)) {
-      prefetch_ptr = std::max(next, prefetch_ptr);
-      ABSL_DCHECK(prefetch_ptr != nullptr);
-      const char* end = std::min(limit, prefetch_ptr + prefetch_degree);
-      for (; prefetch_ptr < end; prefetch_ptr += ABSL_CACHELINE_SIZE) {
-        absl::PrefetchToLocalCacheForWrite(prefetch_ptr);
-      }
+    if (ABSL_PREDICT_TRUE(prefetch_ptr - next > prefetch_degree)) {
+      return nullptr;
     }
+    if (ABSL_PREDICT_FALSE(prefetch_ptr >= limit)) {
+      return nullptr;
+    }
+
+    prefetch_ptr = std::max(next, prefetch_ptr);
+    ABSL_DCHECK(prefetch_ptr != nullptr);
+    const char* end = std::min(limit, prefetch_ptr + prefetch_degree);
+    for (; prefetch_ptr < end; prefetch_ptr += ABSL_CACHELINE_SIZE) {
+      absl::PrefetchToLocalCacheForWrite(prefetch_ptr);
+    }
+    PROTOBUF_ASSUME(prefetch_ptr != nullptr);
     return prefetch_ptr;
   }
   PROTOBUF_ALWAYS_INLINE
   void MaybePrefetchData(const char* next) {
     ABSL_DCHECK(static_cast<const void*>(prefetch_ptr_) == ptr() ||
                 static_cast<const void*>(prefetch_ptr_) >= head());
-    prefetch_ptr_ =
-        MaybePrefetchImpl(kPrefetchDataDegree, next, limit_, prefetch_ptr_);
+    if (const char* new_prefetch_ptr = MaybePrefetchImpl(
+            kPrefetchDataDegree, next, limit_, prefetch_ptr_)) {
+      prefetch_ptr_ = new_prefetch_ptr;
+    }
   }
   PROTOBUF_ALWAYS_INLINE
   void MaybePrefetchCleanup() {
@@ -346,10 +354,13 @@ class PROTOBUF_EXPORT SerialArena {
                     nullptr ||
                 static_cast<const void*>(cleanup_list_.prefetch_ptr_) >=
                     cleanup_list_.head_);
-    cleanup_list_.prefetch_ptr_ = MaybePrefetchImpl(
+    const char* new_prefetch_ptr = MaybePrefetchImpl(
         kPrefetchCleanupDegree, reinterpret_cast<char*>(cleanup_list_.next_),
         reinterpret_cast<char*>(cleanup_list_.limit_),
         cleanup_list_.prefetch_ptr_);
+    if (new_prefetch_ptr != nullptr) {
+      cleanup_list_.prefetch_ptr_ = new_prefetch_ptr;
+    }
   }
 
   // Creates a new SerialArena inside mem using the remaining memory as for

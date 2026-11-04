@@ -629,7 +629,6 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularParseMessageAuxImpl(
   auto saved_tag = UnalignedLoad<TagType>(ptr);
   ptr += sizeof(TagType);
   SetCachedHasBit(hasbits, data.hasbit_idx());
-  SyncHasbits(msg, hasbits, table);
   auto& field = RefAt<MessageLite*>(msg, data.offset());
   const auto* class_data = table->field_aux(data.aux_idx())->class_data();
   // Keep `inner_msg` in a local variable to avoid a second read in the
@@ -642,9 +641,14 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularParseMessageAuxImpl(
   const auto inner_loop = [&](const char* ptr) {
     return ParseLoop(inner_msg, ptr, ctx, inner_table);
   };
-  return group_coding
-             ? ctx->ParseGroupInlined(ptr, FastDecodeTag(saved_tag), inner_loop)
-             : ctx->ParseLengthDelimitedInlined(ptr, inner_loop);
+  ptr = group_coding
+            ? ctx->ParseGroupInlined(ptr, FastDecodeTag(saved_tag), inner_loop)
+            : ctx->ParseLengthDelimitedInlined(ptr, inner_loop);
+
+  if (ABSL_PREDICT_FALSE(ptr == nullptr)) {
+    PROTOBUF_MUSTTAIL return Error(PROTOBUF_TC_PARAM_NO_DATA_PASS);
+  }
+  PROTOBUF_MUSTTAIL return ToTagDispatch(PROTOBUF_TC_PARAM_NO_DATA_PASS);
 }
 
 PROTOBUF_NOINLINE const char* TcParser::FastMcS1(PROTOBUF_TC_PARAM_DECL) {
@@ -2786,8 +2790,6 @@ PROTOBUF_NOINLINE const char* TcParser::MpMessage(PROTOBUF_TC_PARAM_DECL) {
     ChangeOneof(table, class_data, entry, data.tag() >> 3, ctx, msg);
   }
 
-  SyncHasbits(msg, hasbits, table);
-
   MessageLite*& field = MutableField<MessageLite*, is_split>(msg, table, entry);
 
   // Keep `inner_msg` in a local variable to avoid a second read in the
@@ -2800,8 +2802,13 @@ PROTOBUF_NOINLINE const char* TcParser::MpMessage(PROTOBUF_TC_PARAM_DECL) {
   const auto inner_loop = [&](const char* ptr) {
     return ParseLoopPreserveNone(inner_msg, ptr, ctx, inner_table);
   };
-  return is_group ? ctx->ParseGroupInlined(ptr, decoded_tag, inner_loop)
-                  : ctx->ParseLengthDelimitedInlined(ptr, inner_loop);
+  ptr = is_group ? ctx->ParseGroupInlined(ptr, decoded_tag, inner_loop)
+                 : ctx->ParseLengthDelimitedInlined(ptr, inner_loop);
+
+  if (ABSL_PREDICT_FALSE(ptr == nullptr)) {
+    PROTOBUF_MUSTTAIL return Error(PROTOBUF_TC_PARAM_NO_DATA_PASS);
+  }
+  PROTOBUF_MUSTTAIL return ToTagDispatch(PROTOBUF_TC_PARAM_NO_DATA_PASS);
 }
 
 template <bool is_split, bool is_group>
