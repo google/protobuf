@@ -421,6 +421,11 @@ class PROTOBUF_EXPORT TcParser final {
       PROTOBUF_TC_PARAM_DECL);
   // Fallback handler for parsing unknown fields directly.
   PROTOBUF_CC static const char* MpUnknownFields(PROTOBUF_TC_PARAM_DECL);
+  PROTOBUF_ATTRIBUTE_WEAK PROTOBUF_CC static const char* GenericFallbackWeak(
+      PROTOBUF_TC_PARAM_DECL);
+  PROTOBUF_ATTRIBUTE_WEAK PROTOBUF_CC static const char* ReflectionFallbackWeak(
+      PROTOBUF_TC_PARAM_DECL);
+  static inline TailCallParseFunc custom_fallback_ = nullptr;
 
   // These follow the "fast" function ABI but implement the whole loop for
   // message_set_wire_format types.
@@ -890,7 +895,7 @@ class PROTOBUF_EXPORT TcParser final {
       // In that case we would be doing `|= 0` so the target just need to be
       // some valid space in the message.
       if (static_cast<uint32_t>(hasbits) != 0) {
-        ABSL_DCHECK_NE(has_bits_offset, table->class_data->cached_size_offset);
+        ABSL_DCHECK(table->has_hasbits_for_debug);
       }
     }
     // Only the first 32 has-bits are updated. Nothing above those is stored,
@@ -931,7 +936,8 @@ class PROTOBUF_EXPORT TcParser final {
     ABSL_DCHECK(table->extension_offset != 0);
     return RefAt<ExtensionSet>(msg, table->extension_offset)
         .ParseField(*msg, tag, ptr,
-                    static_cast<const MessageBaseT*>(table->default_instance()),
+                    static_cast<const MessageBaseT*>(
+                        internal::GetClassData(*msg)->default_instance()),
                     ctx);
   }
 
@@ -939,9 +945,10 @@ class PROTOBUF_EXPORT TcParser final {
   PROTOBUF_CC static const char* MessageSetWireFormatParseLoopImpl(
       PROTOBUF_TC_PARAM_NO_DATA_DECL) {
     return RefAt<ExtensionSet>(msg, table->extension_offset)
-        .ParseMessageSet(
-            *msg, ptr,
-            static_cast<const MessageBaseT*>(table->default_instance()), ctx);
+        .ParseMessageSet(*msg, ptr,
+                         static_cast<const MessageBaseT*>(
+                             internal::GetClassData(*msg)->default_instance()),
+                         ctx);
   }
 
   // Note: `inline` is needed on template function declarations below to avoid
@@ -1157,13 +1164,79 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseLoop(
     if (ctx->LastTag() != 1) break;  // Ended on terminating tag
   }
   table -= 1;
-  if (ABSL_PREDICT_FALSE(table->has_post_loop_handler)) {
-    return table->post_loop_handler(msg, ptr, ctx);
+  if (ABSL_PREDICT_FALSE(table->has_post_loop_handler != 0)) {
+    if (table->has_post_loop_handler == TcParseTableBase::kPostLoopInAux) {
+      return table->field_aux(table->num_aux_entries - 1)
+          ->post_loop_handler(msg, ptr, ctx);
+    }
+    return table->fast_entry(0)->target_function(
+        msg, ptr, ctx, TcFieldData::DefaultInit(), table, 0);
   }
   if (ABSL_PREDICT_FALSE(PerformDebugChecks() && ptr == nullptr)) {
     CheckHasBitConsistency(msg, table);
   }
   return ptr;
+}
+
+constexpr TcParseTableBase::TcParseTableBase(
+    uint16_t has_bits_offset, uint16_t extension_offset,
+    uint32_t max_field_number, uint8_t fast_idx_mask,
+    uint16_t lookup_table_offset, uint32_t skipmap32,
+    uint32_t field_entries_offset, uint16_t num_field_entries,
+    uint16_t num_aux_entries, uint32_t aux_offset, size_t sizeof_self,
+    const ClassData* class_data, PostLoopHandler post_loop_handler,
+    TailCallParseFunc fallback)
+    : has_bits_offset(has_bits_offset),
+      extension_offset(extension_offset),
+      max_field_number(max_field_number),
+      fast_idx_mask(fast_idx_mask),
+      has_post_loop_handler(
+          post_loop_handler == nullptr
+              ? kPostLoopNone
+              : (num_aux_entries != 0 ? kPostLoopInAux : kPostLoopStub)),
+      has_hasbits_for_debug(class_data == nullptr ||
+                            has_bits_offset != class_data->cached_size_offset),
+      fallback_idx(
+          fallback == nullptr                          ? kFallbackNull
+          : fallback == &TcParser::GenericFallback     ? kFallbackGeneric
+          : fallback == &TcParser::GenericFallbackLite ? kFallbackGenericLite
+          : fallback == &TcParser::MpUnknownFields    ? kFallbackMpUnknownFields
+          : fallback == &TcParser::ReflectionFallback ? kFallbackReflection
+          : fallback == &TcParser::DiscardEverythingFallback
+              ? kFallbackDiscardEverything
+              : kFallbackCustom),
+      lookup_table_offset(lookup_table_offset),
+      skipmap32(skipmap32),
+      field_entries_offset(field_entries_offset),
+      num_field_entries(num_field_entries),
+      num_aux_entries(num_aux_entries),
+      aux_offset(aux_offset),
+      sizeof_self(static_cast<uint32_t>(sizeof_self)) {
+  if (!std::is_constant_evaluated() && fallback_idx == kFallbackCustom) {
+    TcParser::custom_fallback_ = fallback;
+  }
+  // Check that the size of the table fits in a uint32_t.
+  ABSL_DCHECK_EQ(static_cast<size_t>(this->sizeof_self), sizeof_self);
+}
+
+inline TailCallParseFunc TcParseTableBase::fallback() const {
+  switch (static_cast<FallbackKind>(fallback_idx)) {
+    case kFallbackNull:
+      return nullptr;
+    case kFallbackGeneric:
+      return &TcParser::GenericFallbackWeak;
+    case kFallbackGenericLite:
+      return &TcParser::GenericFallbackLite;
+    case kFallbackMpUnknownFields:
+      return &TcParser::MpUnknownFields;
+    case kFallbackReflection:
+      return &TcParser::ReflectionFallbackWeak;
+    case kFallbackDiscardEverything:
+      return &TcParser::DiscardEverythingFallback;
+    case kFallbackCustom:
+      return TcParser::custom_fallback_;
+  }
+  Unreachable();
 }
 
 // Prints the type card as or of labels, using known higher level labels.

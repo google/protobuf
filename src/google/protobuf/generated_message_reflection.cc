@@ -3832,6 +3832,7 @@ void Reflection::PopulateTcParseEntries(
   }
 }
 
+
 void Reflection::PopulateTcParseFieldAux(
     const internal::TailCallTableInfo& table_info,
     TcParseTableBase::FieldAux* field_aux) const {
@@ -3853,6 +3854,9 @@ void Reflection::PopulateTcParseFieldAux(
       case internal::TailCallTableInfo::kMessageVerifyFunc:
       case internal::TailCallTableInfo::kSelfVerifyFunc:
         ABSL_LOG(FATAL) << "Not supported";
+        break;
+      case internal::TailCallTableInfo::kPostLoopHandler:
+        field_aux++->post_loop_handler = nullptr;
         break;
       case internal::TailCallTableInfo::kMapAuxInfo:
         // TODO: Fix this now that dynamic uses normal map ABIs.
@@ -3876,7 +3880,6 @@ void Reflection::PopulateTcParseFieldAux(
     }
   }
 }
-
 
 const internal::TcParseTableBase* Reflection::CreateTcParseTable() const {
   using TcParseTableBase = internal::TcParseTableBase;
