@@ -1775,39 +1775,70 @@ inline auto FileDescriptorTables::FindNestedSymbol(
                                         : K::IterToSymbol(it, flat_buffer_);
 }
 
-Symbol DescriptorPool::Tables::FindByNameHelper(const DescriptorPool* pool,
-                                                absl::string_view name) {
-  if (pool->mutex_ != nullptr) {
-    // Fast path: the Symbol is already cached.  This is just a hash lookup.
-    absl::ReaderMutexLock lock(*pool->mutex_);
-    Symbol result = FindSymbol(name);
-    if (!result.IsNull()) return result;
+namespace {
+class ABSL_SCOPED_LOCKABLE ReaderMutexLockMaybe {
+ public:
+  explicit ReaderMutexLockMaybe(absl::Mutex* mu) ABSL_SHARED_LOCK_FUNCTION(mu)
+      : mu_(mu) {
+    if (mu_ != nullptr) mu_->lock_shared();
   }
-  DescriptorPool::DeferredValidation deferred_validation(pool);
-  Symbol result;
+  ReaderMutexLockMaybe(const ReaderMutexLockMaybe&) = delete;
+  ReaderMutexLockMaybe& operator=(const ReaderMutexLockMaybe&) = delete;
+  ~ReaderMutexLockMaybe() ABSL_UNLOCK_FUNCTION() {
+    if (mu_ != nullptr) mu_->unlock_shared();
+  }
+
+ private:
+  absl::Mutex* const mu_;
+};
+}  // namespace
+
+template <typename FindInTable, typename FindInUnderlay,
+          typename TryFindInFallbackDb>
+auto DescriptorPool::LookupWithFallback(
+    FindInTable find_in_table, FindInUnderlay find_in_underlay,
+    TryFindInFallbackDb try_find_in_fallback_db) const {
+  using ResultT = decltype(find_in_table(*tables_));
+
+  // 1. Fast path: reader lock on cached tables.
+  if (mutex_ != nullptr) {
+    absl::ReaderMutexLock lock(*mutex_);
+    ResultT result = find_in_table(*tables_);
+    if (result != nullptr) return result;
+  }
+
+  // 2. Slow path: exclusive lock for underlay and fallback database.
+  DeferredValidation deferred_validation(this);
+  ResultT result{};
   {
-    absl::MutexLockMaybe lock(pool->mutex_);
-    result = FindSymbol(name);
-
-    if (result.IsNull() && pool->underlay_ != nullptr) {
-      // Symbol not found; check the underlay.
-      result =
-          pool->underlay_->tables_->FindByNameHelper(pool->underlay_, name);
+    absl::MutexLockMaybe lock(mutex_);
+    result = find_in_table(*tables_);
+    if (result == nullptr && underlay_ != nullptr) {
+      result = find_in_underlay(*underlay_);
     }
-
-    if (result.IsNull() && pool->fallback_database_ != nullptr) {
-      // Symbol still not found, so check fallback database.
-      ScopedBuildState build_state(*this, deferred_validation);
-      if (pool->TryFindSymbolInFallbackDatabase(name)) {
-        result = FindSymbol(name);
+    if (result == nullptr && fallback_database_ != nullptr) {
+      Tables::ScopedBuildState build_state(*tables_, deferred_validation);
+      if (try_find_in_fallback_db()) {
+        result = find_in_table(*tables_);
       }
     }
   }
 
+  // 3. Deferred validation outside the lock.
   if (!deferred_validation.Validate()) {
-    return Symbol();
+    return ResultT{};
   }
   return result;
+}
+
+Symbol DescriptorPool::Tables::FindByNameHelper(const DescriptorPool* pool,
+                                                absl::string_view name) {
+  return pool->LookupWithFallback(
+      [&](const Tables& t) { return t.FindSymbol(name); },
+      [&](const DescriptorPool& u) {
+        return u.tables_->FindByNameHelper(&u, name);
+      },
+      [&] { return pool->TryFindSymbolInFallbackDatabase(name); });
 }
 
 inline const FileDescriptor* DescriptorPool::Tables::FindFile(
@@ -2344,59 +2375,25 @@ void DescriptorPool::InternalAddGeneratedFile(
 
 // Find*By* methods ==================================================
 
-// TODO:  There's a lot of repeated code here, but I'm not sure if
-//   there's any good way to factor it out.  Think about this some time when
-//   there's nothing more important to do (read: never).
-
 const FileDescriptor* DescriptorPool::FindFileByName(
     absl::string_view name) const {
-  DeferredValidation deferred_validation(this);
-  const FileDescriptor* result = nullptr;
-  {
-    absl::MutexLockMaybe lock(mutex_);
-    result = tables_->FindFile(name);
-    if (result != nullptr) return result;
-    if (underlay_ != nullptr) {
-      result = underlay_->FindFileByName(name);
-      if (result != nullptr) return result;
-    }
-    if (fallback_database_ != nullptr) {
-      Tables::ScopedBuildState build_state(*tables_, deferred_validation);
-      if (TryFindFileInFallbackDatabase(name)) {
-        result = tables_->FindFile(name);
-      }
-    }
-  }
-  if (!deferred_validation.Validate()) {
-    return nullptr;
-  }
-  return result;
+  return LookupWithFallback(
+      [&](const Tables& t) { return t.FindFile(name); },
+      [&](const DescriptorPool& u) { return u.FindFileByName(name); },
+      [&] { return TryFindFileInFallbackDatabase(name); });
 }
 
 const FileDescriptor* DescriptorPool::FindFileContainingSymbol(
     absl::string_view symbol_name) const {
-  const FileDescriptor* file_result = nullptr;
-  DeferredValidation deferred_validation(this);
-  {
-    absl::MutexLockMaybe lock(mutex_);
-    Symbol result = tables_->FindSymbol(symbol_name);
-    if (!result.IsNull()) return result.GetFile();
-    if (underlay_ != nullptr) {
-      file_result = underlay_->FindFileContainingSymbol(symbol_name);
-      if (file_result != nullptr) return file_result;
-    }
-    if (fallback_database_ != nullptr) {
-      Tables::ScopedBuildState build_state(*tables_, deferred_validation);
-      if (TryFindSymbolInFallbackDatabase(symbol_name)) {
-        result = tables_->FindSymbol(symbol_name);
-        if (!result.IsNull()) file_result = result.GetFile();
-      }
-    }
-  }
-  if (!deferred_validation.Validate()) {
-    return nullptr;
-  }
-  return file_result;
+  return LookupWithFallback(
+      [&](const Tables& t) {
+        Symbol s = t.FindSymbol(symbol_name);
+        return s.IsNull() ? nullptr : s.GetFile();
+      },
+      [&](const DescriptorPool& u) {
+        return u.FindFileContainingSymbol(symbol_name);
+      },
+      [&] { return TryFindSymbolInFallbackDatabase(symbol_name); });
 }
 
 const Descriptor* DescriptorPool::FindMessageTypeByName(
@@ -2454,42 +2451,17 @@ const MethodDescriptor* DescriptorPool::FindMethodByName(
 const FieldDescriptor* DescriptorPool::FindExtensionByNumber(
     const Descriptor* extendee, int number) const {
   if (extendee->extension_range_count() == 0) return nullptr;
-  // A faster path to reduce lock contention in finding extensions, assuming
-  // most extensions will be cache hit.
-  if (mutex_ != nullptr) {
-    absl::ReaderMutexLock lock(*mutex_);
-    const FieldDescriptor* result = tables_->FindExtension(extendee, number);
-    if (result != nullptr) {
-      return result;
-    }
-  }
-  const FieldDescriptor* result = nullptr;
-  DeferredValidation deferred_validation(this);
-  {
-    absl::MutexLockMaybe lock(mutex_);
-    result = tables_->FindExtension(extendee, number);
-    if (result != nullptr) {
-      return result;
-    }
-    if (underlay_ != nullptr) {
-      result = underlay_->FindExtensionByNumber(extendee, number);
-      if (result != nullptr) return result;
-    }
-    if (fallback_database_ != nullptr) {
-      Tables::ScopedBuildState build_state(*tables_, deferred_validation);
-      if (TryFindExtensionInFallbackDatabase(extendee, number)) {
-        result = tables_->FindExtension(extendee, number);
-      }
-    }
-  }
-  if (!deferred_validation.Validate()) {
-    return nullptr;
-  }
-  return result;
+  return LookupWithFallback(
+      [&](const Tables& t) { return t.FindExtension(extendee, number); },
+      [&](const DescriptorPool& u) {
+        return u.FindExtensionByNumber(extendee, number);
+      },
+      [&] { return TryFindExtensionInFallbackDatabase(extendee, number); });
 }
 
 const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
     const Descriptor* extendee, int number) const {
+  AssertReaderHeld();
   if (extendee->extension_range_count() == 0) return nullptr;
 
   const FieldDescriptor* result = tables_->FindExtension(extendee, number);
@@ -2498,6 +2470,7 @@ const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
   }
 
   if (underlay_ != nullptr) {
+    ReaderMutexLockMaybe lock(underlay_->mutex_);
     result = underlay_->InternalFindExtensionByNumberNoLock(extendee, number);
     if (result != nullptr) return result;
   }
@@ -2824,6 +2797,7 @@ bool DescriptorPool::TryFindFileInFallbackDatabase(
 }
 
 bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
+  AssertReaderHeld();
   for (size_t pos = name.find('.'); pos != name.npos;
        pos = name.find('.', pos + 1)) {
     auto prefix = name.substr(0, pos);
@@ -2839,6 +2813,7 @@ bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
   }
   if (underlay_ != nullptr) {
     // Check to see if any prefix of this symbol exists in the underlay.
+    ReaderMutexLockMaybe lock(underlay_->mutex_);
     return underlay_->IsSubSymbolOfBuiltType(name);
   }
   return false;
@@ -4328,7 +4303,7 @@ const FileDescriptor* DescriptorPool::BuildFileCollectingErrors(
 
 const FileDescriptor* DescriptorPool::BuildFileFromDatabase(
     const FileDescriptorProto& proto) const {
-  mutex_->AssertHeld();
+  AssertHeld();
   build_started_ = true;
   if (tables_->IsKnownBadFile(proto.name())) {
     return nullptr;
@@ -4765,9 +4740,7 @@ Symbol DescriptorPool::NewPlaceholder(absl::string_view name,
 
 Symbol DescriptorPool::NewPlaceholderWithMutexHeld(
     absl::string_view name, PlaceholderType placeholder_type) const {
-  if (mutex_) {
-    mutex_->AssertHeld();
-  }
+  AssertHeld();
   // Compute names.
   absl::string_view placeholder_full_name;
   absl::string_view placeholder_name;
@@ -4903,9 +4876,7 @@ FileDescriptor* DescriptorPool::NewPlaceholderFile(
 
 FileDescriptor* DescriptorPool::NewPlaceholderFileWithMutexHeld(
     const absl::string_view name, internal::FlatAllocator& alloc) const {
-  if (mutex_) {
-    mutex_->AssertHeld();
-  }
+  AssertHeld();
   FileDescriptor* placeholder = alloc.AllocateArray<FileDescriptor>(1);
   memset(static_cast<void*>(placeholder), 0, sizeof(*placeholder));
 

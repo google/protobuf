@@ -49,11 +49,15 @@ namespace pb {
 namespace enumvalue {
 class JsonEnumValueOptions;
 struct JsonEnumValueOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const JsonEnumValueOptionsGlobalsTypeInternal JsonEnumValueOptions_globals_;
+PROTOBUF_EXPORT extern const JsonEnumValueOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) JsonEnumValueOptions_globals_;
 }  // namespace enumvalue
 }  // namespace pb
 namespace google {
 namespace protobuf {
+template <>
+internal::GeneratedMessageTraitsT<&::pb::enumvalue::JsonEnumValueOptions_globals_>
+    internal::MessageTraitsImpl::value<::pb::enumvalue::JsonEnumValueOptions>;
 }  // namespace protobuf
 }  // namespace google
 

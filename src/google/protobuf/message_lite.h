@@ -180,7 +180,7 @@ struct EnumTraitsImpl {
   // The `enable_if` is there to workaround some compilers/tools that complain
   // on the declaration even with no instantiations.
   template <typename T>
-  static std::enable_if_t<sizeof(T) != 0, Undefined> value;
+  static std::enable_if_t<std::is_void_v<T>, Undefined> value;
 };
 template <typename T>
 using EnumTraits = decltype(EnumTraitsImpl::value<T>);
@@ -853,9 +853,18 @@ class PROTOBUF_EXPORT MessageLite {
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
   explicit constexpr MessageLite(const internal::ClassData* data)
-      : _class_data_(data) {}
+      : _class_data_(data) {
+    // We want to evaluate the aligned-ness of `data` at compile time, which
+    // requires the use of `__builtin_is_aligned`. When message globals are
+    // constructed, the address of `data` has not been synthesized yet, but the
+    // compiler is able to deduce it from the alignment of the forward-declared
+    // message globals value itself.
+    internal::DebugAssertPtrIsAligned(data, internal::kClassDataAlignment);
+  }
   explicit MessageLite(Arena* arena, const internal::ClassData* data)
-      : _internal_metadata_(arena), _class_data_(data) {}
+      : _internal_metadata_(arena), _class_data_(data) {
+    internal::DebugAssertPtrIsAligned(data, internal::kClassDataAlignment);
+  }
 #else   // PROTOBUF_CUSTOM_VTABLE
   constexpr MessageLite() {}
   explicit MessageLite(Arena* arena) : _internal_metadata_(arena) {}
