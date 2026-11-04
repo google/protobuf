@@ -68,6 +68,10 @@ ParseFunctionGenerator::ParseFunctionGenerator(
                                   get_has_bit_index, options_);
   tc_table_info_ = std::make_unique<TailCallTableInfo>(
       BuildTcTableInfoFromDescriptor(descriptor_, options_, fields));
+  if (NeedsPostLoopHandler(descriptor_, options_)) {
+    tc_table_info_->aux_entries.push_back(
+        {TailCallTableInfo::kPostLoopHandler});
+  }
   SetCommonMessageDataVariables(descriptor_, &variables_);
   SetUnknownFieldsVariable(descriptor_, options_, &variables_);
 }
@@ -344,6 +348,9 @@ void ParseFunctionGenerator::GenerateParseTableHelperDefinition(
               )cc");
           break;
         }
+        case TailCallTableInfo::kPostLoopHandler:
+          p->Emit("{&$Msg$::PostLoopHandler},\n");
+          break;
       }
     }
   };
@@ -386,7 +393,10 @@ void ParseFunctionGenerator::GenerateParseTableHelperDefinition(
         [&] {
           if (ordered_fields_.empty() &&
               !descriptor_->options().message_set_wire_format()) {
-            ABSL_DLOG_IF(FATAL, !tc_table_info_->aux_entries.empty())
+            ABSL_LOG_IF(
+                DFATAL,
+                tc_table_info_->aux_entries.size() >
+                    (NeedsPostLoopHandler(descriptor_, options_) ? 1 : 0))
                 << "Invalid message: " << descriptor_->full_name() << " has "
                 << tc_table_info_->aux_entries.size()
                 << " auxiliary field entries, but no fields";

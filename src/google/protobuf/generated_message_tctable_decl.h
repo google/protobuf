@@ -290,10 +290,29 @@ struct alignas(uint64_t) TcParseTableBase {
   uint16_t extension_offset;
   uint32_t max_field_number;
   uint8_t fast_idx_mask;
-  // Testing one bit is cheaper than testing whether post_loop_handler is null,
-  // and we expect it to be null most of the time so no reason to load the
-  // pointer.
-  uint8_t has_post_loop_handler : 1;
+  using PostLoopHandler = const char* (*)(MessageLite* msg, const char* ptr,
+                                          ParseContext* ctx);
+  enum PostLoopHandlerKind : uint8_t {
+    kPostLoopNone = 0,
+    kPostLoopInAux = 1,
+    kPostLoopStub = 2,
+  };
+  enum FallbackKind : uint8_t {
+    kFallbackNull = 0,
+    kFallbackGeneric = 1,
+    kFallbackGenericLite = 2,
+    kFallbackMpUnknownFields = 3,
+    kFallbackReflection = 4,
+    kFallbackDiscardEverything = 5,
+    kFallbackCustom = 6,
+  };
+  // Testing two bits is cheaper than loading a pointer, and we expect
+  // post_loop_handler to be null most of the time (~98% of messages). When
+  // non-null on codegen tables, the pointer is stored in the trailing FieldAux
+  // entry (kPostLoopInAux).
+  uint8_t has_post_loop_handler : 2;
+  uint8_t has_hasbits_for_debug : 1;
+  uint8_t fallback_idx : 5;
   uint16_t lookup_table_offset;
   uint32_t skipmap32;
   uint32_t field_entries_offset;
@@ -305,21 +324,39 @@ struct alignas(uint64_t) TcParseTableBase {
   // The size of the whole parse table.
   uint32_t sizeof_self;
 
-  const ClassData* class_data;
-  using PostLoopHandler = const char* (*)(MessageLite* msg, const char* ptr,
-                                          ParseContext* ctx);
-  PostLoopHandler post_loop_handler;
-
-  // Handler for fields which are not handled by table dispatch.
-  TailCallParseFunc fallback;
-
   // A sub message's table to be prefetched.
 
-  // This constructor exactly follows the field layout, so it's technically
-  // not necessary.  However, it makes it much much easier to add or re-arrange
-  // fields, because it can be overloaded with an additional constructor,
-  // temporarily allowing both old and new protocol buffer headers to be
-  // compiled.
+  constexpr TcParseTableBase(uint16_t has_bits_offset,
+                             uint16_t extension_offset,
+                             uint32_t max_field_number, uint8_t fast_idx_mask,
+                             uint16_t lookup_table_offset, uint32_t skipmap32,
+                             uint32_t field_entries_offset,
+                             uint16_t num_field_entries,
+                             uint16_t num_aux_entries, uint32_t aux_offset,
+                             size_t sizeof_self, const ClassData* class_data,
+                             PostLoopHandler post_loop_handler)
+      : has_bits_offset(has_bits_offset),
+        extension_offset(extension_offset),
+        max_field_number(max_field_number),
+        fast_idx_mask(fast_idx_mask),
+        has_post_loop_handler(
+            post_loop_handler == nullptr
+                ? kPostLoopNone
+                : (num_aux_entries != 0 ? kPostLoopInAux : kPostLoopStub)),
+        has_hasbits_for_debug(class_data == nullptr ||
+                              has_bits_offset !=
+                                  class_data->cached_size_offset),
+        fallback_idx(kFallbackNull),
+        lookup_table_offset(lookup_table_offset),
+        skipmap32(skipmap32),
+        field_entries_offset(field_entries_offset),
+        num_field_entries(num_field_entries),
+        num_aux_entries(num_aux_entries),
+        aux_offset(aux_offset),
+        sizeof_self(static_cast<uint32_t>(sizeof_self)) {
+    ABSL_DCHECK_EQ(static_cast<size_t>(this->sizeof_self), sizeof_self);
+  }
+
   constexpr TcParseTableBase(uint16_t has_bits_offset,
                              uint16_t extension_offset,
                              uint32_t max_field_number, uint8_t fast_idx_mask,
@@ -329,25 +366,9 @@ struct alignas(uint64_t) TcParseTableBase {
                              uint16_t num_aux_entries, uint32_t aux_offset,
                              size_t sizeof_self, const ClassData* class_data,
                              PostLoopHandler post_loop_handler,
-                             TailCallParseFunc fallback)
-      : has_bits_offset(has_bits_offset),
-        extension_offset(extension_offset),
-        max_field_number(max_field_number),
-        fast_idx_mask(fast_idx_mask),
-        has_post_loop_handler(post_loop_handler != nullptr),
-        lookup_table_offset(lookup_table_offset),
-        skipmap32(skipmap32),
-        field_entries_offset(field_entries_offset),
-        num_field_entries(num_field_entries),
-        num_aux_entries(num_aux_entries),
-        aux_offset(aux_offset),
-        sizeof_self(static_cast<uint32_t>(sizeof_self)),
-        class_data(class_data),
-        post_loop_handler(post_loop_handler),
-        fallback(fallback) {
-    // Check that the size of the table fits in a uint32_t.
-    ABSL_DCHECK_EQ(static_cast<size_t>(this->sizeof_self), sizeof_self);
-  }
+                             TailCallParseFunc fallback);
+
+  TailCallParseFunc fallback() const;
 
   // Table entry for fast-path tailcall dispatch handling.
   struct FastFieldEntry {
@@ -462,6 +483,8 @@ struct alignas(uint64_t) TcParseTableBase {
     constexpr FieldAux(MapAuxInfo map_info) : map_info(map_info) {}
     constexpr FieldAux(LazyEagerVerifyFnType verify_func)
         : verify_func(verify_func) {}
+    constexpr FieldAux(PostLoopHandler post_loop_handler)
+        : post_loop_handler(post_loop_handler) {}
     // NOLINTEND(google-explicit-constructor)
     struct {
       int32_t first;  // the first label in the range (inclusive)
@@ -473,6 +496,7 @@ struct alignas(uint64_t) TcParseTableBase {
     const uint32_t* enum_data;
     MapAuxInfo map_info;
     LazyEagerVerifyFnType verify_func;
+    PostLoopHandler post_loop_handler;
 
     const ClassData* class_data() const {
       return static_cast<const ClassData*>(class_data_p);
@@ -506,11 +530,9 @@ struct alignas(uint64_t) TcParseTableBase {
                                    aux_offset +
                                    num_aux_entries * sizeof(FieldAux));
   }
-
-  const MessageLite* default_instance() const {
-    return class_data->default_instance();
-  }
 };
+static_assert(sizeof(TcParseTableBase) == 32,
+              "TcParseTableBase should be 32 bytes.");
 
 #if defined(_MSC_VER) && !defined(_WIN64)
 #pragma warning(pop)
@@ -617,7 +639,6 @@ constexpr TcParseTable<0> CreateStubTcParseTable(
           sizeof(TcParseTable<0>),  // sizeof_self
           class_data,               //
           post_loop_handler,        //
-          nullptr,                  // fallback
       },
       {{{StubParseImpl<T, func>, {}}}},
   };

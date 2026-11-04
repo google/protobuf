@@ -138,6 +138,14 @@ PROTOBUF_CONSTINIT PROTOBUF_EXPORT const DescriptorMethods
         nullptr,
 };
 
+const char* TcParser::GenericFallbackWeak(PROTOBUF_TC_PARAM_DECL) {
+  PROTOBUF_MUSTTAIL return GenericFallback(PROTOBUF_TC_PARAM_PASS);
+}
+
+const char* TcParser::ReflectionFallbackWeak(PROTOBUF_TC_PARAM_DECL) {
+  PROTOBUF_MUSTTAIL return ReflectionFallback(PROTOBUF_TC_PARAM_PASS);
+}
+
 }  // namespace internal
 
 using internal::ReflectionOps;
