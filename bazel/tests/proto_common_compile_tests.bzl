@@ -8,6 +8,7 @@
 """Tests for `proto_common.compile` function."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@proto_bazel_features//:features.bzl", "bazel_features")
 load("@rules_testing//lib:analysis_test.bzl", "analysis_test", "test_suite")
 load("@rules_testing//lib:truth.bzl", "matching")
 load("@rules_testing//lib:util.bzl", "util")
@@ -23,32 +24,38 @@ def proto_common_compile_test_suite(name):
         name = "simple_proto",
         srcs = ["A.proto"],
     )
+    tests = [
+        _test_compile_basic,
+        _test_compile_noplugin,
+        _test_compile_with_plugin_output,
+        _test_compile_with_directory_plugin_output,
+        _test_compile_additional_args,
+        _test_compile_additional_tools,
+        _test_compile_additional_tools_no_plugin,
+        _test_compile_additional_inputs,
+        _test_compile_resource_set,
+        _test_compile_protoc_opts,
+        _test_compile_protoc_opts_starlark,
+        _test_compile_direct_generated_protos,
+        _test_compile_indirect_generated_protos,
+        _test_compile_override_progress_message,
+        _test_proto_compiler_flag_override,
+        _test_proto_compiler_native_flag_override,
+        _test_proto_toolchain_for_cc_flag_override,
+        _test_proto_toolchain_for_cc_native_flag_override,
+        _test_proto_toolchain_for_java_flag_override,
+        _test_proto_toolchain_for_java_native_flag_override,
+        _test_proto_toolchain_for_javalite_flag_override,
+        _test_proto_toolchain_for_javalite_native_flag_override,
+    ]
+    if bazel_features.rules.analysis_tests_can_transition_on_experimental_incompatible_flags:
+        tests.append(_test_compile_path_mapping)
+        tests.append(_test_compile_genproto_legacy_no_path_mapping)
+        tests.append(_test_compile_genproto_directory_no_path_mapping)
+
     test_suite(
         name = name,
-        tests = [
-            _test_compile_basic,
-            _test_compile_noplugin,
-            _test_compile_with_plugin_output,
-            _test_compile_with_directory_plugin_output,
-            _test_compile_additional_args,
-            _test_compile_additional_tools,
-            _test_compile_additional_tools_no_plugin,
-            _test_compile_additional_inputs,
-            _test_compile_resource_set,
-            _test_compile_protoc_opts,
-            _test_compile_protoc_opts_starlark,
-            _test_compile_direct_generated_protos,
-            _test_compile_indirect_generated_protos,
-            _test_compile_override_progress_message,
-            _test_proto_compiler_flag_override,
-            _test_proto_compiler_native_flag_override,
-            _test_proto_toolchain_for_cc_flag_override,
-            _test_proto_toolchain_for_cc_native_flag_override,
-            _test_proto_toolchain_for_java_flag_override,
-            _test_proto_toolchain_for_java_native_flag_override,
-            _test_proto_toolchain_for_javalite_flag_override,
-            _test_proto_toolchain_for_javalite_native_flag_override,
-        ],
+        tests = tests,
     )
 
 def _match_proto_compiler():
@@ -403,6 +410,117 @@ def _test_compile_indirect_generated_protos_impl(env, target):
             matching.str_endswith("/A.proto"),
         ],
     )
+
+# Verifies `proto_common.compile` strips configuration prefixes under `supports-path-mapping`.
+def _test_compile_path_mapping(name):
+    util.helper_target(native.genrule, name = name + "_generate_G", cmd = "", outs = ["path_mapped_G.proto"])
+    util.helper_target(
+        proto_library,
+        name = name + "_generated_proto",
+        srcs = ["path_mapped_G.proto"],
+    )
+    util.helper_target(
+        proto_library,
+        name = name + "_virtual_proto",
+        srcs = ["A.proto"],
+        strip_import_prefix = "/bazel/tests",
+        deps = [":" + name + "_generated_proto"],
+    )
+    util.helper_target(
+        compile_rule,
+        name = name + "_compile",
+        proto_dep = name + "_virtual_proto",
+        output_files = "multiple",
+    )
+
+    analysis_test(
+        name = name,
+        target = name + "_compile",
+        config_settings = {
+            "//command_line_option:experimental_output_paths": "strip",
+            "//command_line_option:modify_execution_info": ["MyMnemonic=+supports-path-mapping"],
+        },
+        impl = _test_compile_path_mapping_impl,
+    )
+
+def _test_compile_path_mapping_impl(env, target):
+    action = env.expect.that_target(target).action_named("MyMnemonic")
+    action.argv().contains_exactly_predicates(
+        [
+            _match_proto_compiler(),
+            matching.str_matches("--java_out=param1,param2:*-out/cfg/bin/*/tests/_virtual_imports/" + target.label.name.removesuffix("_compile") + "_virtual_proto"),
+            matching.str_matches("--plugin=*-out/cfg/bin/*testdata/plugin*"),
+            matching.str_matches("-I*-out/cfg/bin/*/tests/_virtual_imports/" + target.label.name.removesuffix("_compile") + "_virtual_proto"),
+            matching.str_matches("-I*-out/cfg/*"),
+            matching.equals_wrapper("-I."),
+            matching.str_matches("*-out/cfg/bin/*/tests/_virtual_imports/*/A.proto"),
+        ],
+    )
+
+# Verifies `proto_common.compile` does not enable `supports-path-mapping` when `output_files == "legacy"`.
+def _test_compile_genproto_legacy_no_path_mapping(name):
+    util.helper_target(
+        proto_lang_toolchain,
+        name = name + "_genproto_legacy_toolchain",
+        command_line = "--java_out=param1,param2:$(OUT)",
+        mnemonic = "GenProto",
+        output_files = "legacy",
+        plugin = "//bazel/tests/testdata:plugin",
+        plugin_format_flag = "--plugin=%s",
+    )
+    util.helper_target(
+        compile_rule,
+        name = name + "_compile",
+        proto_dep = ":simple_proto",
+        plugin_output = "multiple",
+        toolchain = ":" + name + "_genproto_legacy_toolchain",
+    )
+
+    analysis_test(
+        name = name,
+        target = name + "_compile",
+        config_settings = {
+            "//command_line_option:experimental_output_paths": "strip",
+        },
+        impl = _test_compile_genproto_legacy_no_path_mapping_impl,
+    )
+
+def _test_compile_genproto_legacy_no_path_mapping_impl(env, target):
+    action = env.expect.that_target(target).action_named("GenProto")
+    action.argv().not_contains_predicate(matching.str_matches("*-out/cfg/*"))
+
+# Verifies `proto_common.compile` does not enable `supports-path-mapping` when `generated_files` contains a directory (`TreeArtifact`).
+def _test_compile_genproto_directory_no_path_mapping(name):
+    util.helper_target(
+        proto_lang_toolchain,
+        name = name + "_genproto_multiple_toolchain",
+        command_line = "--cpp_out=$(OUT)",
+        mnemonic = "GenProto",
+        output_files = "multiple",
+        plugin = "//bazel/tests/testdata:plugin",
+        plugin_format_flag = "--plugin=%s",
+    )
+    util.helper_target(
+        compile_rule,
+        name = name + "_compile",
+        declare_directory = True,
+        output_files = "multiple",
+        proto_dep = ":simple_proto",
+        toolchain = ":" + name + "_genproto_multiple_toolchain",
+    )
+
+    analysis_test(
+        name = name,
+        target = name + "_compile",
+        config_settings = {
+            "//command_line_option:experimental_output_paths": "strip",
+        },
+        impl = _test_compile_genproto_directory_no_path_mapping_impl,
+    )
+
+def _test_compile_genproto_directory_no_path_mapping_impl(env, target):
+    action = env.expect.that_target(target).action_named("GenProto")
+    action.argv().not_contains_predicate(matching.str_matches("*-out/cfg/*"))
 
 # Verifies usage of `proto_common.compile` with `experimental_progress_message` parameter
 def _test_compile_override_progress_message(name):
