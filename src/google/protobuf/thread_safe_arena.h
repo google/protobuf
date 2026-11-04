@@ -19,10 +19,10 @@
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
-#include "google/protobuf/arena_align.h"
 #include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/arenaz_sampler.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
 
@@ -273,7 +273,7 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   static constexpr size_t kSerialArenaSize =
       (sizeof(SerialArena) + 7) & static_cast<size_t>(-8);
   static constexpr size_t kAllocPolicySize =
-      ArenaAlignDefault::Ceil(sizeof(AllocationPolicy));
+      ArenaAlignDefault{}.Ceil(sizeof(AllocationPolicy));
   static constexpr size_t kMaxCleanupNodeSize = 16;
   static_assert(kBlockHeaderSize % 8 == 0,
                 "kBlockHeaderSize must be a multiple of 8.");

@@ -160,6 +160,28 @@ TEST(ReflectionTest, ImplicitPresenceWithDefault) {
             "(FooMessage.f1)");
 }
 
+TEST(ReflectionTest, RepeatedFieldWithDefault) {
+  absl::Status status =
+      LoadDescriptorProto(
+          R"pb(
+            syntax: "proto2"
+            name: "F"
+            message_type {
+              name: "FooMessage"
+              field {
+                name: "f1"
+                number: 1
+                label: LABEL_REPEATED
+                type: TYPE_STRING
+                default_value: "abc"
+              }
+            }
+          )pb")
+          .status();
+  EXPECT_EQ(std::string_view(status.message()),
+            "repeated fields cannot have explicit defaults (FooMessage.f1)");
+}
+
 TEST(ReflectionTest, ImplicitPresenceWithNonZeroDefaultEnum) {
   absl::Status status =
       LoadDescriptorProto(

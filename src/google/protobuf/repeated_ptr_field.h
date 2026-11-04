@@ -42,11 +42,11 @@
 #include "absl/log/absl_check.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
-#include "google/protobuf/arena_align.h"
 #include "google/protobuf/class_data.h"
 #include "google/protobuf/field_with_arena.h"
 #include "google/protobuf/internal_metadata_locator.h"
 #include "google/protobuf/internal_visibility.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
@@ -507,9 +507,9 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
     auto* r = rep();
     size_t desired_capacity =
         std::max<size_t>(r->allocated_size, kMinNonSsoCapacity);
-    if constexpr (ArenaAlignDefault::Ceil(sizeof(void*)) != sizeof(void*)) {
+    if constexpr (ArenaAlignDefault{}.Ceil(sizeof(void*)) != sizeof(void*)) {
       desired_capacity =
-          ArenaAlignDefault::Ceil(desired_capacity * sizeof(void*)) /
+          ArenaAlignDefault{}.Ceil(desired_capacity * sizeof(void*)) /
           sizeof(void*);
     }
     if (arena->TryTrimTail(r->elements + r->capacity,
@@ -1277,7 +1277,7 @@ class ABSL_ATTRIBUTE_WARN_UNUSED RepeatedPtrField final
             internal::is_supported_string_type<Element>,
             internal::is_supported_message_type<Element>>,
         "We only support string and Message types in RepeatedPtrField.");
-    static_assert(alignof(Element) <= internal::ArenaAlignDefault::align,
+    static_assert(alignof(Element) <= internal::ArenaAlignDefault{}.align,
                   "Overaligned types are not supported");
   }
 
