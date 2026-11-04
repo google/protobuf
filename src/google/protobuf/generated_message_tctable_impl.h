@@ -20,12 +20,13 @@
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/arena.h"
+#include "google/protobuf/class_data.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
 #include "google/protobuf/map.h"
 #include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
-#include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/raw_ptr.h"
@@ -380,6 +381,12 @@ class PROTOBUF_EXPORT TcParser final {
   static PROTOBUF_ALWAYS_INLINE const char* ParseMessage(
       MessageLite* msg, const char* ptr, ParseContext* ctx,
       const TcParseTableBase* tc_table) {
+    // An existing extension can be heap-allocated under an arena-allocated
+    // parent message.
+    if (ABSL_PREDICT_FALSE(!ctx->HasSameArena(*msg))) {
+      return ParseHeapSubmessage</*group_coding=*/false>(
+          msg, ptr, ctx, tc_table->class_data, 0);
+    }
     return ctx->ParseLengthDelimitedInlined(ptr, [&](const char* ptr) {
       return ParseLoop(msg, ptr, ctx, tc_table);
     });
@@ -388,6 +395,12 @@ class PROTOBUF_EXPORT TcParser final {
   static PROTOBUF_ALWAYS_INLINE const char* ParseGroup(
       MessageLite* msg, const char* ptr, ParseContext* ctx,
       const TcParseTableBase* tc_table, uint32_t start_tag) {
+    // An existing extension can be heap-allocated under an arena-allocated
+    // parent message.
+    if (ABSL_PREDICT_FALSE(!ctx->HasSameArena(*msg))) {
+      return ParseHeapSubmessage</*group_coding=*/true>(
+          msg, ptr, ctx, tc_table->class_data, start_tag);
+    }
     return ctx->ParseGroupInlined(ptr, start_tag, [&](const char* ptr) {
       return ParseLoop(msg, ptr, ctx, tc_table);
     });
@@ -723,9 +736,11 @@ class PROTOBUF_EXPORT TcParser final {
     return *target;
   }
 
-  static MessageLite* NewMessage(const ClassData* class_data, Arena* arena);
+  static MessageLite* NewMessage(const ClassData* class_data,
+                                 SerialArena* arena);
   static MessageLite* AddMessage(const ClassData* class_data,
-                                 RepeatedPtrFieldBase& field, Arena* arena);
+                                 RepeatedPtrFieldBase& field,
+                                 SerialArena* arena);
 
   static void* MutableSplitField(MessageLite* msg,
                                  const TcParseTableBase* table,
@@ -910,6 +925,13 @@ class PROTOBUF_EXPORT TcParser final {
 
   class ScopedArenaSwap;
 
+  // Parses a heap-allocated submessage under an arena-allocated parent. This
+  // method temporarily switches `ctx->arena()` to `nullptr`.
+  template <bool group_coding>
+  PROTOBUF_NOINLINE static const char* ParseHeapSubmessage(
+      MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+      const ClassData* inner_class_data, uint32_t start_tag);
+
   static void WriteVarintToUnknown(MessageLite* msg,
                                    const ClassData* class_data, int number,
                                    int value);
@@ -1032,7 +1054,7 @@ class PROTOBUF_EXPORT TcParser final {
   static void InitOneof(const TcParseTableBase* table,
                         const ClassData* class_data,
                         const TcParseTableBase::FieldEntry& entry,
-                        MessageLite* msg);
+                        SerialArena* arena, MessageLite* msg);
   static void ChangeOneof(const TcParseTableBase* table,
                           const ClassData* class_data,
                           const TcParseTableBase::FieldEntry& entry,
@@ -1136,6 +1158,8 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::ToParseLoop(
 PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseLoop(
     MessageLite* msg, const char* ptr, ParseContext* ctx,
     const TcParseTableBase* table) {
+  // Callers must keep the arena cached in `ctx` in sync with `msg`.
+  ABSL_DCHECK_EQ(ctx->arena(), GetSerialArena(msg->GetArena()));
   // Note: TagDispatch uses a dispatch table at "&table->fast_entries".
   // For fast dispatch, we'd like to have a pointer to that, but if we use
   // that expression, there's no easy way to get back to "table", which we also
@@ -1164,6 +1188,13 @@ PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseLoop(
   }
   return ptr;
 }
+
+extern template const char* TcParser::ParseHeapSubmessage<false>(
+    MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+    const ClassData* inner_class_data, uint32_t start_tag);
+extern template const char* TcParser::ParseHeapSubmessage<true>(
+    MessageLite* inner_msg, const char* ptr, ParseContext* ctx,
+    const ClassData* inner_class_data, uint32_t start_tag);
 
 // Prints the type card as or of labels, using known higher level labels.
 // Used for code generation, but also useful for debugging.

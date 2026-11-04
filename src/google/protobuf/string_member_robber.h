@@ -8,10 +8,11 @@
 #ifndef GOOGLE_PROTOBUF_STRING_MEMBER_ROBBER_H__
 #define GOOGLE_PROTOBUF_STRING_MEMBER_ROBBER_H__
 
+#include <cstddef>
 #include <string>
-#include <type_traits>
 
 #include "absl/log/absl_check.h"
+#include "google/protobuf/memory_align.h"
 
 
 #endif  // GOOGLE_PROTOBUF_STRING_MEMBER_ROBBER_H__

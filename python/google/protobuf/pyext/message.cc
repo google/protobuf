@@ -2302,7 +2302,7 @@ static PyObject* MergeFromStringImpl(CMessage* self, PyObject* arg,
                   : io::CodedInputStream::GetDefaultRecursionLimit();
   const char* ptr;
   internal::ParseContext ctx(
-      depth, false, &ptr,
+      depth, false, merge_dst->GetArena(), &ptr,
       absl::string_view(static_cast<const char*>(data.buf), data.len));
 
   ctx.data().pool = factory->pool->pool->get();
