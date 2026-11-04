@@ -44,6 +44,13 @@ namespace compiler {
 namespace cpp {
 namespace {
 
+// DO NOT SUBMIT: CI benchmark. A real (not comment-only, so sccache cannot
+// hit) but inert change to one generator translation unit, to measure a warm
+// rebuild of //cmake:protobuf_cmake and //cmake:protobuf_cmake_tests: one TU
+// recompiles, libprotoc/protoc and everything downstream relink, and only the
+// tests whose executables changed re-run.
+[[maybe_unused]] constexpr int kCmakeRebuildBenchmark = 2;
+
 std::string NumberedCcFileName(absl::string_view basename, int number) {
   return absl::StrCat(basename, ".out/", number, ".cc");
 }
