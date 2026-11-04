@@ -132,8 +132,7 @@ void ServiceGenerator::GenerateImplementation(io::Printer* printer) {
       },
       R"cc(
         const $pb$::ServiceDescriptor* $nonnull$ $classname$::descriptor() {
-          $pbi$::AssignDescriptors(&$desc_table$);
-          return $file_level_service_descriptors$[$index$];
+          return $pbi$::GetServiceDescriptor(&$desc_table$, $index$);
         }
 
         const $pb$::ServiceDescriptor* $nonnull$ $classname$::GetDescriptor() {
@@ -202,8 +201,7 @@ void ServiceGenerator::GenerateCallMethod(io::Printer* printer) {
             $pb$::Message* $nonnull$ response, ::google::protobuf::Closure* $nullable$ done) {
       )"
       R"(
-        ABSL_DCHECK_EQ(method->service(),
-                       $file_level_service_descriptors$[$index$]);
+        ABSL_DCHECK_EQ(method->service(), descriptor());
         switch (method->index()) {
           $cases$;
 

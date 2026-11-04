@@ -136,7 +136,7 @@ PROTOBUF_CONSTINIT PROTOBUF_EXPORT const DescriptorMethods
         SpaceUsedLongImpl,
         DebugStringImpl,
         nullptr,
-};
+    };
 
 }  // namespace internal
 

@@ -4098,11 +4098,6 @@ void AssignDescriptorsImpl(const DescriptorTable* table, bool eager) {
   for (int i = 0; i < file->enum_type_count(); i++) {
     helper.AssignEnumDescriptor(file->enum_type(i));
   }
-  if (file->options().cc_generic_services()) {
-    for (int i = 0; i < file->service_count(); i++) {
-      table->file_level_service_descriptors[i] = file->service(i);
-    }
-  }
 }
 
 void MaybeInitializeLazyDescriptors(const DescriptorTable* table) {
@@ -4169,9 +4164,20 @@ void AddDescriptors(const DescriptorTable* table) {
   // properly serialized. This function is only called pre-main by global
   // descriptors and we can assume single threaded access or it's called
   // by AssignDescriptorImpl which uses a mutex to sequence calls.
-  if (table->is_initialized) return;
-  table->is_initialized = true;
+  if (table->once->is_initialized) return;
+  table->once->is_initialized = true;
   AddDescriptorsImpl(table);
+}
+
+const ServiceDescriptor* GetServiceDescriptor(const DescriptorTable* table,
+                                              int index) {
+  AssignDescriptors(table);
+  const FileDescriptor* file =
+      DescriptorPool::internal_generated_pool()->FindFileByName(
+          table->filename);
+  ABSL_CHECK(file != nullptr) << " Missing file descriptor for `"
+                              << table->filename << "` in the generated pool.";
+  return file->service(index);
 }
 
 void AssignDescriptorsOnceInnerCall(const DescriptorTable* table) {

@@ -33,11 +33,12 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 #define PROTOBUF_NO_CUSTOM_VTABLE_INLINE PROTOBUF_ALWAYS_INLINE
 #endif
 namespace {
-PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
+static ::google::protobuf::internal::ReflectionState file_reflection_state[1];
+static constexpr ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::pb::CppFeatures
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto, /* tracker*/ nullptr,},
-};
+        {&file_reflection_state[0], &::descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto},
+    };
 }  // namespace
 namespace pb {
 class CppFeatures::_Internal {
@@ -176,8 +177,6 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
 }  // namespace pb
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
     file_level_enum_descriptors_google_2fprotobuf_2fcpp_5ffeatures_2eproto[2];
-static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
-    file_level_service_descriptors_google_2fprotobuf_2fcpp_5ffeatures_2eproto = nullptr;
 const ::uint32_t
     TableStruct_google_2fprotobuf_2fcpp_5ffeatures_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
@@ -192,16 +191,16 @@ const ::uint32_t
         0,
         2,
         3,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::pb::CppFeatures)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::CppFeatures_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffeatures_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\"google/protobuf/cpp_features.proto\022\002pb"
@@ -228,10 +227,9 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffeatures_2eproto[
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
-static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto_once;
+    };
+static ::_pbi::DescriptorTableOnce descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto = {
-    false,
     false,
     795,
     descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffeatures_2eproto,
@@ -244,7 +242,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fproto
     file_message_globals,
     TableStruct_google_2fprotobuf_2fcpp_5ffeatures_2eproto::offsets,
     file_level_enum_descriptors_google_2fprotobuf_2fcpp_5ffeatures_2eproto,
-    file_level_service_descriptors_google_2fprotobuf_2fcpp_5ffeatures_2eproto,
 };
 namespace pb {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL

@@ -69,8 +69,6 @@ absl::flat_hash_map<absl::string_view, std::string> FileVars(
       {"file_level_metadata", UniqueName("file_level_metadata", file, options)},
       {"file_level_enum_descriptors",
        UniqueName("file_level_enum_descriptors", file, options)},
-      {"file_level_service_descriptors",
-       UniqueName("file_level_service_descriptors", file, options)},
   };
 }
 
@@ -773,35 +771,58 @@ void FileGenerator::GenerateSource(io::Printer* p) {
   GenerateInternalForwardDeclarations(refs, p);
 
   if (HasDescriptorMethods(file_, options_) && !message_generators_.empty()) {
+    bool has_tracker = false;
+    for (const auto& generator : message_generators_) {
+      if (HasTracker(generator->descriptor(), options_)) {
+        has_tracker = true;
+        break;
+      }
+    }
     p->Emit(
-        {{"reflection_data",
+        {{"num_msgs", message_generators_.size()},
+         {"reflection_data_type",
+          has_tracker ? "ReflectionDataWithTracker" : "ReflectionData"},
+         {"reflection_data",
           [&] {
-            for (const auto& generator : message_generators_) {
-              p->Emit(
-                  {{"class",
-                    QualifiedClassName(generator->descriptor(), options_)},
-                   {"tracker_on_get_metadata",
-                    [&] {
-                      if (HasTracker(generator->descriptor(), options_)) {
-                        p->Emit(
-                            R"cc(&::_pbi::PrivateAccess::TrackerOnGetMetadata<
-                                     $class$>,)cc");
-                      } else {
-                        p->Emit(R"cc(/* tracker*/ nullptr,)cc");
-                      }
-                    }}},
-                  R"cc(
-                    // $class$
-                    {&::_pbi::kDescriptorMethods, &::$desc_table$, $tracker_on_get_metadata$},
-                  )cc");
+            for (size_t i = 0; i < message_generators_.size(); ++i) {
+              const auto& generator = message_generators_[i];
+              if (has_tracker) {
+                p->Emit(
+                    {{"idx", i},
+                     {"class",
+                      QualifiedClassName(generator->descriptor(), options_)},
+                     {"tracker_on_get_metadata",
+                      [&] {
+                        if (HasTracker(generator->descriptor(), options_)) {
+                          p->Emit(
+                              R"cc(&::_pbi::PrivateAccess::TrackerOnGetMetadata<
+                                       $class$>)cc");
+                        } else {
+                          p->Emit(R"cc(/* tracker */ nullptr)cc");
+                        }
+                      }}},
+                    R"cc(
+                      // $class$
+                      {&file_reflection_state[$idx$], &::$desc_table$, $tracker_on_get_metadata$},
+                    )cc");
+              } else {
+                p->Emit({{"idx", i},
+                         {"class", QualifiedClassName(generator->descriptor(),
+                                                      options_)}},
+                        R"cc(
+                          // $class$
+                          {&file_reflection_state[$idx$], &::$desc_table$},
+                        )cc");
+              }
             }
           }}},
         R"cc(
           namespace {
-          PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
+          static ::google::protobuf::internal::ReflectionState file_reflection_state[$num_msgs$];
+          static constexpr ::google::protobuf::internal::$reflection_data_type$
               file_reflection_data[] = {
                   $reflection_data$,
-          };
+              };
           }  // namespace
         )cc");
   }
@@ -1072,19 +1093,6 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
     )cc");
   }
 
-  if (HasGenericServices(file_, options_) && file_->service_count() > 0) {
-    p->Emit({{"len", file_->service_count()}}, R"cc(
-      //~ Default initialized to null, but set to non-null values before use.
-      static const ::_pb::ServiceDescriptor* $nonnull$
-          $file_level_service_descriptors$[$len$];
-    )cc");
-  } else {
-    p->Emit(R"cc(
-      static constexpr const ::_pb::ServiceDescriptor* $nonnull$* $nullable$
-          $file_level_service_descriptors$ = nullptr;
-    )cc");
-  }
-
   if (!message_generators_.empty()) {
     std::vector<size_t> offsets;
     offsets.reserve(message_generators_.size());
@@ -1111,18 +1119,18 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
               $tablename$::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
                   protodesc_cold) = {
                   $offsets$,
-          };
+              };
 
           static const ::_pbi::MigrationSchema
               schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
                   $schemas$,
-          };
+              };
         )cc");
     constexpr absl::string_view file_default_instances_code = R"cc(
       static const ::_pbi::MessageGlobalsBase* $nonnull$ const
           file_message_globals[] = {
               $globals$,
-      };
+          };
     )cc";
     if (!UsingImplicitWeakDescriptor(file_, options_)) {
       std::vector<Sub> subs = {
@@ -1242,7 +1250,7 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
           static const ::_pbi::DescriptorTable* $nonnull$ const
               $desc_table$_deps[$len$] = {
                   $deps$,
-          };
+              };
         )cc");
   }
 
@@ -1264,9 +1272,8 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
           {"num_msgs", message_generators_.size()},
       },
       R"cc(
-        static ::absl::once_flag $desc_table$_once;
+        static ::_pbi::DescriptorTableOnce $desc_table$_once;
         PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable $desc_table$ = {
-            false,
             $eager$,
             $file_proto_len$,
             $proto_name$,
@@ -1279,7 +1286,6 @@ void FileGenerator::GenerateReflectionInitializationCode(io::Printer* p) {
             file_message_globals,
             $tablename$::offsets,
             $file_level_enum_descriptors$,
-            $file_level_service_descriptors$,
         };
       )cc");
 

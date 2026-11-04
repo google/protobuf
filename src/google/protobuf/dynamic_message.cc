@@ -397,10 +397,10 @@ struct DynamicMessageFactory::TypeInfo {
   std::unique_ptr<uint32_t[]> has_bits_indices;
 
   DynamicMessageGlobalsInternalType* globals = nullptr;
+  internal::ReflectionState reflection_state;
   internal::ReflectionData reflection_data = {
-      &internal::kDescriptorMethods,
+      &reflection_state,
       nullptr,  // descriptor_table
-      nullptr,  // get_metadata_tracker
   };
 
   TypeInfo() = default;
