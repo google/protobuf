@@ -421,6 +421,8 @@ class FlatAllocatorImpl {
     return res;
   }
 
+  // TODO: Remove the NULL terminators to save memory and simplify
+  // the code.
   absl::optional<internal::DescriptorNames::Input> CreateDescriptorNames(
       std::initializer_list<absl::string_view> bytes,
       std::initializer_list<size_t> sizes) {
@@ -454,18 +456,22 @@ class FlatAllocatorImpl {
   }
   absl::optional<internal::DescriptorNames::Input> AllocateEntityNames(
       absl::string_view scope, absl::string_view name) {
+    static constexpr absl::string_view kNullChar("\0", 1);
     if (scope.empty()) {
-      return CreateDescriptorNames({name}, {name.size(), name.size()});
+      return CreateDescriptorNames({name, kNullChar},
+                                   {name.size(), name.size()});
     } else {
       return CreateDescriptorNames(
-          {scope, ".", name}, {name.size(), scope.size() + 1 + name.size()});
+          {scope, ".", name, kNullChar},
+          {name.size(), scope.size() + 1 + name.size()});
     }
   }
 
   internal::DescriptorNames::Input AllocatePlaceholderNames(
       absl::string_view full_name, size_t name_size) {
-    auto out =
-        CreateDescriptorNames({full_name}, {name_size, full_name.size()});
+    static constexpr absl::string_view kNullChar("\0", 1);
+    auto out = CreateDescriptorNames({full_name, kNullChar},
+                                     {name_size, full_name.size()});
     if (out.has_value()) return *out;
     // Return any valid name for the caller to use and keep going.
     return AllocateEntityNames("", "unknown").value();
@@ -496,7 +502,8 @@ class FlatAllocatorImpl {
     // camelcase (offset, size), json (offset, size),
     constexpr int kIndexSize = 8 * sizeof(uint16_t);
 
-    size_t total_bytes = kIndexSize + name.size();
+    constexpr int kNullCharSize = 1;
+    size_t total_bytes = kIndexSize + name.size() + kNullCharSize;
     if (parent_scope_size != 0) {
       total_bytes += parent_scope_size + /* '.' */ 1;
     }
@@ -507,21 +514,24 @@ class FlatAllocatorImpl {
         case FieldNameCase::kAllLower:
           // Case 1: they are all the same.
           return PlanArray<char>(total_bytes);
-        case FieldNameCase::kSnakeCase:
+        case FieldNameCase::kSnakeCase: {
           // Case 2: name==lower, camel==json
-          return PlanArray<char>(total_bytes + CamelCaseSize(name));
+          return PlanArray<char>(total_bytes + CamelCaseSize(name) +
+                                 kNullCharSize);
+        }
         default:
           break;
       }
     }
 
     // lowercase
-    total_bytes += name.size();
+    total_bytes += name.size() + kNullCharSize;
     // camelcase
-    total_bytes += CamelCaseSize(name);
+    total_bytes += CamelCaseSize(name) + kNullCharSize;
     // json_name
-    total_bytes +=
-        (opt_json_name != nullptr ? opt_json_name->size() : JsonNameSize(name));
+    total_bytes += (opt_json_name != nullptr ? opt_json_name->size()
+                                             : JsonNameSize(name)) +
+                   kNullCharSize;
     PlanArray<char>(total_bytes);
   }
 
@@ -533,17 +543,19 @@ class FlatAllocatorImpl {
     const absl::string_view scope_dot = scope.empty() ? "" : ".";
     const size_t full_name_size = scope.size() + scope_dot.size() + name.size();
 
+    static constexpr absl::string_view kNullChar("\0", 1);
+
     if (opt_json_name == nullptr) {
       switch (GetFieldNameCase(name)) {
         case FieldNameCase::kAllLower:
           PROTOBUF_DEBUG_COUNTER("AllocateFieldNames.AllLower").Inc();
           // Case 1: they are all the same.
           return CreateDescriptorNames(
-              {scope, scope_dot, name},
+              {scope, scope_dot, name, kNullChar},
               {name.size(), full_name_size,
-               /* lowercase */ name.size(), name.size(),
-               /* camelcase */ name.size(), name.size(),
-               /* json */ name.size(), name.size()});
+               /* lowercase */ name.size() + 1, name.size(),
+               /* camelcase */ name.size() + 1, name.size(),
+               /* json */ name.size() + 1, name.size()});
         case FieldNameCase::kSnakeCase: {
           PROTOBUF_DEBUG_COUNTER("AllocateFieldNames.SnakeCase").Inc();
           // Case 2: name==lower, camel==json
@@ -552,11 +564,11 @@ class FlatAllocatorImpl {
           const size_t camelcase_offset =
               full_name_size + camelcase_name.size();
           return CreateDescriptorNames(
-              {camelcase_name, scope, scope_dot, name},
+              {camelcase_name, kNullChar, scope, scope_dot, name, kNullChar},
               {name.size(), full_name_size,
-               /* lowercase */ name.size(), name.size(),
-               /* camelcase */ camelcase_offset, camelcase_name.size(),
-               /* json */ camelcase_offset, camelcase_name.size()});
+               /* lowercase */ name.size() + 1, name.size(),
+               /* camelcase */ camelcase_offset + 2, camelcase_name.size(),
+               /* json */ camelcase_offset + 2, camelcase_name.size()});
         }
         default:
           break;
@@ -571,13 +583,14 @@ class FlatAllocatorImpl {
     const std::string json_name =
         opt_json_name != nullptr ? *opt_json_name : ToJsonName(name);
 
-    size_t offset = full_name_size;
+    size_t offset = full_name_size + 1;
     return CreateDescriptorNames(
-        {json_name, camelcase_name, lowercase_name, scope, scope_dot, name},
+        {json_name, kNullChar, camelcase_name, kNullChar,  //
+         lowercase_name, kNullChar, scope, scope_dot, name, kNullChar},
         {name.size(), full_name_size,  //
-         offset += lowercase_name.size(), lowercase_name.size(),
-         offset += camelcase_name.size(), camelcase_name.size(),
-         offset += json_name.size(), json_name.size()});
+         offset += lowercase_name.size() + 1, lowercase_name.size(),
+         offset += camelcase_name.size() + 1, camelcase_name.size(),
+         offset += json_name.size() + 1, json_name.size()});
   }
 
   template <typename Alloc>
@@ -1486,35 +1499,25 @@ class DescriptorPool::Tables {
 
   // Roll back the Tables to the state of the checkpoint at the top of the
   // stack, removing everything that was added after that point.
-  void RollbackToLastCheckpoint();
+  void RollbackToLastCheckpoint(DeferredValidation& deferred_validation);
 
-  class ScopedBuildState;
+  // The stack of files which are currently being built.  Used to detect
+  // cyclic dependencies when loading files from a DescriptorDatabase.  Not
+  // used when fallback_database_ == nullptr.
+  std::vector<std::string> pending_files_;
 
-  bool IsKnownBadFile(absl::string_view name) const {
-    return build_state().known_bad_files.contains(name);
-  }
-  void AddKnownBadFile(absl::string_view name) {
-    build_state().known_bad_files.emplace(name);
-  }
-  bool IsKnownBadSymbol(absl::string_view name) const {
-    return build_state().known_bad_symbols.contains(name);
-  }
-  void AddKnownBadSymbol(absl::string_view name) {
-    build_state().known_bad_symbols.emplace(name);
-  }
-  absl::Span<const std::string> pending_files() const {
-    return build_state().pending_files;
-  }
-  void PushPendingFile(absl::string_view name) {
-    build_state().pending_files.emplace_back(name);
-  }
-  void PopPendingFile() {
-    ABSL_DCHECK(!build_state().pending_files.empty());
-    build_state().pending_files.pop_back();
-  }
-  DeferredValidation& deferred_validation() {
-    return build_state().deferred_validation;
-  }
+  // A set of files which we have tried to load from the fallback database
+  // and encountered errors.  We will not attempt to load them again during
+  // execution of the current public API call, but for compatibility with
+  // legacy clients, this is cleared at the beginning of each public API call.
+  // Not used when fallback_database_ == nullptr.
+  absl::flat_hash_set<std::string> known_bad_files_;
+
+  // A set of symbols which we have tried to load from the fallback database
+  // and encountered errors. We will not attempt to load them again during
+  // execution of the current public API call, but for compatibility with
+  // legacy clients, this is cleared at the beginning of each public API call.
+  absl::flat_hash_set<std::string> known_bad_symbols_;
 
   // The set of descriptors for which we've already loaded the full
   // set of extensions numbers from fallback_database_.
@@ -1613,85 +1616,26 @@ class DescriptorPool::Tables {
           misc_allocations_before_checkpoint(
               static_cast<int>(tables->misc_allocs_.size())),
           pending_symbols_before_checkpoint(
-              tables->build_state().symbols_after_checkpoint.size()),
+              tables->symbols_after_checkpoint_.size()),
           pending_files_before_checkpoint(
-              tables->build_state().files_after_checkpoint.size()),
+              tables->files_after_checkpoint_.size()),
           pending_extensions_before_checkpoint(
-              tables->build_state().extensions_after_checkpoint.size()) {}
+              tables->extensions_after_checkpoint_.size()) {}
     int flat_allocations_before_checkpoint;
     int misc_allocations_before_checkpoint;
     int pending_symbols_before_checkpoint;
     int pending_files_before_checkpoint;
     int pending_extensions_before_checkpoint;
   };
-
-  struct BuildState {
-    explicit BuildState(DeferredValidation& deferred_validation)
-        : deferred_validation(deferred_validation) {}
-
-    DeferredValidation& deferred_validation;
-
-    std::vector<CheckPoint> checkpoints;
-    std::vector<Symbol> symbols_after_checkpoint;
-    std::vector<const FileDescriptor*> files_after_checkpoint;
-    std::vector<std::pair<const Descriptor*, int>> extensions_after_checkpoint;
-
-    // The stack of files which are currently being built.  Used to detect
-    // cyclic dependencies when loading files from a DescriptorDatabase.  Not
-    // used when fallback_database_ == nullptr.
-    std::vector<std::string> pending_files;
-
-    // A set of files which we have tried to load from the fallback database
-    // and encountered errors.  We will not attempt to load them again during
-    // execution of the current public API call.
-    // Not used when fallback_database_ == nullptr.
-    absl::flat_hash_set<std::string> known_bad_files;
-
-    // A set of symbols which we have tried to load from the fallback database
-    // and encountered errors. We will not attempt to load them again during
-    // execution of the current public API call.
-    absl::flat_hash_set<std::string> known_bad_symbols;
-  };
-  BuildState& build_state() {
-    ABSL_DCHECK(build_state_ != nullptr);
-    return *build_state_;
-  }
-  const BuildState& build_state() const {
-    ABSL_DCHECK(build_state_ != nullptr);
-    return *build_state_;
-  }
-
-  BuildState* build_state_ = nullptr;
-};
-
-class DescriptorPool::Tables::ScopedBuildState {
- public:
-  explicit ScopedBuildState(Tables& tables,
-                            DeferredValidation& deferred_validation)
-      : tables_(tables), state_(deferred_validation) {
-    ABSL_DCHECK(tables_.build_state_ == nullptr);
-    tables_.build_state_ = &state_;
-  }
-  ScopedBuildState(const ScopedBuildState&) = delete;
-  ScopedBuildState& operator=(const ScopedBuildState&) = delete;
-  ~ScopedBuildState() {
-    ABSL_DCHECK(state_.checkpoints.empty());
-    ABSL_DCHECK(state_.symbols_after_checkpoint.empty());
-    ABSL_DCHECK(state_.files_after_checkpoint.empty());
-    ABSL_DCHECK(state_.extensions_after_checkpoint.empty());
-    ABSL_DCHECK(state_.pending_files.empty());
-    ABSL_DCHECK(tables_.build_state_ == &state_);
-    tables_.build_state_ = nullptr;
-  }
-
- private:
-  Tables& tables_;
-  BuildState state_;
+  std::vector<CheckPoint> checkpoints_;
+  std::vector<Symbol> symbols_after_checkpoint_;
+  std::vector<const FileDescriptor*> files_after_checkpoint_;
+  std::vector<std::pair<const Descriptor*, int>> extensions_after_checkpoint_;
 };
 
 DescriptorPool::Tables::Tables() {}
 
-DescriptorPool::Tables::~Tables() { ABSL_DCHECK(build_state_ == nullptr); }
+DescriptorPool::Tables::~Tables() { ABSL_DCHECK(checkpoints_.empty()); }
 
 FileDescriptorTables::FileDescriptorTables() = default;
 
@@ -1707,57 +1651,49 @@ inline const FileDescriptorTables& FileDescriptorTables::GetEmptyInstance() {
 }
 
 void DescriptorPool::Tables::AddCheckpoint() {
-  BuildState& state = build_state();
-  if (state.checkpoints.empty()) {
-    ABSL_DCHECK(state.symbols_after_checkpoint.empty());
-    ABSL_DCHECK(state.files_after_checkpoint.empty());
-    ABSL_DCHECK(state.extensions_after_checkpoint.empty());
-  }
-  state.checkpoints.emplace_back(this);
+  checkpoints_.emplace_back(this);
 }
 
 void DescriptorPool::Tables::ClearLastCheckpoint() {
-  BuildState& state = build_state();
-  ABSL_DCHECK(!state.checkpoints.empty());
-  state.checkpoints.pop_back();
-  if (state.checkpoints.empty()) {
+  ABSL_DCHECK(!checkpoints_.empty());
+  checkpoints_.pop_back();
+  if (checkpoints_.empty()) {
     // All checkpoints have been cleared: we can now commit all of the pending
     // data.
-    state.symbols_after_checkpoint.clear();
-    state.files_after_checkpoint.clear();
-    state.extensions_after_checkpoint.clear();
+    symbols_after_checkpoint_.clear();
+    files_after_checkpoint_.clear();
+    extensions_after_checkpoint_.clear();
   }
 }
 
-void DescriptorPool::Tables::RollbackToLastCheckpoint() {
-  BuildState& state = build_state();
-  ABSL_DCHECK(!state.checkpoints.empty());
-  const CheckPoint& checkpoint = state.checkpoints.back();
+void DescriptorPool::Tables::RollbackToLastCheckpoint(
+    DeferredValidation& deferred_validation) {
+  ABSL_DCHECK(!checkpoints_.empty());
+  const CheckPoint& checkpoint = checkpoints_.back();
 
   for (size_t i = checkpoint.pending_symbols_before_checkpoint;
-       i < state.symbols_after_checkpoint.size(); i++) {
-    symbols_by_name_.erase(state.symbols_after_checkpoint[i]);
+       i < symbols_after_checkpoint_.size(); i++) {
+    symbols_by_name_.erase(symbols_after_checkpoint_[i]);
   }
   for (size_t i = checkpoint.pending_files_before_checkpoint;
-       i < state.files_after_checkpoint.size(); i++) {
-    state.deferred_validation.RollbackFile(state.files_after_checkpoint[i]);
-    files_by_name_.erase(state.files_after_checkpoint[i]);
+       i < files_after_checkpoint_.size(); i++) {
+    deferred_validation.RollbackFile(files_after_checkpoint_[i]);
+    files_by_name_.erase(files_after_checkpoint_[i]);
   }
   for (size_t i = checkpoint.pending_extensions_before_checkpoint;
-       i < state.extensions_after_checkpoint.size(); i++) {
-    extensions_.erase(state.extensions_after_checkpoint[i]);
+       i < extensions_after_checkpoint_.size(); i++) {
+    extensions_.erase(extensions_after_checkpoint_[i]);
   }
 
-  state.symbols_after_checkpoint.resize(
+  symbols_after_checkpoint_.resize(
       checkpoint.pending_symbols_before_checkpoint);
-  state.files_after_checkpoint.resize(
-      checkpoint.pending_files_before_checkpoint);
-  state.extensions_after_checkpoint.resize(
+  files_after_checkpoint_.resize(checkpoint.pending_files_before_checkpoint);
+  extensions_after_checkpoint_.resize(
       checkpoint.pending_extensions_before_checkpoint);
 
   flat_allocs_.resize(checkpoint.flat_allocations_before_checkpoint);
   misc_allocs_.resize(checkpoint.misc_allocations_before_checkpoint);
-  ClearLastCheckpoint();
+  checkpoints_.pop_back();
 }
 
 // -------------------------------------------------------------------
@@ -1775,70 +1711,44 @@ inline auto FileDescriptorTables::FindNestedSymbol(
                                         : K::IterToSymbol(it, flat_buffer_);
 }
 
-namespace {
-class ABSL_SCOPED_LOCKABLE ReaderMutexLockMaybe {
- public:
-  explicit ReaderMutexLockMaybe(absl::Mutex* mu) ABSL_SHARED_LOCK_FUNCTION(mu)
-      : mu_(mu) {
-    if (mu_ != nullptr) mu_->lock_shared();
-  }
-  ReaderMutexLockMaybe(const ReaderMutexLockMaybe&) = delete;
-  ReaderMutexLockMaybe& operator=(const ReaderMutexLockMaybe&) = delete;
-  ~ReaderMutexLockMaybe() ABSL_UNLOCK_FUNCTION() {
-    if (mu_ != nullptr) mu_->unlock_shared();
-  }
-
- private:
-  absl::Mutex* const mu_;
-};
-}  // namespace
-
-template <typename FindInTable, typename FindInUnderlay,
-          typename TryFindInFallbackDb>
-auto DescriptorPool::LookupWithFallback(
-    FindInTable find_in_table, FindInUnderlay find_in_underlay,
-    TryFindInFallbackDb try_find_in_fallback_db) const {
-  using ResultT = decltype(find_in_table(*tables_));
-
-  // 1. Fast path: reader lock on cached tables.
-  if (mutex_ != nullptr) {
-    absl::ReaderMutexLock lock(*mutex_);
-    ResultT result = find_in_table(*tables_);
-    if (result != nullptr) return result;
-  }
-
-  // 2. Slow path: exclusive lock for underlay and fallback database.
-  DeferredValidation deferred_validation(this);
-  ResultT result{};
-  {
-    absl::MutexLockMaybe lock(mutex_);
-    result = find_in_table(*tables_);
-    if (result == nullptr && underlay_ != nullptr) {
-      result = find_in_underlay(*underlay_);
+Symbol DescriptorPool::Tables::FindByNameHelper(const DescriptorPool* pool,
+                                                absl::string_view name) {
+  if (pool->mutex_ != nullptr) {
+    // Fast path: the Symbol is already cached.  This is just a hash lookup.
+    absl::ReaderMutexLock lock(*pool->mutex_);
+    if (known_bad_symbols_.empty() && known_bad_files_.empty()) {
+      Symbol result = FindSymbol(name);
+      if (!result.IsNull()) return result;
     }
-    if (result == nullptr && fallback_database_ != nullptr) {
-      Tables::ScopedBuildState build_state(*tables_, deferred_validation);
-      if (try_find_in_fallback_db()) {
-        result = find_in_table(*tables_);
+  }
+  DescriptorPool::DeferredValidation deferred_validation(pool);
+  Symbol result;
+  {
+    absl::MutexLockMaybe lock(pool->mutex_);
+    if (pool->fallback_database_ != nullptr) {
+      known_bad_symbols_.clear();
+      known_bad_files_.clear();
+    }
+    result = FindSymbol(name);
+
+    if (result.IsNull() && pool->underlay_ != nullptr) {
+      // Symbol not found; check the underlay.
+      result =
+          pool->underlay_->tables_->FindByNameHelper(pool->underlay_, name);
+    }
+
+    if (result.IsNull()) {
+      // Symbol still not found, so check fallback database.
+      if (pool->TryFindSymbolInFallbackDatabase(name, deferred_validation)) {
+        result = FindSymbol(name);
       }
     }
   }
 
-  // 3. Deferred validation outside the lock.
   if (!deferred_validation.Validate()) {
-    return ResultT{};
+    return Symbol();
   }
   return result;
-}
-
-Symbol DescriptorPool::Tables::FindByNameHelper(const DescriptorPool* pool,
-                                                absl::string_view name) {
-  return pool->LookupWithFallback(
-      [&](const Tables& t) { return t.FindSymbol(name); },
-      [&](const DescriptorPool& u) {
-        return u.tables_->FindByNameHelper(&u, name);
-      },
-      [&] { return pool->TryFindSymbolInFallbackDatabase(name); });
 }
 
 inline const FileDescriptor* DescriptorPool::Tables::FindFile(
@@ -2028,7 +1938,7 @@ bool DescriptorPool::Tables::AddSymbol(absl::string_view full_name,
                                        Symbol symbol) {
   ABSL_DCHECK_EQ(full_name, symbol.full_name());
   if (symbols_by_name_.insert(symbol).second) {
-    build_state().symbols_after_checkpoint.push_back(symbol);
+    symbols_after_checkpoint_.push_back(symbol);
     return true;
   } else {
     return false;
@@ -2048,7 +1958,7 @@ bool FileDescriptorTables::AddAliasUnderParent(const void* parent,
 
 bool DescriptorPool::Tables::AddFile(const FileDescriptor* file) {
   if (files_by_name_.insert(file).second) {
-    build_state().files_after_checkpoint.push_back(file);
+    files_after_checkpoint_.push_back(file);
     return true;
   } else {
     return false;
@@ -2093,8 +2003,7 @@ bool DescriptorPool::Tables::AddExtension(const FieldDescriptor* field) {
   auto it_inserted =
       extensions_.insert({{field->containing_type(), field->number()}, field});
   if (it_inserted.second) {
-    build_state().extensions_after_checkpoint.push_back(
-        it_inserted.first->first);
+    extensions_after_checkpoint_.push_back(it_inserted.first->first);
     return true;
   } else {
     return false;
@@ -2375,25 +2284,61 @@ void DescriptorPool::InternalAddGeneratedFile(
 
 // Find*By* methods ==================================================
 
+// TODO:  There's a lot of repeated code here, but I'm not sure if
+//   there's any good way to factor it out.  Think about this some time when
+//   there's nothing more important to do (read: never).
+
 const FileDescriptor* DescriptorPool::FindFileByName(
     absl::string_view name) const {
-  return LookupWithFallback(
-      [&](const Tables& t) { return t.FindFile(name); },
-      [&](const DescriptorPool& u) { return u.FindFileByName(name); },
-      [&] { return TryFindFileInFallbackDatabase(name); });
+  DeferredValidation deferred_validation(this);
+  const FileDescriptor* result = nullptr;
+  {
+    absl::MutexLockMaybe lock(mutex_);
+    if (fallback_database_ != nullptr) {
+      tables_->known_bad_symbols_.clear();
+      tables_->known_bad_files_.clear();
+    }
+    result = tables_->FindFile(name);
+    if (result != nullptr) return result;
+    if (underlay_ != nullptr) {
+      result = underlay_->FindFileByName(name);
+      if (result != nullptr) return result;
+    }
+    if (TryFindFileInFallbackDatabase(name, deferred_validation)) {
+      result = tables_->FindFile(name);
+    }
+  }
+  if (!deferred_validation.Validate()) {
+    return nullptr;
+  }
+  return result;
 }
 
 const FileDescriptor* DescriptorPool::FindFileContainingSymbol(
     absl::string_view symbol_name) const {
-  return LookupWithFallback(
-      [&](const Tables& t) {
-        Symbol s = t.FindSymbol(symbol_name);
-        return s.IsNull() ? nullptr : s.GetFile();
-      },
-      [&](const DescriptorPool& u) {
-        return u.FindFileContainingSymbol(symbol_name);
-      },
-      [&] { return TryFindSymbolInFallbackDatabase(symbol_name); });
+  const FileDescriptor* file_result = nullptr;
+  DeferredValidation deferred_validation(this);
+  {
+    absl::MutexLockMaybe lock(mutex_);
+    if (fallback_database_ != nullptr) {
+      tables_->known_bad_symbols_.clear();
+      tables_->known_bad_files_.clear();
+    }
+    Symbol result = tables_->FindSymbol(symbol_name);
+    if (!result.IsNull()) return result.GetFile();
+    if (underlay_ != nullptr) {
+      file_result = underlay_->FindFileContainingSymbol(symbol_name);
+      if (file_result != nullptr) return file_result;
+    }
+    if (TryFindSymbolInFallbackDatabase(symbol_name, deferred_validation)) {
+      result = tables_->FindSymbol(symbol_name);
+      if (!result.IsNull()) file_result = result.GetFile();
+    }
+  }
+  if (!deferred_validation.Validate()) {
+    return nullptr;
+  }
+  return file_result;
 }
 
 const Descriptor* DescriptorPool::FindMessageTypeByName(
@@ -2451,17 +2396,44 @@ const MethodDescriptor* DescriptorPool::FindMethodByName(
 const FieldDescriptor* DescriptorPool::FindExtensionByNumber(
     const Descriptor* extendee, int number) const {
   if (extendee->extension_range_count() == 0) return nullptr;
-  return LookupWithFallback(
-      [&](const Tables& t) { return t.FindExtension(extendee, number); },
-      [&](const DescriptorPool& u) {
-        return u.FindExtensionByNumber(extendee, number);
-      },
-      [&] { return TryFindExtensionInFallbackDatabase(extendee, number); });
+  // A faster path to reduce lock contention in finding extensions, assuming
+  // most extensions will be cache hit.
+  if (mutex_ != nullptr) {
+    absl::ReaderMutexLock lock(*mutex_);
+    const FieldDescriptor* result = tables_->FindExtension(extendee, number);
+    if (result != nullptr) {
+      return result;
+    }
+  }
+  const FieldDescriptor* result = nullptr;
+  DeferredValidation deferred_validation(this);
+  {
+    absl::MutexLockMaybe lock(mutex_);
+    if (fallback_database_ != nullptr) {
+      tables_->known_bad_symbols_.clear();
+      tables_->known_bad_files_.clear();
+    }
+    result = tables_->FindExtension(extendee, number);
+    if (result != nullptr) {
+      return result;
+    }
+    if (underlay_ != nullptr) {
+      result = underlay_->FindExtensionByNumber(extendee, number);
+      if (result != nullptr) return result;
+    }
+    if (TryFindExtensionInFallbackDatabase(extendee, number,
+                                           deferred_validation)) {
+      result = tables_->FindExtension(extendee, number);
+    }
+  }
+  if (!deferred_validation.Validate()) {
+    return nullptr;
+  }
+  return result;
 }
 
 const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
     const Descriptor* extendee, int number) const {
-  AssertReaderHeld();
   if (extendee->extension_range_count() == 0) return nullptr;
 
   const FieldDescriptor* result = tables_->FindExtension(extendee, number);
@@ -2470,7 +2442,6 @@ const FieldDescriptor* DescriptorPool::InternalFindExtensionByNumberNoLock(
   }
 
   if (underlay_ != nullptr) {
-    ReaderMutexLockMaybe lock(underlay_->mutex_);
     result = underlay_->InternalFindExtensionByNumberNoLock(extendee, number);
     if (result != nullptr) return result;
   }
@@ -2513,6 +2484,10 @@ void DescriptorPool::FindAllExtensions(
   std::vector<const FieldDescriptor*> extensions;
   {
     absl::MutexLockMaybe lock(mutex_);
+    if (fallback_database_ != nullptr) {
+      tables_->known_bad_symbols_.clear();
+      tables_->known_bad_files_.clear();
+    }
 
     // Initialize tables_->extensions_ from the fallback database first
     // (but do this only once per descriptor).
@@ -2521,10 +2496,10 @@ void DescriptorPool::FindAllExtensions(
       std::vector<int> numbers;
       if (fallback_database_->FindAllExtensionNumbers(
               std::string(extendee->full_name()), &numbers)) {
-        Tables::ScopedBuildState build_state(*tables_, deferred_validation);
         for (int number : numbers) {
           if (tables_->FindExtension(extendee, number) == nullptr) {
-            TryFindExtensionInFallbackDatabase(extendee, number);
+            TryFindExtensionInFallbackDatabase(extendee, number,
+                                               deferred_validation);
           }
         }
         tables_->extensions_loaded_from_db_.insert(extendee);
@@ -2775,10 +2750,10 @@ EnumDescriptor::FindReservedRangeContainingNumber(int number) const {
 // -------------------------------------------------------------------
 
 bool DescriptorPool::TryFindFileInFallbackDatabase(
-    absl::string_view name) const {
+    absl::string_view name, DeferredValidation& deferred_validation) const {
   if (fallback_database_ == nullptr) return false;
 
-  if (tables_->IsKnownBadFile(name)) return false;
+  if (tables_->known_bad_files_.contains(name)) return false;
 
   // NOINLINE to reduce the stack cost of the operation in the caller.
   const auto find_file = [](DescriptorDatabase& database,
@@ -2787,17 +2762,16 @@ bool DescriptorPool::TryFindFileInFallbackDatabase(
     return database.FindFileByName(std::string(filename), &output);
   };
 
-  auto& file_proto = tables_->deferred_validation().CreateProto();
+  auto& file_proto = deferred_validation.CreateProto();
   if (!find_file(*fallback_database_, name, file_proto) ||
-      BuildFileFromDatabase(file_proto) == nullptr) {
-    tables_->AddKnownBadFile(name);
+      BuildFileFromDatabase(file_proto, deferred_validation) == nullptr) {
+    tables_->known_bad_files_.emplace(name);
     return false;
   }
   return true;
 }
 
 bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
-  AssertReaderHeld();
   for (size_t pos = name.find('.'); pos != name.npos;
        pos = name.find('.', pos + 1)) {
     auto prefix = name.substr(0, pos);
@@ -2813,19 +2787,19 @@ bool DescriptorPool::IsSubSymbolOfBuiltType(absl::string_view name) const {
   }
   if (underlay_ != nullptr) {
     // Check to see if any prefix of this symbol exists in the underlay.
-    ReaderMutexLockMaybe lock(underlay_->mutex_);
     return underlay_->IsSubSymbolOfBuiltType(name);
   }
   return false;
 }
 
 bool DescriptorPool::TryFindSymbolInFallbackDatabase(
-    absl::string_view name) const {
+    absl::string_view name, DeferredValidation& deferred_validation) const {
   if (fallback_database_ == nullptr) return false;
 
-  if (tables_->IsKnownBadSymbol(name)) return false;
+  if (tables_->known_bad_symbols_.contains(name)) return false;
 
-  auto& file_proto = tables_->deferred_validation().CreateProto();
+  std::string name_string(name);
+  auto& file_proto = deferred_validation.CreateProto();
   if (  // We skip looking in the fallback database if the name is a sub-symbol
         // of any descriptor that already exists in the descriptor pool (except
         // for package descriptors).  This is valid because all symbols except
@@ -2845,7 +2819,7 @@ bool DescriptorPool::TryFindSymbolInFallbackDatabase(
       IsSubSymbolOfBuiltType(name)
 
       // Look up file containing this symbol in fallback database.
-      || !fallback_database_->FindFileContainingSymbol(name, &file_proto)
+      || !fallback_database_->FindFileContainingSymbol(name_string, &file_proto)
 
       // Check if we've already built this file. If so, it apparently doesn't
       // contain the symbol we're looking for.  Some DescriptorDatabases
@@ -2853,8 +2827,8 @@ bool DescriptorPool::TryFindSymbolInFallbackDatabase(
       || tables_->FindFile(file_proto.name()) != nullptr
 
       // Build the file.
-      || BuildFileFromDatabase(file_proto) == nullptr) {
-    tables_->AddKnownBadSymbol(name);
+      || BuildFileFromDatabase(file_proto, deferred_validation) == nullptr) {
+    tables_->known_bad_symbols_.insert(std::move(name_string));
     return false;
   }
 
@@ -2862,10 +2836,11 @@ bool DescriptorPool::TryFindSymbolInFallbackDatabase(
 }
 
 bool DescriptorPool::TryFindExtensionInFallbackDatabase(
-    const Descriptor* containing_type, int field_number) const {
+    const Descriptor* containing_type, int field_number,
+    DeferredValidation& deferred_validation) const {
   if (fallback_database_ == nullptr) return false;
 
-  auto& file_proto = tables_->deferred_validation().CreateProto();
+  auto& file_proto = deferred_validation.CreateProto();
   if (!fallback_database_->FindFileContainingExtension(
           std::string(containing_type->full_name()), field_number,
           &file_proto)) {
@@ -2879,7 +2854,7 @@ bool DescriptorPool::TryFindExtensionInFallbackDatabase(
     return false;
   }
 
-  if (BuildFileFromDatabase(file_proto) == nullptr) {
+  if (BuildFileFromDatabase(file_proto, deferred_validation) == nullptr) {
     return false;
   }
 
@@ -4286,15 +4261,14 @@ const FileDescriptor* DescriptorPool::BuildFileCollectingErrors(
          "DescriptorDatabase.  You must instead find a way to get your file "
          "into the underlying database.";
   ABSL_CHECK(mutex_ == nullptr);  // Implied by the above ABSL_CHECK.
+  tables_->known_bad_symbols_.clear();
+  tables_->known_bad_files_.clear();
   build_started_ = true;
   DeferredValidation deferred_validation(this, error_collector);
-  const FileDescriptor* file;
-  {
-    Tables::ScopedBuildState build_state(*tables_, deferred_validation);
-    file =
-        internal::DescriptorBuilder::New(this, tables_.get(), error_collector)
-            ->BuildFile(proto);
-  }
+  const FileDescriptor* file =
+      internal::DescriptorBuilder::New(this, tables_.get(), deferred_validation,
+                                       error_collector)
+          ->BuildFile(proto);
   if (deferred_validation.Validate()) {
     return file;
   }
@@ -4302,17 +4276,19 @@ const FileDescriptor* DescriptorPool::BuildFileCollectingErrors(
 }
 
 const FileDescriptor* DescriptorPool::BuildFileFromDatabase(
-    const FileDescriptorProto& proto) const {
-  AssertHeld();
+    const FileDescriptorProto& proto,
+    DeferredValidation& deferred_validation) const {
+  mutex_->AssertHeld();
   build_started_ = true;
-  if (tables_->IsKnownBadFile(proto.name())) {
+  if (tables_->known_bad_files_.contains(proto.name())) {
     return nullptr;
   }
   const FileDescriptor* result;
   const auto build_file = [&] {
-    result = internal::DescriptorBuilder::New(this, tables_.get(),
-                                              default_error_collector_)
-                 ->BuildFile(proto);
+    result =
+        internal::DescriptorBuilder::New(
+            this, tables_.get(), deferred_validation, default_error_collector_)
+            ->BuildFile(proto);
   };
   if (dispatcher_ != nullptr) {
     (*dispatcher_)(build_file);
@@ -4320,7 +4296,7 @@ const FileDescriptor* DescriptorPool::BuildFileFromDatabase(
     build_file();
   }
   if (result == nullptr) {
-    tables_->AddKnownBadFile(proto.name());
+    tables_->known_bad_files_.insert(proto.name());
   }
   return result;
 }
@@ -4402,9 +4378,11 @@ bool DescriptorPool::ResolvesFeaturesForImpl(int extension_number) const {
 
 internal::DescriptorBuilder::DescriptorBuilder(
     const DescriptorPool* pool, DescriptorPool::Tables* tables,
+    DescriptorPool::DeferredValidation& deferred_validation,
     DescriptorPool::ErrorCollector* error_collector)
     : pool_(pool),
       tables_(tables),
+      deferred_validation_(deferred_validation),
       error_collector_(error_collector),
       possible_undeclared_dependency_(nullptr),
       undefine_resolved_name_("") {}
@@ -4549,17 +4527,9 @@ Symbol internal::DescriptorBuilder::FindSymbolNotEnforcingDepsHelper(
     // to build the file containing the symbol, and build_it will be set.
     // Also, build_it will be true when !lazily_build_dependencies_, to provide
     // better error reporting of missing dependencies.
-    if (build_it && pool->fallback_database_ != nullptr) {
-      std::unique_ptr<DescriptorPool::Tables::ScopedBuildState>
-          underlay_build_state;
-      if (pool != pool_) {
-        underlay_build_state =
-            std::make_unique<DescriptorPool::Tables::ScopedBuildState>(
-                *pool->tables_, tables_->deferred_validation());
-      }
-      if (pool->TryFindSymbolInFallbackDatabase(name)) {
-        result = pool->tables_->FindSymbol(name);
-      }
+    if (build_it &&
+        pool->TryFindSymbolInFallbackDatabase(name, deferred_validation_)) {
+      result = pool->tables_->FindSymbol(name);
     }
   }
 
@@ -4740,7 +4710,9 @@ Symbol DescriptorPool::NewPlaceholder(absl::string_view name,
 
 Symbol DescriptorPool::NewPlaceholderWithMutexHeld(
     absl::string_view name, PlaceholderType placeholder_type) const {
-  AssertHeld();
+  if (mutex_) {
+    mutex_->AssertHeld();
+  }
   // Compute names.
   absl::string_view placeholder_full_name;
   absl::string_view placeholder_name;
@@ -4876,7 +4848,9 @@ FileDescriptor* DescriptorPool::NewPlaceholderFile(
 
 FileDescriptor* DescriptorPool::NewPlaceholderFileWithMutexHeld(
     const absl::string_view name, internal::FlatAllocator& alloc) const {
-  AssertHeld();
+  if (mutex_) {
+    mutex_->AssertHeld();
+  }
   FileDescriptor* placeholder = alloc.AllocateArray<FileDescriptor>(1);
   memset(static_cast<void*>(placeholder), 0, sizeof(*placeholder));
 
@@ -5264,19 +5238,18 @@ void internal::DescriptorBuilder::PostProcessFieldFeatures(
 
 PROTOBUF_NOINLINE void internal::DescriptorBuilder::AddRecursiveImportError(
     const FileDescriptorProto& proto, int from_here) {
-  absl::Span<const std::string> pending_files = tables_->pending_files();
   auto make_error = [&] {
     std::string error_message("File recursively imports itself: ");
-    for (size_t i = from_here; i < pending_files.size(); i++) {
-      error_message.append(pending_files[i]);
+    for (size_t i = from_here; i < tables_->pending_files_.size(); i++) {
+      error_message.append(tables_->pending_files_[i]);
       error_message.append(" -> ");
     }
     error_message.append(proto.name());
     return error_message;
   };
 
-  if (static_cast<size_t>(from_here) < pending_files.size() - 1) {
-    AddError(pending_files[from_here + 1], proto,
+  if (static_cast<size_t>(from_here) < tables_->pending_files_.size() - 1) {
+    AddError(tables_->pending_files_[from_here + 1], proto,
              DescriptorPool::ErrorCollector::IMPORT, make_error);
   } else {
     AddError(proto.name(), proto, DescriptorPool::ErrorCollector::IMPORT,
@@ -5398,19 +5371,28 @@ static void PlanAllocationSize(
   }
 }
 
-static void PlanAllocationSize(
+// Returns false when the message nesting exceeds
+// MaxMessageDeclarationNestingDepth(), so that the allocation-planning
+// pre-pass cannot recurse past the limit that DescriptorBuilder::BuildMessage
+// enforces. `depth` is the number of nesting levels still allowed for the
+// messages in this list, including those messages themselves.
+static bool PlanAllocationSize(
     const RepeatedPtrField<DescriptorProto>& messages, size_t parent_scope_size,
-    internal::FlatAllocator& alloc) {
+    internal::FlatAllocator& alloc, int depth) {
   alloc.PlanArray<Descriptor>(messages.size());
 
   for (const auto& message : messages) {
+    if (depth <= 0) return false;
     const size_t full_name_size =
         parent_scope_size ? parent_scope_size + 1 + message.name().size()
                           : message.name().size();
     alloc.PlanEntityNames(full_name_size);
 
     if (message.has_options()) alloc.PlanArray<MessageOptions>(1);
-    PlanAllocationSize(message.nested_type(), full_name_size, alloc);
+    if (!PlanAllocationSize(message.nested_type(), full_name_size, alloc,
+                            depth - 1)) {
+      return false;
+    }
     PlanAllocationSize(message.field(), full_name_size, alloc);
     PlanAllocationSize(message.extension(), full_name_size, alloc);
     PlanAllocationSize(message.extension_range(), alloc);
@@ -5420,6 +5402,7 @@ static void PlanAllocationSize(
     PlanAllocationSize(message.enum_type(), full_name_size, alloc);
     PlanAllocationSize(message.oneof_decl(), full_name_size, alloc);
   }
+  return true;
 }
 
 static void PlanAllocationSize(
@@ -5446,7 +5429,7 @@ static void PlanAllocationSize(
   }
 }
 
-static void PlanAllocationSize(const FileDescriptorProto& proto,
+static bool PlanAllocationSize(const FileDescriptorProto& proto,
                                internal::FlatAllocator& alloc) {
   alloc.PlanArray<FileDescriptor>(1);
   alloc.PlanArray<FileDescriptorTables>(1);
@@ -5455,7 +5438,10 @@ static void PlanAllocationSize(const FileDescriptorProto& proto,
   if (proto.has_source_code_info()) alloc.PlanArray<SourceCodeInfo>(1);
 
   PlanAllocationSize(proto.service(), proto.package().size(), alloc);
-  PlanAllocationSize(proto.message_type(), proto.package().size(), alloc);
+  if (!PlanAllocationSize(proto.message_type(), proto.package().size(), alloc,
+                          internal::cpp::MaxMessageDeclarationNestingDepth())) {
+    return false;
+  }
   PlanAllocationSize(proto.enum_type(), proto.package().size(), alloc);
   PlanAllocationSize(proto.extension(), proto.package().size(), alloc);
 
@@ -5466,6 +5452,7 @@ static void PlanAllocationSize(const FileDescriptorProto& proto,
   for (int i = 0; i < proto.option_dependency_size(); i++) {
     alloc.PlanArray<char>(proto.option_dependency(i).size());
   }
+  return true;
 }
 
 template <typename OptionT>
@@ -5511,9 +5498,8 @@ const FileDescriptor* internal::DescriptorBuilder::BuildFile(
   //   mid-file, but that's pretty ugly, and I'm pretty sure there are
   //   some languages out there that do not allow recursive dependencies
   //   at all.
-  absl::Span<const std::string> pending_files = tables_->pending_files();
-  for (size_t i = 0; i < pending_files.size(); i++) {
-    if (pending_files[i] == proto.name()) {
+  for (size_t i = 0; i < tables_->pending_files_.size(); i++) {
+    if (tables_->pending_files_[i] == proto.name()) {
       AddRecursiveImportError(proto, i);
       return nullptr;
     }
@@ -5539,23 +5525,22 @@ const FileDescriptor* internal::DescriptorBuilder::BuildFile(
   //    dependency's checkpoint.
   if (!pool_->lazily_build_dependencies_) {
     if (pool_->fallback_database_ != nullptr) {
-      tables_->PushPendingFile(proto.name());
+      tables_->pending_files_.push_back(proto.name());
       for (int i = 0;
            i < proto.dependency_size() + proto.option_dependency_size(); i++) {
         absl::string_view name =
             i >= proto.dependency_size()
                 ? proto.option_dependency(i - proto.dependency_size())
                 : proto.dependency(i);
-        if (!absl::StrContains(name, '\0') &&
-            tables_->FindFile(name) == nullptr &&
+        if (tables_->FindFile(name) == nullptr &&
             (pool_->underlay_ == nullptr ||
              pool_->underlay_->FindFileByName(name) == nullptr)) {
           // We don't care what this returns since we'll find out below anyway.
           internal::ScopedFallbackDatabaseErrorSuppressor suppressor;
-          pool_->TryFindFileInFallbackDatabase(name);
+          pool_->TryFindFileInFallbackDatabase(name, deferred_validation_);
         }
       }
-      tables_->PopPendingFile();
+      tables_->pending_files_.pop_back();
     }
   }
 
@@ -5563,9 +5548,13 @@ const FileDescriptor* internal::DescriptorBuilder::BuildFile(
   tables_->AddCheckpoint();
 
   auto alloc = std::make_unique<internal::FlatAllocator>();
-  PlanAllocationSize(proto, *alloc);
   FileDescriptor* result = nullptr;
-  if (!alloc->FinalizePlanning(tables_)) {
+  if (!PlanAllocationSize(proto, *alloc)) {
+    // Do not call FinalizePlanning on a partially planned allocator: the
+    // file is rejected here, and the checkpoint rollback below discards it.
+    AddError(proto.name(), proto, DescriptorPool::ErrorCollector::OTHER,
+             "Reached maximum recursion limit for nested messages.");
+  } else if (!alloc->FinalizePlanning(tables_)) {
     AddError(proto.name(), proto, DescriptorPool::ErrorCollector::OTHER,
              "The file is too large.");
   } else {
@@ -5578,13 +5567,13 @@ const FileDescriptor* internal::DescriptorBuilder::BuildFile(
     result->finished_building_ = true;
     alloc->ExpectConsumed();
   } else {
-    tables_->RollbackToLastCheckpoint();
+    tables_->RollbackToLastCheckpoint(deferred_validation_);
   }
 
   return result;
 }
 
-PROTOBUF_NOINLINE FileDescriptor* internal::DescriptorBuilder::BuildFileImpl(
+FileDescriptor* internal::DescriptorBuilder::BuildFileImpl(
     const FileDescriptorProto& proto, internal::FlatAllocator& alloc) {
   FileDescriptor* result = alloc.AllocateArray<FileDescriptor>(1);
   file_ = result;
@@ -5701,12 +5690,6 @@ PROTOBUF_NOINLINE FileDescriptor* internal::DescriptorBuilder::BuildFileImpl(
     absl::string_view name =
         is_option_dep ? proto.option_dependency(i - proto.dependency_size())
                       : proto.dependency(i);
-    if (absl::StrContains(name, '\0')) {
-      AddError(name, proto, DescriptorPool::ErrorCollector::IMPORT, [&] {
-        return absl::StrCat("\"", name, "\" contains null character.");
-      });
-      return nullptr;
-    }
     if (!seen_dependencies.insert(name).second) {
       AddTwiceListedError(proto, name);
     }
@@ -5955,13 +5938,13 @@ PROTOBUF_NOINLINE FileDescriptor* internal::DescriptorBuilder::BuildFileImpl(
     internal::VisitDescriptors(
         *result, proto, [&](const auto& descriptor, const auto& desc_proto) {
           if (!IsDefaultInstance(*descriptor.proto_features_)) {
-            tables_->deferred_validation().ValidateFeatureLifetimes(
+            deferred_validation_.ValidateFeatureLifetimes(
                 GetFile(descriptor), {descriptor.proto_features_, &desc_proto,
                                       GetFullName(descriptor), proto.name()});
           }
           if (!IsDefaultInstance(*descriptor.options_) &&
               descriptor.options_->ByteSizeLong() != 0) {
-            tables_->deferred_validation().ValidateFeatureLifetimes(
+            deferred_validation_.ValidateFeatureLifetimes(
                 GetFile(descriptor), {descriptor.options_, &desc_proto,
                                       GetFullName(descriptor), proto.name()});
           }
@@ -9137,16 +9120,6 @@ bool IsLazilyInitializedFile(absl::string_view filename) {
 }
 
 bool IsStringFieldWithPrivatizedAccessors(const FieldDescriptor& field) {
-  // Synthetic map-entry key/value string fields always use MapEntry's
-  // std::string (ArenaStringPtr) storage, regardless of the file/field-level
-  // string_type feature (CORD, VIEW, ...). Keep cpp_string_type() consistent
-  // with the physical storage.
-  if (field.cpp_type() == FieldDescriptor::CPPTYPE_STRING &&
-      field.containing_type() != nullptr &&
-      field.containing_type()->options().map_entry()) {
-    return true;
-  }
-
   // In open-source, protobuf CORD is only supported for singular bytes
   // fields.
   if (field.cpp_type() == FieldDescriptor::CPPTYPE_STRING &&
