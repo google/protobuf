@@ -390,30 +390,41 @@ template <typename Traits>
 absl::Status ParseField(JsonLexer& lex, const Desc<Traits>& desc,
                         absl::string_view name, Msg<Traits>& msg);
 
+// The functions below that are marked PROTOBUF_NOINLINE are the
+// non-recursive parts of the mutually recursive descent parser. They are kept
+// out of line so that their locals do not inflate the stack frames of the
+// recursive functions (ParseSingular, ParseMessage, ParseValue and the array /
+// object visitors), which bounds the stack used per level of JSON nesting.
+
+// Handles a `null` token in place of a singular field.
 template <typename Traits>
-absl::Status ParseSingular(JsonLexer& lex, Field<Traits> field,
-                           Msg<Traits>& msg) {
-  auto field_type = Traits::FieldType(field);
-  if (lex.Peek(JsonLexer::kNull)) {
-    auto message_type = ClassifyMessage(Traits::FieldTypeName(field));
+PROTOBUF_NOINLINE absl::Status ParseSingularNull(JsonLexer& lex,
+                                                 Field<Traits> field,
+                                                 Msg<Traits>& msg) {
+  auto message_type = ClassifyMessage(Traits::FieldTypeName(field));
 
-    if (message_type == MessageType::kNull) {
-      Traits::SetEnum(field, msg, 0);
-    } else if (message_type == MessageType::kValue) {
-      return Traits::NewMsg(
-          field, msg,
-          [&](const Desc<Traits>& type, Msg<Traits>& msg) -> absl::Status {
-            auto field = Traits::FieldByNumber(type, 1);
-            ABSL_DCHECK(field.has_value());
-            RETURN_IF_ERROR(lex.Expect("null"));
-            Traits::SetEnum(Traits::MustHaveField(type, 1), msg, 0);
-            return absl::OkStatus();
-          });
-    }
-    return lex.Expect("null");
+  if (message_type == MessageType::kNull) {
+    Traits::SetEnum(field, msg, 0);
+  } else if (message_type == MessageType::kValue) {
+    return Traits::NewMsg(
+        field, msg,
+        [&](const Desc<Traits>& type, Msg<Traits>& msg) -> absl::Status {
+          auto field = Traits::FieldByNumber(type, 1);
+          ABSL_DCHECK(field.has_value());
+          RETURN_IF_ERROR(lex.Expect("null"));
+          Traits::SetEnum(Traits::MustHaveField(type, 1), msg, 0);
+          return absl::OkStatus();
+        });
   }
+  return lex.Expect("null");
+}
 
-  switch (field_type) {
+// Parses a singular field of any non-message type.
+template <typename Traits>
+PROTOBUF_NOINLINE absl::Status ParseSingularScalar(JsonLexer& lex,
+                                                   Field<Traits> field,
+                                                   Msg<Traits>& msg) {
+  switch (Traits::FieldType(field)) {
     case FieldDescriptor::TYPE_FLOAT: {
       auto x = ParseFp<Traits>(lex, field);
       RETURN_IF_ERROR(x.status());
@@ -511,21 +522,33 @@ absl::Status ParseSingular(JsonLexer& lex, Field<Traits> field,
       }
       break;
     }
-    case FieldDescriptor::TYPE_MESSAGE:
-    case FieldDescriptor::TYPE_GROUP: {
-      return Traits::NewMsg(
-          field, msg,
-          [&](const Desc<Traits>& type, Msg<Traits>& msg) -> absl::Status {
-            return ParseMessage<Traits>(lex, type, msg,
-                                        /*any_reparse=*/false);
-          });
-    }
     default:
       return lex.Invalid(
           absl::StrCat("unsupported field type: ", Traits::FieldType(field)));
   }
 
   return absl::OkStatus();
+}
+
+template <typename Traits>
+absl::Status ParseSingular(JsonLexer& lex, Field<Traits> field,
+                           Msg<Traits>& msg) {
+  if (lex.Peek(JsonLexer::kNull)) {
+    return ParseSingularNull<Traits>(lex, field, msg);
+  }
+
+  switch (Traits::FieldType(field)) {
+    case FieldDescriptor::TYPE_MESSAGE:
+    case FieldDescriptor::TYPE_GROUP:
+      return Traits::NewMsg(
+          field, msg,
+          [&](const Desc<Traits>& type, Msg<Traits>& msg) -> absl::Status {
+            return ParseMessage<Traits>(lex, type, msg,
+                                        /*any_reparse=*/false);
+          });
+    default:
+      return ParseSingularScalar<Traits>(lex, field, msg);
+  }
 }
 
 template <typename Traits>
@@ -644,6 +667,26 @@ absl::Status ParseMapKey(const Desc<Traits>& type, Msg<Traits>& entry,
   return absl::OkStatus();
 }
 
+// Handles a `null` element inside of a JSON array.
+template <typename Traits>
+PROTOBUF_NOINLINE absl::Status ParseArrayNullElement(JsonLexer& lex,
+                                                     Field<Traits> field,
+                                                     Msg<Traits>& msg,
+                                                     MessageType type) {
+  if (type == MessageType::kValue) {
+    return ParseSingular<Traits>(lex, field, msg);
+  }
+  if (type == MessageType::kNull) {
+    return ParseSingular<Traits>(lex, field, msg);
+  }
+
+  if (lex.options().allow_legacy_nonconformant_behavior) {
+    RETURN_IF_ERROR(lex.Expect("null"));
+    return EmitNull<Traits>(lex, field, msg);
+  }
+  return lex.Invalid("null cannot occur inside of repeated fields");
+}
+
 template <typename Traits>
 absl::Status ParseArray(JsonLexer& lex, Field<Traits> field, Msg<Traits>& msg) {
   if (lex.Peek(JsonLexer::kNull)) {
@@ -655,18 +698,7 @@ absl::Status ParseArray(JsonLexer& lex, Field<Traits> field, Msg<Traits>& msg) {
     MessageType type = ClassifyMessage(Traits::FieldTypeName(field));
 
     if (lex.Peek(JsonLexer::kNull)) {
-      if (type == MessageType::kValue) {
-        return ParseSingular<Traits>(lex, field, msg);
-      }
-      if (type == MessageType::kNull) {
-        return ParseSingular<Traits>(lex, field, msg);
-      }
-
-      if (lex.options().allow_legacy_nonconformant_behavior) {
-        RETURN_IF_ERROR(lex.Expect("null"));
-        return EmitNull<Traits>(lex, field, msg);
-      }
-      return lex.Invalid("null cannot occur inside of repeated fields");
+      return ParseArrayNullElement<Traits>(lex, field, msg, type);
     }
 
     // Note that this is sufficient to catch when we are inside of a ListValue,
@@ -823,8 +855,9 @@ absl::optional<int32_t> TakeNanosAndAdvance(absl::string_view& data) {
 }
 
 template <typename Traits>
-absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
-                            Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseTimestamp(JsonLexer& lex,
+                                              const Desc<Traits>& desc,
+                                              Msg<Traits>& msg) {
   if (lex.Peek(JsonLexer::kNull)) {
     return lex.Expect("null");
   }
@@ -946,8 +979,9 @@ absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseDuration(JsonLexer& lex, const Desc<Traits>& desc,
-                           Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseDuration(JsonLexer& lex,
+                                             const Desc<Traits>& desc,
+                                             Msg<Traits>& msg) {
   if (lex.Peek(JsonLexer::kNull)) {
     return lex.Expect("null");
   }
@@ -1000,8 +1034,9 @@ absl::Status ParseDuration(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseFieldMask(JsonLexer& lex, const Desc<Traits>& desc,
-                            Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseFieldMask(JsonLexer& lex,
+                                              const Desc<Traits>& desc,
+                                              Msg<Traits>& msg) {
   absl::StatusOr<LocationWith<MaybeOwnedString>> str = lex.ParseUtf8();
   RETURN_IF_ERROR(str.status());
   auto paths = str->value.AsView();
@@ -1038,8 +1073,9 @@ absl::Status ParseFieldMask(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseAny(JsonLexer& lex, const Desc<Traits>& desc,
-                      Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseAny(JsonLexer& lex,
+                                        const Desc<Traits>& desc,
+                                        Msg<Traits>& msg) {
   // Buffer an entire object. Because @type can occur anywhere, we're forced
   // to do this.
   RETURN_IF_ERROR(lex.SkipToToken());
@@ -1101,21 +1137,24 @@ absl::Status ParseAny(JsonLexer& lex, const Desc<Traits>& desc,
 
 // These are mutually recursive with ParseValue.
 template <typename Traits>
-absl::Status ParseStructValue(JsonLexer& lex, const Desc<Traits>& desc,
-                              Msg<Traits>& msg);
+PROTOBUF_NOINLINE absl::Status ParseStructValue(JsonLexer& lex,
+                                                const Desc<Traits>& desc,
+                                                Msg<Traits>& msg);
 template <typename Traits>
 absl::Status ParseListValue(JsonLexer& lex, const Desc<Traits>& desc,
                             Msg<Traits>& msg);
 
+// Parses the non-recursive (null, number, string, bool) cases of
+// google.protobuf.Value.
 template <typename Traits>
-absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
-                        Msg<Traits>& msg) {
-  auto kind = lex.PeekKind();
-  RETURN_IF_ERROR(kind.status());
+PROTOBUF_NOINLINE absl::Status ParseValueScalar(JsonLexer& lex,
+                                                const Desc<Traits>& desc,
+                                                Msg<Traits>& msg,
+                                                JsonLexer::Kind kind) {
   // NOTE: The field numbers 1 through 6 are the numbers of the oneof fields
   // in google.protobuf.Value. Conformance tests verify the correctness of
   // these numbers.
-  switch (*kind) {
+  switch (kind) {
     case JsonLexer::kNull: {
       auto field = Traits::MustHaveField(desc, 1);
       auto pop =
@@ -1157,7 +1196,7 @@ absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
 
       // "Quoted" bools, including non-standard Abseil Atob bools, are not
       // supported, because all strings are treated as genuine JSON strings.
-      if (*kind == JsonLexer::kTrue) {
+      if (kind == JsonLexer::kTrue) {
         RETURN_IF_ERROR(lex.Expect("true"));
         Traits::SetBool(field, msg, true);
       } else {
@@ -1166,6 +1205,21 @@ absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
       }
       break;
     }
+    default:
+      break;
+  }
+
+  return absl::OkStatus();
+}
+
+template <typename Traits>
+absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
+                        Msg<Traits>& msg) {
+  auto kind = lex.PeekKind();
+  RETURN_IF_ERROR(kind.status());
+  // NOTE: The field numbers 5 and 6 are the numbers of the struct_value and
+  // list_value oneof fields in google.protobuf.Value.
+  switch (*kind) {
     case JsonLexer::kObj: {
       auto field = Traits::MustHaveField(desc, 5);
       auto pop =
@@ -1186,14 +1240,15 @@ absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
         return ParseListValue<Traits>(lex, desc, msg);
       });
     }
+    default:
+      return ParseValueScalar<Traits>(lex, desc, msg, *kind);
   }
-
-  return absl::OkStatus();
 }
 
 template <typename Traits>
-absl::Status ParseStructValue(JsonLexer& lex, const Desc<Traits>& desc,
-                              Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseStructValue(JsonLexer& lex,
+                                                const Desc<Traits>& desc,
+                                                Msg<Traits>& msg) {
   auto entry_field = Traits::MustHaveField(desc, 1);
   auto pop = lex.path().Push("<struct>", FieldDescriptor::TYPE_MESSAGE,
                              Traits::FieldTypeName(entry_field));
@@ -1306,6 +1361,41 @@ absl::Status ParseField(JsonLexer& lex, const Desc<Traits>& desc,
   return ParseSingular<Traits>(lex, *field, msg);
 }
 
+// Parses a message as a JSON object of fields. This is out of line so that the
+// field lookup and error formatting it does do not inflate ParseMessage's
+// frame, which is on the recursive path of every google.protobuf.Value.
+template <typename Traits>
+PROTOBUF_NOINLINE absl::Status ParseMessageFields(JsonLexer& lex,
+                                                  const Desc<Traits>& desc,
+                                                  Msg<Traits>& msg,
+                                                  bool any_reparse,
+                                                  MessageType type) {
+  return lex.VisitObject(
+      [&](LocationWith<MaybeOwnedString>& name) -> absl::Status {
+        // If this is a well-known type, we expect its contents to be inside
+        // of a JSON field named "value".
+        if (any_reparse) {
+          if (name.value == "@type") {
+            RETURN_IF_ERROR(lex.SkipValue());
+            return absl::OkStatus();
+          }
+          if (type != MessageType::kNotWellKnown) {
+            if (name.value != "value") {
+              return lex.Invalid(
+                  "fields in a well-known-typed Any must be @type or value");
+            }
+            // Parse the upcoming value as the message itself. This is *not*
+            // an Any reparse because we do not expect to see @type in the
+            // upcoming value.
+            return ParseMessage<Traits>(lex, desc, msg,
+                                        /*any_reparse=*/false);
+          }
+        }
+
+        return ParseField<Traits>(lex, desc, name.value.ToString(), msg);
+      });
+}
+
 template <typename Traits>
 absl::Status ParseMessage(JsonLexer& lex, const Desc<Traits>& desc,
                           Msg<Traits>& msg, bool any_reparse) {
@@ -1346,30 +1436,7 @@ absl::Status ParseMessage(JsonLexer& lex, const Desc<Traits>& desc,
     }
   }
 
-  return lex.VisitObject(
-      [&](LocationWith<MaybeOwnedString>& name) -> absl::Status {
-        // If this is a well-known type, we expect its contents to be inside
-        // of a JSON field named "value".
-        if (any_reparse) {
-          if (name.value == "@type") {
-            RETURN_IF_ERROR(lex.SkipValue());
-            return absl::OkStatus();
-          }
-          if (type != MessageType::kNotWellKnown) {
-            if (name.value != "value") {
-              return lex.Invalid(
-                  "fields in a well-known-typed Any must be @type or value");
-            }
-            // Parse the upcoming value as the message itself. This is *not*
-            // an Any reparse because we do not expect to see @type in the
-            // upcoming value.
-            return ParseMessage<Traits>(lex, desc, msg,
-                                        /*any_reparse=*/false);
-          }
-        }
-
-        return ParseField<Traits>(lex, desc, name.value.ToString(), msg);
-      });
+  return ParseMessageFields<Traits>(lex, desc, msg, any_reparse, type);
 }
 }  // namespace
 
