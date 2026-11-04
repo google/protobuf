@@ -33,6 +33,7 @@
 #include "absl/base/call_once.h"
 #include "absl/base/casts.h"
 #include "absl/base/optimization.h"
+#include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "google/protobuf/any.h"
@@ -100,6 +101,17 @@ PROTOBUF_EXPORT extern const EmptyCord empty_cord_;
 PROTOBUF_FUTURE_ADD_EARLY_NODISCARD
 constexpr const ::absl::Cord& GetEmptyCordAlreadyInited() {
   return empty_cord_.value;
+}
+
+// Clears `cord` while preserving an unshared flat buffer (<= 4096 bytes) for
+// reuse across repeated parse/clear cycles when supported by Abseil.
+inline void ClearCord(::absl::Cord& cord) {
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+  // NOLINTNEXTLINE(abseil-no-internal-dependencies)
+  ::absl::cord_internal::ClearCordPreservingCapacity(cord);
+#else
+  cord.Clear();
+#endif
 }
 
 // True if IsInitialized() is true for all elements of t.  Type is expected

@@ -20,6 +20,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/generated_message_util.h"
 #include "google/protobuf/io/test_zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/unittest.pb.h"
@@ -191,6 +192,73 @@ TEST(ParseContextTest, ReadCordFromMultipleFragmentsWithEmptyFragment) {
   EXPECT_EQ(out, "abcdef");
 }
 
+
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+TEST(ParseContextTest, ReadCordPreservesCapacityAcrossFragmentsAndEmpty) {
+  const std::string payload_a(128, 'a');
+  const std::string payload_b(200, 'b');
+  const std::string payload_large(600, 'c');
+  const std::string init_1024(1024, 'w');
+  absl::Cord out(init_1024);
+  ASSERT_TRUE(out.TryFlat().has_value());
+  const char* const flat_ptr = out.TryFlat()->data();
+  auto expect_flat_at = [](const absl::Cord& c, const char* ptr,
+                           absl::string_view expected) {
+    EXPECT_EQ(c, expected);
+    if (absl::optional<absl::string_view> flat = c.TryFlat();
+        flat.has_value()) {
+      EXPECT_EQ(flat->data(), ptr);
+    } else {
+      ADD_FAILURE() << "Expected flat cord";
+    }
+  };
+  auto read_contig = [&](absl::string_view src, int size) {
+    const char* ptr;
+    ParseContext ctx(kMaxLimit, false, &ptr, src);
+    EXPECT_NE(ctx.ReadCord(ptr, size, &out), nullptr);
+    expect_flat_at(out, flat_ptr, src.substr(0, static_cast<size_t>(size)));
+  };
+
+  ClearCord(out);
+  read_contig(payload_a, 0);
+  ClearCord(out);
+  read_contig("0123456789", 10);
+  read_contig(payload_a, static_cast<int>(payload_a.size()));
+  read_contig(payload_large, static_cast<int>(payload_large.size()));
+
+  for (const int block_size : {5, 16, 20, 64, 128}) {
+    for (const std::string* payload : {&payload_b, &payload_large}) {
+      if (block_size != 128) ClearCord(out);
+      const char* ptr;
+      io::ArrayInputStream ais(payload->data(),
+                               static_cast<int>(payload->size()), block_size);
+      ParseContext ctx(kMaxLimit, false, &ptr, &ais);
+      ASSERT_NE(ctx.ReadCord(ptr, static_cast<int>(payload->size()), &out),
+                nullptr);
+      expect_flat_at(out, flat_ptr, *payload);
+    }
+  }
+
+  ClearCord(out);
+  const char* ptr;
+  io::internal::TestZeroCopyInputStream stream(
+      {"abcde", "", std::string(120, 'x')});
+  ParseContext ctx(kMaxLimit, false, &ptr, &stream);
+  ASSERT_NE(ctx.ReadCord(ptr, 125, &out), nullptr);
+  expect_flat_at(out, flat_ptr, absl::StrCat("abcde", std::string(120, 'x')));
+
+  const std::string btree_16k(16 << 10, 'B');
+  out = absl::Cord(btree_16k);
+  io::ArrayInputStream ais(payload_large.data(),
+                           static_cast<int>(payload_large.size()), 128);
+  ParseContext large_ctx(kMaxLimit, false, &ptr, &ais);
+  ASSERT_NE(
+      large_ctx.ReadCord(ptr, static_cast<int>(payload_large.size()), &out),
+      nullptr);
+  EXPECT_EQ(out, payload_large);
+  EXPECT_LT(out.EstimatedMemoryUsage(), 2048u);
+}
+#endif  // ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
 
 template <typename DataT, typename PeekFunc>
 void TestAdvancePtrSinkingAndPeeking(

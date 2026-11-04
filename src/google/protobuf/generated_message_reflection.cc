@@ -1643,11 +1643,12 @@ void Reflection::ClearField(Message* message,
       case FieldDescriptor::CPPTYPE_STRING: {
         switch (field->cpp_string_type()) {
           case FieldDescriptor::CppStringType::kCord:
-            if (field->has_default_value()) {
+            if (field->has_default_value() &&
+                !field->default_value_string().empty()) {
               *MutableRaw<absl::Cord>(message, field) =
                   field->default_value_string();
             } else {
-              MutableRaw<absl::Cord>(message, field)->Clear();
+              internal::ClearCord(*MutableRaw<absl::Cord>(message, field));
             }
             break;
           case FieldDescriptor::CppStringType::kView:

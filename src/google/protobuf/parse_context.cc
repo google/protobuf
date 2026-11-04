@@ -24,6 +24,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "google/protobuf/generated_message_util.h"
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/micro_string.h"
@@ -399,14 +400,14 @@ const char* EpsCopyInputStream::ReadCordFallback(const char* ptr, int size,
                                 reinterpret_cast<uintptr_t>(patch_buffer_) <=
                             kPatchBufferSize;
   if (bytes_from_buffer > kPatchBufferSize || !in_patch_buf) {
-    cord->Clear();
+    internal::ClearCord(*cord);
     StreamBackUp(bytes_from_buffer);
   } else if (bytes_from_buffer == kSlopBytes && next_chunk_ != nullptr &&
              // Only backup if next_chunk_ points to a valid buffer returned by
              // ZeroCopyInputStream. This happens when NextStream() returns a
              // chunk that's smaller than or equal to kSlopBytes.
              next_chunk_ != patch_buffer_) {
-    cord->Clear();
+    internal::ClearCord(*cord);
     StreamBackUp(size_);
   } else {
     size -= bytes_from_buffer;

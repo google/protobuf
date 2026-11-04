@@ -73,6 +73,15 @@ inline uint8_t* CopyCordToArray(const absl::Cord& cord, uint8_t* target) {
   return target;
 }
 
+inline void ClearCord(absl::Cord& cord) {
+#ifdef ABSL_INTERNAL_HAVE_CLEAR_CORD_PRESERVING_CAPACITY
+  // NOLINTNEXTLINE(abseil-no-internal-dependencies)
+  ::absl::cord_internal::ClearCordPreservingCapacity(cord);
+#else
+  cord.Clear();
+#endif
+}
+
 }  // namespace
 
 // CodedInputStream ==================================================
@@ -328,7 +337,7 @@ bool CodedInputStream::ReadCord(absl::Cord* output, int size) {
       return false;
     }
   } else {
-    output->Clear();
+    ClearCord(*output);
     BackUpInputToCurrentPosition();
   }
 
