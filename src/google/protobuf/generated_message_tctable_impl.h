@@ -23,6 +23,7 @@
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
 #include "google/protobuf/map.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/parse_context.h"
@@ -699,8 +700,7 @@ class PROTOBUF_EXPORT TcParser final {
 #if !defined(NDEBUG) && !(defined(_MSC_VER) && defined(_M_IX86))
     // Check the alignment in debug mode, except in 32-bit msvc because it does
     // not respect the alignment as expressed by `alignof(T)`
-    if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(target) % alignof(T) !=
-                           0)) {
+    if (ABSL_PREDICT_FALSE(!MemoryAlign{alignof(T)}.IsAligned(target))) {
       AlignFail(std::integral_constant<size_t, alignof(T)>(),
                 reinterpret_cast<uintptr_t>(target));
     }
@@ -715,8 +715,7 @@ class PROTOBUF_EXPORT TcParser final {
 #if !defined(NDEBUG) && !(defined(_MSC_VER) && defined(_M_IX86))
     // Check the alignment in debug mode, except in 32-bit msvc because it does
     // not respect the alignment as expressed by `alignof(T)`
-    if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(target) % alignof(T) !=
-                           0)) {
+    if (ABSL_PREDICT_FALSE(!MemoryAlign{alignof(T)}.IsAligned(target))) {
       AlignFail(std::integral_constant<size_t, alignof(T)>(),
                 reinterpret_cast<uintptr_t>(target));
     }
