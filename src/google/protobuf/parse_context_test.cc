@@ -394,6 +394,7 @@ TEST(VerifyUTF8AndFlush, InvalidSeparatelyButValidTogether) {
 }
 
 
+
 }  // namespace
 }  // namespace internal
 }  // namespace protobuf
