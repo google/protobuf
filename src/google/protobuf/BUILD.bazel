@@ -549,7 +549,6 @@ cc_library(
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":port",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
@@ -932,6 +931,7 @@ cc_library(
     deps = [
         ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",
@@ -1990,6 +1990,7 @@ cc_test(
         ":protobuf_lite",
         ":test_util",
         "//src/google/protobuf/io",
+        "//src/google/protobuf/testing:protobuf_test",
         "@abseil-cpp//absl/base:config",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_set",
@@ -2000,7 +2001,6 @@ cc_test(
         "@abseil-cpp//absl/strings:str_format",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/utility",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],

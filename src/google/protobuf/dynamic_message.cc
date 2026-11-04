@@ -63,6 +63,7 @@
 #include "google/protobuf/internal_metadata_locator.h"
 #include "google/protobuf/map.h"
 #include "google/protobuf/map_field.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/micro_string.h"
@@ -273,18 +274,14 @@ uint32_t FieldFlags(const FieldDescriptor* field) {
   return 0;
 }
 
-inline int DivideRoundingUp(int i, int j) { return (i + (j - 1)) / j; }
-
 static const int kSafeAlignment = sizeof(uint64_t);
 static const int kMaxOneofUnionSize = sizeof(uint64_t);
 
-inline int AlignTo(int offset, int alignment) {
-  return DivideRoundingUp(offset, alignment) * alignment;
-}
-
 // Rounds the given byte offset up to the next offset aligned such that any
 // type may be stored at it.
-inline int AlignOffset(int offset) { return AlignTo(offset, kSafeAlignment); }
+inline int AlignOffset(int offset) {
+  return internal::MemoryAlign{kSafeAlignment}.Ceil(offset);
+}
 
 #define bitsizeof(T) (sizeof(T) * 8)
 
@@ -927,7 +924,9 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
   }
 
   if (max_hasbit > 0) {
-    int has_bits_array_size = DivideRoundingUp(max_hasbit, bitsizeof(uint32_t));
+    int has_bits_array_size =
+        internal::MemoryAlign{bitsizeof(uint32_t)}.Ceil(max_hasbit) /
+        bitsizeof(uint32_t);
     size += has_bits_array_size * sizeof(uint32_t);
     size = AlignOffset(size);
   }
@@ -960,7 +959,8 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
     // Oneof fields do not use any space.
     if (!InRealOneof(type->field(i))) {
       int field_size = FieldSpaceUsed(type->field(i));
-      size = AlignTo(size, std::min(kSafeAlignment, field_size));
+      size_t align = static_cast<size_t>(std::min(kSafeAlignment, field_size));
+      size = internal::MemoryAlign{align}.Ceil(size);
       offsets[i] = size | FieldFlags(type->field(i));
       size += field_size;
     }
@@ -968,7 +968,7 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
 
   // The oneofs.
   for (int i = 0; i < type->real_oneof_decl_count(); i++) {
-    size = AlignTo(size, kSafeAlignment);
+    size = AlignOffset(size);
     offsets[type->field_count() + i] = size;
 
     for (int j = 0; j < type->real_oneof_decl(i)->field_count(); j++) {

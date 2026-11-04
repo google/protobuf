@@ -43,6 +43,7 @@
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/arena_test_util.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
@@ -53,9 +54,12 @@
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/repeated_ptr_field.h"
 #include "google/protobuf/test_util.h"
+#include "google/protobuf/testing/protobuf_test.h"
 #include "google/protobuf/unittest.pb.h"
 #include "google/protobuf/unittest_arena.pb.h"
 #include "google/protobuf/unittest_import.pb.h"
+#include "google/protobuf/unittest_mset.pb.h"
+#include "google/protobuf/unittest_mset_wire_format.pb.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "google/protobuf/wire_format_lite.h"
 
@@ -69,8 +73,14 @@ using proto2_unittest::NestedTestAllTypes;
 using proto2_unittest::TestAllExtensions;
 using proto2_unittest::TestAllTypes;
 using proto2_unittest::TestEmptyMessage;
+using proto2_unittest::TestHugeFieldNumbers;
+using proto2_unittest::TestLazyExtensions;
+using proto2_unittest::TestMessageSetExtension1;
+using proto2_unittest::TestMessageSetExtension3;
 using proto2_unittest::TestOneof2;
 using proto2_unittest::TestRepeatedString;
+using proto2_unittest::TestVerifiedLazyExtensions;
+using proto2_wireformat_unittest::TestMessageSet;
 using ::testing::AnyOf;
 using ::testing::ElementsAre;
 using ::testing::ElementsAreArray;
@@ -701,6 +711,259 @@ TEST_F(ArenaTest, Parsing) {
   // Test that string fields have nul terminator bytes (earlier bug).
   EXPECT_EQ(strlen(original.optional_string().c_str()),
             strlen(arena_message->optional_string().c_str()));
+}
+
+// Parsing into an existing submessage on a different arena than its parent
+// must allocate the submessage's new fields on its own arena, and then resume
+// allocating on the parent's arena for the parent's subsequent fields.
+TEST_F(ArenaTest, ParseIntoSubmessageOnOtherArena) {
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<NestedTestAllTypes>(&parent_arena);
+  auto* child = Arena::Create<NestedTestAllTypes>(&child_arena);
+  parent->unsafe_arena_set_allocated_child(child);
+
+  NestedTestAllTypes data;
+  data.mutable_child()->mutable_payload();
+  NestedTestAllTypes after;
+  after.mutable_payload();
+  ASSERT_TRUE(parent->MergeFromString(data.SerializeAsString() +
+                                      after.SerializeAsString()));
+
+  EXPECT_EQ(child->payload().GetArena(), &child_arena);
+  EXPECT_EQ(parent->payload().GetArena(), &parent_arena);
+}
+
+// Like `ParseIntoSubmessageOnOtherArena`, for a group.
+TEST_F(ArenaTest, ParseIntoGroupOnOtherArena) {
+  using proto2_unittest::TestParsingMerge;
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestParsingMerge>(&parent_arena);
+  auto* child = Arena::Create<TestParsingMerge::OptionalGroup>(&child_arena);
+  parent->unsafe_arena_set_allocated_optionalgroup(child);
+
+  TestParsingMerge data;
+  data.mutable_optionalgroup()->mutable_optional_group_all_types();
+  TestParsingMerge after;
+  after.mutable_required_all_types();
+  ASSERT_TRUE(parent->MergeFromString(data.SerializePartialAsString() +
+                                      after.SerializeAsString()));
+
+  EXPECT_EQ(child->optional_group_all_types().GetArena(), &child_arena);
+  EXPECT_EQ(parent->required_all_types().GetArena(), &parent_arena);
+}
+
+// Oneof submessages are parsed by `TcParser::MpMessage` instead of the fast
+// path.
+TEST_F(ArenaTest, ParseIntoOneofSubmessageOnOtherArena) {
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestHugeFieldNumbers>(&parent_arena);
+  auto* child = Arena::Create<TestAllTypes>(&child_arena);
+  parent->unsafe_arena_set_allocated_oneof_test_all_types(child);
+
+  TestHugeFieldNumbers data;
+  data.mutable_oneof_test_all_types()->mutable_optional_nested_message();
+  TestHugeFieldNumbers after;
+  after.mutable_optional_message();
+  ASSERT_TRUE(parent->MergeFromString(data.SerializeAsString() +
+                                      after.SerializeAsString()));
+
+  EXPECT_EQ(child->optional_nested_message().GetArena(), &child_arena);
+  EXPECT_EQ(parent->optional_message().GetArena(), &parent_arena);
+}
+
+// Like `ParseIntoSubmessageOnOtherArena`, for an extension.
+TEST_F(ArenaTest, ParseIntoExtensionOnOtherArena) {
+  using proto2_unittest::TestParsingMerge;
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestParsingMerge>(&parent_arena);
+  auto* child = Arena::Create<TestAllTypes>(&child_arena);
+  parent->UnsafeArenaSetAllocatedExtension(TestParsingMerge::optional_ext,
+                                           child);
+
+  TestParsingMerge data;
+  data.MutableExtension(TestParsingMerge::optional_ext)
+      ->mutable_optional_nested_message();
+  TestParsingMerge after;
+  after.mutable_required_all_types();
+  ASSERT_TRUE(parent->MergeFromString(data.SerializePartialAsString() +
+                                      after.SerializeAsString()));
+
+  EXPECT_EQ(child->optional_nested_message().GetArena(), &child_arena);
+  EXPECT_EQ(parent->required_all_types().GetArena(), &parent_arena);
+}
+
+namespace {
+
+// Merges `data` into `msg`, forcing eager parsing of lazy fields if `eager`.
+bool MergeFromString(MessageLite& msg, absl::string_view data,
+                     [[maybe_unused]] bool eager) {
+  io::ArrayInputStream input_stream(data.data(), static_cast<int>(data.size()));
+  io::CodedInputStream input(&input_stream);
+  return msg.MergeFromCodedStream(&input);
+}
+
+class CrossArenaLazyTest : public ArenaTest {
+ protected:
+  bool eager_ = PB_TEST_CHOOSE_VALUE(testing::Bool(), "eager");
+};
+
+}  // namespace
+
+// The lazy field itself is on a different arena than its parent.
+PB_TEST_F(CrossArenaLazyTest, ParseIntoLazySubmessageOnOtherArena) {
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<NestedTestAllTypes>(&parent_arena);
+  auto* child = Arena::Create<NestedTestAllTypes>(&child_arena);
+  parent->unsafe_arena_set_allocated_lazy_child(child);
+
+  NestedTestAllTypes data;
+  data.mutable_lazy_child()->mutable_payload();
+  NestedTestAllTypes after;
+  after.mutable_payload();
+  ASSERT_TRUE(MergeFromString(
+      *parent, data.SerializeAsString() + after.SerializeAsString(), eager_));
+
+  EXPECT_EQ(child->payload().GetArena(), &child_arena);
+  EXPECT_EQ(parent->payload().GetArena(), &parent_arena);
+}
+
+// A lazy field of a submessage that is on a different arena than its parent.
+// When parsed lazily, the lazy field is parsed ("rehydrated") on first access.
+PB_TEST_F(CrossArenaLazyTest, ParseLazyFieldOfSubmessageOnOtherArena) {
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<NestedTestAllTypes>(&parent_arena);
+  auto* child = Arena::Create<NestedTestAllTypes>(&child_arena);
+  parent->unsafe_arena_set_allocated_child(child);
+
+  NestedTestAllTypes data;
+  data.mutable_child()->mutable_lazy_child();
+  NestedTestAllTypes after;
+  after.mutable_payload();
+  ASSERT_TRUE(MergeFromString(
+      *parent, data.SerializeAsString() + after.SerializeAsString(), eager_));
+
+  EXPECT_EQ(child->lazy_child().GetArena(), &child_arena);
+  EXPECT_EQ(parent->payload().GetArena(), &parent_arena);
+}
+
+namespace {
+
+// Serializes `data`'s `TestMessageSetExtension1` as a MessageSet item with the
+// payload before the type id. The parser then has to buffer the payload until
+// it sees the type id, and parses it afterwards with a separate ParseContext.
+std::string SerializePayloadFirst(const TestMessageSet& data) {
+  const auto& ext = TestMessageSetExtension1::message_set_extension;
+  UnknownFieldSet unknown;
+  UnknownFieldSet* item =
+      unknown.AddGroup(internal::WireFormatLite::kMessageSetItemNumber);
+  item->AddLengthDelimited(internal::WireFormatLite::kMessageSetMessageNumber,
+                           data.GetExtension(ext).SerializeAsString());
+  item->AddVarint(internal::WireFormatLite::kMessageSetTypeIdNumber,
+                  ext.number());
+  std::string serialized;
+  ABSL_CHECK(unknown.SerializeToString(&serialized));
+  return serialized;
+}
+
+}  // namespace
+
+// Items with the type id first are parsed like other extensions, which is
+// covered by `ParseIntoExtensionOnOtherArena`.
+TEST_F(ArenaTest, ParseIntoMessageSetExtensionOnOtherArenaPayloadFirst) {
+  const auto& child_ext = TestMessageSetExtension1::message_set_extension;
+  const auto& after_ext = TestMessageSetExtension3::message_set_extension;
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestMessageSet>(&parent_arena);
+  auto* child = Arena::Create<TestMessageSetExtension1>(&child_arena);
+  parent->UnsafeArenaSetAllocatedExtension(child_ext, child);
+
+  TestMessageSet data;
+  data.MutableExtension(child_ext)->mutable_recursive();
+  TestMessageSet after;
+  after.MutableExtension(after_ext)->set_required_int(0);
+  after.MutableExtension(after_ext)->mutable_msg();
+  // Parse eagerly so `after`'s extension is parsed now, with `parent`'s parse
+  // context, rather than lazily on access.
+  ASSERT_TRUE(MergeFromString(
+      *parent, SerializePayloadFirst(data) + after.SerializeAsString(),
+      /*eager=*/true));
+
+  EXPECT_EQ(child->recursive().GetArena(), &child_arena);
+  EXPECT_EQ(parent->GetExtension(after_ext).msg().GetArena(), &parent_arena);
+}
+
+// MessageSets without generated code are parsed with reflection by
+// `WireFormat`, which has its own handling of payload-first items. Items with
+// the type id first go through `ParseContext::ParseMessage`, which is covered
+// by other tests.
+TEST_F(ArenaTest, ParseIntoDynamicMessageSetExtensionOnOtherArenaPayloadFirst) {
+  const FieldDescriptor* child_ext =
+      TestMessageSetExtension1::descriptor()->extension(0);
+  const FieldDescriptor* after_ext =
+      TestMessageSetExtension3::descriptor()->extension(0);
+  DynamicMessageFactory factory;
+  Arena parent_arena;
+  Arena child_arena;
+  Message* parent =
+      factory.GetPrototype(TestMessageSet::descriptor())->New(&parent_arena);
+  Message* child = factory.GetPrototype(TestMessageSetExtension1::descriptor())
+                       ->New(&child_arena);
+  parent->GetReflection()->UnsafeArenaSetAllocatedMessage(parent, child,
+                                                          child_ext);
+
+  TestMessageSet data;
+  data.MutableExtension(TestMessageSetExtension1::message_set_extension)
+      ->mutable_recursive();
+  TestMessageSet after;
+  after.MutableExtension(TestMessageSetExtension3::message_set_extension)
+      ->set_required_int(0);
+  after.MutableExtension(TestMessageSetExtension3::message_set_extension)
+      ->mutable_msg();
+  ASSERT_TRUE(parent->MergeFromString(SerializePayloadFirst(data) +
+                                      after.SerializeAsString()));
+
+  const Message& recursive = child->GetReflection()->GetMessage(
+      *child, child->GetDescriptor()->FindFieldByName("recursive"));
+  EXPECT_EQ(recursive.GetArena(), &child_arena);
+  const Message& after_msg =
+      parent->GetReflection()->GetMessage(*parent, after_ext);
+  const Message& msg = after_msg.GetReflection()->GetMessage(
+      after_msg, after_msg.GetDescriptor()->FindFieldByName("msg"));
+  EXPECT_EQ(msg.GetArena(), &parent_arena);
+}
+
+// Parsing into an extension that was parsed lazily, and then replaced by a
+// message on a different arena. The message is stored in the extension's
+// `LazyField`.
+PB_TEST_F(CrossArenaLazyTest, ParseIntoLazyExtensionOnOtherArena) {
+  const auto& child_ext = TestVerifiedLazyExtensions::lazy_extension;
+  const auto& after_ext = TestVerifiedLazyExtensions::eager_extension;
+  Arena parent_arena;
+  Arena child_arena;
+  auto* parent = Arena::Create<TestLazyExtensions>(&parent_arena);
+  TestLazyExtensions lazy;
+  lazy.MutableExtension(child_ext);
+  ASSERT_TRUE(parent->ParseFromString(lazy.SerializeAsString()));
+  auto* child = Arena::Create<TestVerifiedLazyExtensions>(&child_arena);
+  parent->UnsafeArenaSetAllocatedExtension(child_ext, child);
+
+  TestLazyExtensions data;
+  data.MutableExtension(child_ext)->mutable_optional_all_types();
+  TestLazyExtensions after;
+  after.MutableExtension(after_ext)->mutable_optional_all_types();
+  ASSERT_TRUE(MergeFromString(
+      *parent, data.SerializeAsString() + after.SerializeAsString(), eager_));
+
+  EXPECT_EQ(child->optional_all_types().GetArena(), &child_arena);
+  EXPECT_EQ(parent->GetExtension(after_ext).optional_all_types().GetArena(),
+            &parent_arena);
 }
 
 TEST_F(ArenaTest, UnknownFields) {

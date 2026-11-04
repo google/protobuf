@@ -703,8 +703,9 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   };
 
   template <typename... T>
-  ParseContext(int depth, bool aliasing, const char** start, T&&... args)
-      : EpsCopyInputStream(aliasing), depth_(depth) {
+  ParseContext(int depth, bool aliasing, Arena* arena, const char** start,
+               T&&... args)
+      : EpsCopyInputStream(aliasing), depth_(depth), arena_(arena) {
     *start = InitFrom(std::forward<T>(args)...);
   }
 
@@ -722,7 +723,8 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
                const char** start, T&&... args)
       : EpsCopyInputStream(false),
         depth_(ctx.depth_ - kDepthReduction),
-        data_(ctx.data_)
+        data_(ctx.data_),
+        arena_(ctx.arena_)
   {
     if (kDepthReduction != 0 && depth_ < 0) {
       // Fail right away.
@@ -767,6 +769,24 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD Data& data() { return data_; }
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD const Data& data() const { return data_; }
 
+  // The arena of the message being parsed with this context, cached so the
+  // parser doesn't have to load it from the message.
+  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD Arena* arena() const { return arena_; }
+
+  // RAII object that sets and restores the cached arena in the ParseContext.
+  class ScopedArena {
+   public:
+    ScopedArena(ParseContext* ctx, Arena* arena)
+        : ctx_(ctx), saved_(ctx->ExchangeArena(arena)) {}
+    ScopedArena(const ScopedArena&) = delete;
+    ScopedArena& operator=(const ScopedArena&) = delete;
+    ~ScopedArena() { ctx_->ExchangeArena(saved_); }
+
+   private:
+    ParseContext* ctx_;
+    Arena* saved_;
+  };
+
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD const char* ParseMessage(MessageLite* msg,
                                                                const char* ptr);
 
@@ -783,25 +803,6 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
                                               uint32_t start_tag,
                                               const Func& func);
 
-  // Use a template to avoid the strong dep into TcParser. All callers will have
-  // the dep.
-  template <typename Parser = TcParser>
-  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD PROTOBUF_ALWAYS_INLINE const char*
-  ParseMessage(MessageLite* msg, const TcParseTableBase* tc_table,
-               const char* ptr) {
-    return ParseLengthDelimitedInlined(ptr, [&](const char* ptr) {
-      return Parser::ParseLoop(msg, ptr, this, tc_table);
-    });
-  }
-  template <typename Parser = TcParser>
-  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD PROTOBUF_ALWAYS_INLINE const char*
-  ParseGroup(MessageLite* msg, const TcParseTableBase* tc_table,
-             const char* ptr, uint32_t start_tag) {
-    return ParseGroupInlined(ptr, start_tag, [&](const char* ptr) {
-      return Parser::ParseLoop(msg, ptr, this, tc_table);
-    });
-  }
-
   [[nodiscard]] PROTOBUF_NDEBUG_INLINE const char* ParseGroup(MessageLite* msg,
                                                               const char* ptr,
                                                               uint32_t tag) {
@@ -809,7 +810,7 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
     group_depth_++;
     auto old_depth = depth_;
     auto old_group_depth = group_depth_;
-    ptr = msg->_InternalParse(ptr, this);
+    ptr = InternalParseMessage(msg, ptr);
     if (ptr != nullptr) {
       ABSL_DCHECK_EQ(old_depth, depth_);
       ABSL_DCHECK_EQ(old_group_depth, group_depth_);
@@ -820,7 +821,23 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
     return ptr;
   }
 
+  PROTOBUF_ALWAYS_INLINE const char* InternalParseMessage(MessageLite* msg,
+                                                          const char* ptr) {
+    Arena* message_arena = msg->GetArena();
+    if (ABSL_PREDICT_FALSE(message_arena != arena_)) {
+      return ParseCrossArenaSubmessage(msg, message_arena, ptr);
+    } else {
+      return msg->_InternalParse(ptr, this);
+    }
+  }
+
  private:
+  Arena* ExchangeArena(Arena* arena) { return std::exchange(arena_, arena); }
+
+  PROTOBUF_NOINLINE const char* ParseCrossArenaSubmessage(MessageLite* msg,
+                                                          Arena* arena,
+                                                          const char* ptr);
+
   // Out-of-line routine to save space in ParseContext::ParseMessage<T>
   //   LimitToken old;
   //   ptr = ReadSizeAndPushLimitAndDepth(ptr, &old)
@@ -848,6 +865,7 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   // is intentionally used to avoid decrementing INT_MIN, which is UB.
   int group_depth_ = std::numeric_limits<int16_t>::min();
   Data data_;
+  Arena* arena_;
 };
 
 // Sink types for AdvancePtrMaybeFlush.
