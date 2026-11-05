@@ -2724,6 +2724,17 @@ UPB_API_INLINE bool upb_MiniTableField_IsExtension(
   return (f->UPB_ONLYBITS(mode) & kUpb_LabelFlags_IsExtension) != 0;
 }
 
+// Returns true if `f` describes a field stored in a message's auxiliary data
+// (currently, an extension or a non-canonical field) rather than at a fixed
+// offset in the message.
+//
+// In the current implementation, base fields never have offset 0, since the
+// message data starts after the upb_Message header.
+UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(
+    const struct upb_MiniTableField* f) {
+  return f->UPB_ONLYBITS(offset) == 0;
+}
+
 UPB_API_INLINE bool upb_MiniTableField_IsPacked(
     const struct upb_MiniTableField* f) {
   return (f->UPB_ONLYBITS(mode) & kUpb_LabelFlags_IsPacked) != 0;
@@ -5726,6 +5737,12 @@ UPB_INLINE void UPB_PRIVATE(_upb_Message_SetPresence)(
 UPB_API_INLINE bool upb_Message_HasBaseField(const struct upb_Message* msg,
                                              const upb_MiniTableField* field) {
   UPB_ASSERT(upb_MiniTableField_HasPresence(field));
+  // Base fields are currently always stored in the message body, never as aux
+  // fields. This guards against e.g. passing in a non-canonical unknown field.
+  // If we ever support overflow fields (regular fields stored as upb_AuxField),
+  // we may need to relax this check and possibly add a branch to select the
+  // right access path, since callers can't know a field's physical storage.
+  UPB_ASSERT(!UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(field));
   UPB_ASSUME(!upb_MiniTableField_IsExtension(field));
   if (upb_MiniTableField_IsInOneof(field)) {
     return UPB_PRIVATE(_upb_Message_GetOneofCase)(msg, field) ==
@@ -5744,6 +5761,9 @@ UPB_API_INLINE bool upb_Message_HasExtension(const struct upb_Message* msg,
 UPB_FORCEINLINE void _upb_Message_GetNonExtensionField(
     const struct upb_Message* msg, const upb_MiniTableField* field,
     const void* default_val, void* val) {
+  // This check should be replaced with a branch if we support overflow fields
+  // as upb_AuxField. See the comment in upb_Message_HasBaseField().
+  UPB_ASSERT(!UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(field));
   UPB_ASSUME(!upb_MiniTableField_IsExtension(field));
   if ((upb_MiniTableField_IsInOneof(field) ||
        !UPB_PRIVATE(_upb_MiniTableField_DataIsZero)(field, default_val)) &&
@@ -5791,6 +5811,9 @@ UPB_API_INLINE void upb_Message_SetBaseField(struct upb_Message* msg,
                                              const upb_MiniTableField* f,
                                              const void* val) {
   UPB_ASSERT(!upb_Message_IsFrozen(msg));
+  // This check should be replaced with a branch if we support overflow fields
+  // as upb_AuxField. See the comment in upb_Message_HasBaseField().
+  UPB_ASSERT(!UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(f));
   UPB_ASSUME(!upb_MiniTableField_IsExtension(f));
   // Copy the value before setting the presence: the compiler can't tell that
   // the store to the presence bits of `msg` doesn't modify `f`, so it would
@@ -6401,6 +6424,9 @@ UPB_API_INLINE void upb_Message_Clear(struct upb_Message* msg,
 UPB_API_INLINE void upb_Message_ClearBaseField(struct upb_Message* msg,
                                                const upb_MiniTableField* f) {
   UPB_ASSERT(!upb_Message_IsFrozen(msg));
+  // This check should be replaced with a branch if we support overflow fields
+  // as upb_AuxField. See the comment in upb_Message_HasBaseField().
+  UPB_ASSERT(!UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(f));
   if (UPB_PRIVATE(_upb_MiniTableField_HasHasbit)(f)) {
     UPB_PRIVATE(_upb_Message_ClearHasbit)(msg, f);
   } else if (upb_MiniTableField_IsInOneof(f)) {
