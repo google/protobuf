@@ -718,7 +718,7 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     if (!_upb_mapsorter_pushexts(&e->sorter, in, &sorted)) {
       encode_err(e, kUpb_EncodeStatus_OutOfMemory);
     }
-    const upb_Extension* ext;
+    const upb_AuxField* ext;
     while (_upb_sortedmap_nextext(&e->sorter, &sorted, &ext)) {
       ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                        upb_Extension_GetValue(ext),
@@ -763,7 +763,7 @@ char* encode_message(char* ptr, upb_encstate* e, const upb_Message* msg,
             upb_TaggedPtrAux_StringViewRepr(tagged_ptr);
         ptr = encode_bytes(ptr, e, unknown->data, unknown->size);
       } else if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
-        const upb_Extension* ext =
+        const upb_AuxField* ext =
             upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
         ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                          upb_Extension_GetValue(ext),
