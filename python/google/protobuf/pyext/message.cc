@@ -659,8 +659,9 @@ static bool BufferBytes(PyObject* obj, Py_buffer* view) {
   return true;
 }
 
-std::optional<absl::string_view> CheckString(
-    PyObject* arg, const FieldDescriptor* descriptor) {
+std::optional<absl::string_view> CheckString(PyObject* arg,
+                                             const FieldDescriptor* descriptor,
+                                             ScopedPyObjectPtr* copy) {
   ABSL_DCHECK(descriptor->type() == FieldDescriptor::TYPE_STRING ||
               descriptor->type() == FieldDescriptor::TYPE_BYTES);
   if (descriptor->type() == FieldDescriptor::TYPE_STRING) {
@@ -692,10 +693,17 @@ std::optional<absl::string_view> CheckString(
     if (!BufferBytes(arg, &view)) {
       return std::nullopt;
     }
-    // This is OK as MemoryView guarantees that the underlying data is valid
-    // for the lifetime of the view.
-    absl::string_view value(static_cast<const char*>(view.buf), view.len);
+    // Copy the contents while holding the buffer: once it is released, another
+    // call (or thread) may release the memoryview and resize or free the
+    // exporter's memory.
+    copy->reset(PyBytes_FromStringAndSize(static_cast<const char*>(view.buf),
+                                          view.len));
     PyBuffer_Release(&view);
+    if (*copy == nullptr) {
+      return std::nullopt;
+    }
+    absl::string_view value(PyBytes_AS_STRING(copy->get()),
+                            PyBytes_GET_SIZE(copy->get()));
     if (descriptor->type() == FieldDescriptor::TYPE_STRING &&
         !AllowInvalidUTF8(descriptor)) {
       PyObject* unicode =
@@ -714,8 +722,9 @@ std::optional<absl::string_view> CheckString(
 bool CheckAndSetString(PyObject* arg, Message* message,
                        const FieldDescriptor* field_descriptor,
                        const Reflection* reflection, bool append, int index) {
+  ScopedPyObjectPtr copy;
   if (std::optional<absl::string_view> value =
-          CheckString(arg, field_descriptor);
+          CheckString(arg, field_descriptor, &copy);
       value.has_value()) {
     MessageReflectionFriend::SetString(*value, message, field_descriptor,
                                        reflection, append, index);
@@ -2835,7 +2844,9 @@ PyObject* Contains(CMessage* self, PyObject* arg) {
       const FieldDescriptor* map_field = descriptor->FindFieldByName("fields");
       const FieldDescriptor* key_field = map_field->message_type()->map_key();
       MapKey map_key;
-      std::optional<absl::string_view> key_string = CheckString(arg, key_field);
+      ScopedPyObjectPtr copy;
+      std::optional<absl::string_view> key_string =
+          CheckString(arg, key_field, &copy);
       if (!key_string.has_value()) {
         PyErr_Clear();
         PyErr_SetString(PyExc_TypeError,
