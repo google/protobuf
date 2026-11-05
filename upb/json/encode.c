@@ -23,6 +23,7 @@
 #include "upb/message/array.h"
 #include "upb/message/map.h"
 #include "upb/message/message.h"
+#include "upb/mini_table/extension_registry.h"
 #include "upb/mini_table/message.h"
 #include "upb/port/vsnprintf_compat.h"
 #include "upb/reflection/def.h"
@@ -407,7 +408,9 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
     return;
   }
 
-  if (upb_Decode(value.data, value.size, any, any_layout, NULL, 0, arena) !=
+  const upb_ExtensionRegistry* extreg =
+      upb_DefPool_ExtensionRegistry(e->ext_pool);
+  if (upb_Decode(value.data, value.size, any, any_layout, extreg, 0, arena) !=
       kUpb_DecodeStatus_Ok) {
     jsonenc_err(e, "Error decoding message in Any");
   }
