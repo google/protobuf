@@ -40,17 +40,6 @@ struct RawPrettyFunction {
     return absl::nullopt;
 #endif
   }
-
-  template <template <typename...> class T>
-  static constexpr absl::optional<absl::string_view> Get() {
-#if defined(_MSC_VER) && !defined(__clang__)
-    return __FUNCSIG__;
-#elif defined(__clang__) || defined(__GNUC__)
-    return __PRETTY_FUNCTION__;
-#else
-    return absl::nullopt;
-#endif
-  }
 };
 
 absl::optional<std::string> CleanRawTypeName(
@@ -109,7 +98,7 @@ template <template <typename...> class Tmpl, typename... Args>
 struct TypeNameFormatter<Tmpl<Args...>> {
   template <typename... Prefix>
   static absl::optional<std::string> Format(std::tuple<Prefix...>*) {
-    return FormatTemplateTypeName(RawPrettyFunction::Get<Tmpl>(),
+    return FormatTemplateTypeName(RawPrettyFunction::Get<Tmpl<Args...>>(),
                                   {GetTypeName<Prefix>()...});
   }
 

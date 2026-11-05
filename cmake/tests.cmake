@@ -56,6 +56,7 @@ set(tests_files
   ${annotation_test_util_srcs}
   ${editions_test_files}
   ${io_test_files}
+  ${testing_test_files}
   ${util_test_files}
   ${stubs_test_files}
 )
@@ -194,6 +195,36 @@ target_link_libraries(lazily-build-dependencies-test
 add_test(NAME lazily-build-dependencies-test
   COMMAND lazily-build-dependencies-test ${protobuf_GTEST_ARGS}
   WORKING_DIRECTORY ${protobuf_SOURCE_DIR})
+
+# These tests inspect global test suite registration/counts or spawn the test
+# binary and assert exact GoogleTest output, so each needs its own binary.
+function(_protobuf_add_standalone_test name srcs gtest_lib)
+  # Guarded until src/file_lists.cmake is regenerated.
+  if(NOT ${srcs})
+    return()
+  endif()
+  add_executable(${name} ${${srcs}} ${common_test_files})
+  if(MSVC)
+    target_compile_options(${name} PRIVATE /wd4146 /bigobj)
+  endif()
+  target_link_libraries(${name}
+    libtest_common
+    libtest_common_lite
+    ${protobuf_LIB_PROTOC}
+    ${protobuf_LIB_PROTOBUF}
+    ${protobuf_ABSL_USED_TARGETS}
+    ${protobuf_ABSL_USED_TEST_TARGETS}
+    ${gtest_lib}
+  )
+  add_test(NAME ${name}
+    COMMAND ${name} ${ARGN}
+    WORKING_DIRECTORY ${protobuf_SOURCE_DIR})
+endfunction()
+
+_protobuf_add_standalone_test(
+  protobuf-test-test protobuf_test_test_files GTest::gmock_main ${protobuf_GTEST_ARGS})
+_protobuf_add_standalone_test(
+  protobuf-test-output-test protobuf_test_output_test_files GTest::gmock)
 
 if (protobuf_BUILD_LIBUPB)
   set(upb_test_proto_genfiles)

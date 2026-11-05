@@ -106,29 +106,30 @@
 //     `PB_TEST_CHOOSE_VALUE`.
 //
 //   PB_TEST_CHOOSE_TYPE((T1, T2, ...))
-//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix")
 //   PB_TEST_CHOOSE_TYPE((T1, T2, ...), Printer)
-//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", Printer)
-//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), {"name1", "name2", ...})
-//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", {"name1", "name2", ...})
+//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix")                    // C++20+
+//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", Printer)           // C++20+
+//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), {"name1", "name2", ...})     // C++20+
+//   PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", {"name1", ...})    // C++20+
 //   PB_TEST_CHOOSE_TYPE(Tuple)
-//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix")
 //   PB_TEST_CHOOSE_TYPE(Tuple, Printer)
-//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix", Printer)
-//   PB_TEST_CHOOSE_TYPE(Tuple, {"name1", "name2", ...})
-//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix", {"name1", "name2", ...})
+//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix")                            // C++20+
+//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix", Printer)                   // C++20+
+//   PB_TEST_CHOOSE_TYPE(Tuple, {"name1", "name2", ...})             // C++20+
+//   PB_TEST_CHOOSE_TYPE(Tuple, "prefix", {"name1", "name2", ...})   // C++20+
 //     Evaluates to a type (usable in `using T = PB_TEST_CHOOSE_TYPE(...);` or
 //     any type context) for one of the provided types `T1, T2, ...`, specified
 //     either as a parenthesized list `(T1, T2, ...)` or as a `std::tuple<...>`
 //     type `Tuple`. Each lexical call site defines an independent type
 //     dimension.
-//     An optional `"prefix"` string literal can be provided to prepend
+//     An optional `"prefix"` string literal (C++20+) can be provided to prepend
 //     `<prefix>_` to each type's test name suffix.
 //     To customize type names, pass either:
-//       - an explicit braced list of names `{"name1", "name2", ...}` with the
-//         same number of elements as the type list, or
+//       - an explicit braced list of names `{"name1", "name2", ...}` (C++20+)
+//         with the same number of elements as the type list, or
 //       - a `Printer` type providing
-//         `template <typename T> static std::string Print(size_t index)`.
+//         `template <typename T> static std::string Print(size_t index)`
+//         (works in C++17 and C++20).
 //     When no explicit names or `Printer` are provided, names are obtained via
 //     `GetTypeName<T>()`, falling back to best-effort extraction from the
 //     literal type list, and then to 0-based indices (`0`, `1`, ...).
@@ -283,15 +284,48 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
-#if __cplusplus >= 202002L
-#define PB_TEST_CHOOSE_TYPE_LITERAL_(...) decltype([] { return #__VA_ARGS__; })
-#else
-#define PB_TEST_CHOOSE_TYPE_LITERAL_(...) ::google::protobuf::internal::EmptyLiteral
-#endif
-
-struct EmptyLiteral {
-  constexpr absl::string_view operator()() const { return ""; }
+template <char... Cs>
+struct TypeLiteral {
+  static std::string Get() {
+    static constexpr char kBuf[] = {Cs..., '\0'};
+    return std::string(kBuf, sizeof...(Cs));
+  }
 };
+
+template <char... N>
+struct TypeLiteralPrefix {
+  template <decltype(N)... Cs, char...>
+  using Take = TypeLiteral<Cs...>;
+};
+
+template <size_t N>
+struct MakeTypeLiteralPrefix {
+  template <size_t... Is>
+  static auto Make(std::index_sequence<Is...>) {
+    return TypeLiteralPrefix<char(0 * Is)...>{};
+  }
+  using type = decltype(Make(std::make_index_sequence<N>{}));
+};
+
+#define PB_TEST_STR_AT_(s, i) ((i) < sizeof(s) - 1 ? (s)[(i)] : '\0')
+#define PB_TEST_STR_8_(s, i)                                    \
+  PB_TEST_STR_AT_(s, (i) + 0), PB_TEST_STR_AT_(s, (i) + 1),     \
+      PB_TEST_STR_AT_(s, (i) + 2), PB_TEST_STR_AT_(s, (i) + 3), \
+      PB_TEST_STR_AT_(s, (i) + 4), PB_TEST_STR_AT_(s, (i) + 5), \
+      PB_TEST_STR_AT_(s, (i) + 6), PB_TEST_STR_AT_(s, (i) + 7)
+#define PB_TEST_STR_32_(s, i)                             \
+  PB_TEST_STR_8_(s, (i) + 0), PB_TEST_STR_8_(s, (i) + 8), \
+      PB_TEST_STR_8_(s, (i) + 16), PB_TEST_STR_8_(s, (i) + 24)
+#define PB_TEST_STR_128_(s, i)                               \
+  PB_TEST_STR_32_(s, (i) + 0), PB_TEST_STR_32_(s, (i) + 32), \
+      PB_TEST_STR_32_(s, (i) + 64), PB_TEST_STR_32_(s, (i) + 96)
+#define PB_TEST_STR_512_(s)                                                 \
+  ::google::protobuf::internal::MakeTypeLiteralPrefix<(                               \
+      sizeof(s) - 1 < 512 ? sizeof(s) - 1 : 512)>::type::                   \
+      template Take<                                                        \
+          PB_TEST_STR_128_(s, size_t{0}), PB_TEST_STR_128_(s, size_t{128}), \
+          PB_TEST_STR_128_(s, size_t{256}), PB_TEST_STR_128_(s, size_t{384})>
+#define PB_TEST_CHOOSE_TYPE_LITERAL_(...) PB_TEST_STR_512_(#__VA_ARGS__)
 
 enum class CounterT : size_t {};
 
@@ -359,7 +393,7 @@ using FixtureBasesOf =
         ::google::protobuf::internal::ADLImporter{}));                                   \
                                                                                \
     template <typename Indices>                                                \
-    explicit self_class(Indices*, size_t idx)                                  \
+    explicit self_class(Indices*)                                              \
         : test_body_(&self_class::TestBodyImpl<Indices>) {}                    \
     ~self_class() override {                                                   \
       ::google::protobuf::internal::PartialTestRegistry::Get().UnsetCurrentTest();       \
@@ -535,7 +569,7 @@ class PartialTestRegistry {
             // set it before we start constructing the instance so that it is
             // available on the fixture already.
             SetCurrentTest<Fixture, Indices>(i);
-            return new Fixture(static_cast<Indices*>(nullptr), i);
+            return new Fixture(static_cast<Indices*>(nullptr));
           });
     };
   }
@@ -994,17 +1028,19 @@ constexpr size_t GetTypeIndexForId(void (*)(Indices...)) {
   return ((Indices::value.counter == id ? Indices::value.value : 0) + ... + 0);
 }
 
-template <typename Types, typename Printer, auto Prefix>
+struct NoTypePrefix {
+  static constexpr absl::optional<absl::string_view> prefix() {
+    return absl::nullopt;
+  }
+};
+
+template <typename Types, typename Printer, typename Prefix = NoTypePrefix>
 struct ChooseTypes {
   using types = Types;
   using printer = Printer;
 
   static constexpr absl::optional<absl::string_view> prefix() {
-    if constexpr (std::is_same_v<decltype(Prefix), int>) {
-      return absl::nullopt;
-    } else {
-      return Prefix.buf;
-    }
+    return Prefix::prefix();
   }
 };
 
@@ -1016,20 +1052,26 @@ struct DefaultTypePrinter {
 };
 
 template <typename Tuple, typename Printer = DefaultTypePrinter>
-ChooseTypes<Tuple, Printer, 0> TestChooseTypeParams();
+ChooseTypes<Tuple, Printer> TestChooseTypeParams();
 
-#if __cplusplus >= 202002L
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L) || \
+    (!defined(_MSVC_LANG) && __cplusplus >= 202002L)
 struct FixedString {
   template <size_t N>
   constexpr FixedString(  // NOLINT(google-explicit-constructor)
       const char (&n)[N])
       : buf{} {
     static_assert(N <= sizeof(buf), "String is too long");
-    std::copy(n, n + N, buf);
+    for (size_t i = 0; i < N; ++i) buf[i] = n[i];
   }
   template <typename T>
   constexpr FixedString(std::initializer_list<T>) = delete;
   char buf[64];
+};
+
+template <FixedString s>
+struct FixedTypePrefix {
+  static constexpr absl::optional<absl::string_view> prefix() { return s.buf; }
 };
 
 template <size_t ExpectedSize>
@@ -1045,25 +1087,26 @@ struct ExplicitTypePrinter {
   }
 };
 
-template <typename Tuple,
-          std::enable_if_t<!std::is_void_v<Tuple>,
-                           FixedStringList<std::tuple_size_v<Tuple>>>
-              names>
-ChooseTypes<Tuple, ExplicitTypePrinter<names>, 0> TestChooseTypeParams();
+template <typename Tuple, FixedStringList<std::tuple_size_v<Tuple>> names>
+ChooseTypes<Tuple, ExplicitTypePrinter<names>> TestChooseTypeParams();
 
-template <typename Tuple,
-          std::enable_if_t<!std::is_void_v<Tuple>, FixedString> prefix,
+template <typename Tuple, FixedString prefix,
           typename Printer = DefaultTypePrinter>
-ChooseTypes<Tuple, Printer, prefix> TestChooseTypeParams();
+ChooseTypes<Tuple, Printer, FixedTypePrefix<prefix>> TestChooseTypeParams();
 
-template <typename Tuple,
-          std::enable_if_t<!std::is_void_v<Tuple>, FixedString> prefix,
+template <typename Tuple, FixedString prefix,
           FixedStringList<std::tuple_size_v<Tuple>> names>
-ChooseTypes<Tuple, ExplicitTypePrinter<names>, prefix> TestChooseTypeParams();
-#endif  // __cplusplus >= 202002L
+ChooseTypes<Tuple, ExplicitTypePrinter<names>, FixedTypePrefix<prefix>>
+TestChooseTypeParams();
+#endif  // C++20+
 
-template <typename T, auto*>
-using WithRegistration = T;
+template <void (*Fn)()>
+inline const bool kRunRegistration = (Fn(), false);
+
+template <typename T, const bool*>
+struct WithRegistration {
+  using type = T;
+};
 
 template <typename... Indices>
 constexpr absl::optional<CounterT> LargestCounter(void (*)(Indices...)) {
@@ -1120,21 +1163,23 @@ constexpr auto TestChooseConstexprSelector(Literal, F f) {
 template <typename Fixture, typename Types, typename Literal, CounterT id,
           typename Indices>
 struct TestChooseTypeSelector {
-  static constexpr auto reg = []() {
-    PartialTestRegistry::Get()
-        .AddTypeDimension<Fixture, id, typename Types::printer>(
-            PartialTestRegistry::kKey<Indices>,
-            static_cast<typename Types::types*>(nullptr), Types::prefix(),
-            kDefault<Literal>());
-    InstantiateAllTypes<Fixture, id, 0,
-                        std::tuple_size_v<typename Types::types>, Indices>();
-    PartialTestRegistry::Get().AddDoRegister<Fixture, Indices>();
+  struct Registration {
+    static void Register() {
+      PartialTestRegistry::Get()
+          .AddTypeDimension<Fixture, id, typename Types::printer>(
+              PartialTestRegistry::kKey<Indices>,
+              static_cast<typename Types::types*>(nullptr), Types::prefix(),
+              Literal::Get());
+      InstantiateAllTypes<Fixture, id, 0,
+                          std::tuple_size_v<typename Types::types>, Indices>();
+      PartialTestRegistry::Get().AddDoRegister<Fixture, Indices>();
+    }
   };
-  using type =
-      WithRegistration<std::tuple_element_t<GetTypeIndexForId<id>(
-                                                static_cast<Indices*>(nullptr)),
-                                            typename Types::types>,
-                       &Run<decltype(reg)>>;
+  using type = typename WithRegistration<
+      std::tuple_element_t<GetTypeIndexForId<id>(
+                               static_cast<Indices*>(nullptr)),
+                           typename Types::types>,
+      &kRunRegistration<&Registration::Register>>::type;
 };
 
 }  // namespace internal
