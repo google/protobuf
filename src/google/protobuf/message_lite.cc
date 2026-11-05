@@ -38,11 +38,9 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/message_traits.h"
-#include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/type_id.h"
-#include "google/protobuf/unknown_field_set.h"
 
 
 // Must be included last.
@@ -237,7 +235,7 @@ bool MergeFromImpl(absl::string_view input, MessageLite* msg,
                    MessageLite::ParseFlags parse_flags) {
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             aliasing, &ptr, input);
+                             aliasing, msg->GetArena(), &ptr, input);
   ptr = internal::TcParser::ParseLoop(msg, ptr, &ctx, tc_table);
   // ctx has an explicit limit set (length of string_view).
   if (ABSL_PREDICT_TRUE(ptr && ctx.EndedAtLimit())) {
@@ -252,7 +250,7 @@ bool MergeFromImpl(io::ZeroCopyInputStream* input, MessageLite* msg,
                    MessageLite::ParseFlags parse_flags) {
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             aliasing, &ptr, input);
+                             aliasing, msg->GetArena(), &ptr, input);
   ptr = internal::TcParser::ParseLoop(msg, ptr, &ctx, tc_table);
   // ctx has no explicit limit (hence we end on end of stream)
   if (ABSL_PREDICT_TRUE(ptr && ctx.EndedAtEndOfStream())) {
@@ -267,7 +265,8 @@ bool MergeFromImpl(BoundedZCIS input, MessageLite* msg,
                    MessageLite::ParseFlags parse_flags) {
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             aliasing, &ptr, input.zcis, input.limit);
+                             aliasing, msg->GetArena(), &ptr, input.zcis,
+                             input.limit);
   ptr = internal::TcParser::ParseLoop(msg, ptr, &ctx, tc_table);
   if (ABSL_PREDICT_FALSE(!ptr)) return false;
   if (ABSL_PREDICT_FALSE(!ctx.EndedAtLimit())) return false;
@@ -332,7 +331,7 @@ bool MessageLite::MergeFromImpl(io::CodedInputStream* input,
   ZeroCopyCodedInputStream zcis(input);
   const char* ptr;
   internal::ParseContext ctx(input->RecursionBudget(), zcis.aliasing_enabled(),
-                             &ptr, &zcis);
+                             GetArena(), &ptr, &zcis);
   // MergePartialFromCodedStream allows terminating the wireformat by 0 or
   // end-group tag. Leaving it up to the caller to verify correct ending by
   // calling LastTagWas on input. We need to maintain this behavior.

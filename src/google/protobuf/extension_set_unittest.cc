@@ -124,7 +124,7 @@ class FindExtensionTest : public ::testing::TestWithParam<ExtensionFinderType> {
   bool CallFindExtension(int wire_type, int field_number,
                          ExtensionInfo* extension, bool* was_packed_on_wire) {
     const char* ptr;
-    internal::ParseContext ctx(100, false, &ptr, "");
+    internal::ParseContext ctx(100, false, /*arena=*/nullptr, &ptr, "");
     switch (GetParam()) {
       case ExtensionFinderType::kGeneratedExtensionFinder: {
         return ExtensionSet::FindExtension(wire_type, field_number, extendee_,

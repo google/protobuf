@@ -42,6 +42,7 @@
 #include "google/protobuf/private_access.h"
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/repeated_ptr_field.h"
+#include "google/protobuf/serial_arena.h"
 #include "google/protobuf/wire_format_lite.h"
 #include "utf8_validity.h"
 
@@ -253,7 +254,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
 
   // Implemented in arenastring.cc
   [[nodiscard]] const char* ReadArenaString(const char* ptr, ArenaStringPtr* s,
-                                            Arena* arena);
+                                            SerialArena* arena);
 
   [[nodiscard]] const char* ReadCord(const char* ptr, int size,
                                      ::absl::Cord* cord) {
@@ -703,8 +704,11 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   };
 
   template <typename... T>
-  ParseContext(int depth, bool aliasing, const char** start, T&&... args)
-      : EpsCopyInputStream(aliasing), depth_(depth) {
+  ParseContext(int depth, bool aliasing, Arena* arena, const char** start,
+               T&&... args)
+      : EpsCopyInputStream(aliasing),
+        depth_(depth),
+        arena_(GetSerialArena(arena)) {
     *start = InitFrom(std::forward<T>(args)...);
   }
 
@@ -722,7 +726,8 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
                const char** start, T&&... args)
       : EpsCopyInputStream(false),
         depth_(ctx.depth_ - kDepthReduction),
-        data_(ctx.data_)
+        data_(ctx.data_),
+        arena_(ctx.arena_)
   {
     if (kDepthReduction != 0 && depth_ < 0) {
       // Fail right away.
@@ -767,6 +772,27 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD Data& data() { return data_; }
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD const Data& data() const { return data_; }
 
+  // The arena of the message being parsed with this context, cached so the
+  // parser doesn't have to load it from the message.
+  [[nodiscard]] SerialArena* arena() const { return arena_; }
+
+  // RAII object that temporarily sets the arena to `nullptr` and restores the
+  // cached arena in the ParseContext on destruction.
+  class ScopedHeapSubmessageUnderArenaParent {
+   public:
+    explicit ScopedHeapSubmessageUnderArenaParent(ParseContext* ctx)
+        : ctx_(ctx), saved_(ctx->ExchangeArena(/*arena=*/nullptr)) {}
+    ScopedHeapSubmessageUnderArenaParent(
+        const ScopedHeapSubmessageUnderArenaParent&) = delete;
+    ScopedHeapSubmessageUnderArenaParent& operator=(
+        const ScopedHeapSubmessageUnderArenaParent&) = delete;
+    ~ScopedHeapSubmessageUnderArenaParent() { ctx_->ExchangeArena(saved_); }
+
+   private:
+    ParseContext* ctx_;
+    SerialArena* saved_;
+  };
+
   PROTOBUF_FUTURE_ADD_EARLY_NODISCARD const char* ParseMessage(MessageLite* msg,
                                                                const char* ptr);
 
@@ -790,7 +816,7 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
     group_depth_++;
     auto old_depth = depth_;
     auto old_group_depth = group_depth_;
-    ptr = msg->_InternalParse(ptr, this);
+    ptr = InternalParseMessage(msg, ptr);
     if (ptr != nullptr) {
       ABSL_DCHECK_EQ(old_depth, depth_);
       ABSL_DCHECK_EQ(old_group_depth, group_depth_);
@@ -801,7 +827,33 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
     return ptr;
   }
 
+  // Checks whether the given message is on the same arena as the parse context.
+  // It is possible for a submessage of an arena-allocated message to be
+  // heap-allocated. The AddAllocated* APIs allow adopting heap-allocated
+  // messages into an arena, registering a cleanup action for them.
+  PROTOBUF_ALWAYS_INLINE bool HasSameArena(const MessageLite& msg) {
+    ABSL_DCHECK(!HasArena(msg) || GetSerialArena(msg.GetArena()) == arena_);
+    return (msg.GetArena() == nullptr) == (arena_ == nullptr);
+  }
+
+  PROTOBUF_ALWAYS_INLINE const char* InternalParseMessage(MessageLite* msg,
+                                                          const char* ptr) {
+    if (ABSL_PREDICT_FALSE(!HasSameArena(*msg))) {
+      return ParseHeapSubmessage(msg, ptr);
+    } else {
+      return msg->_InternalParse(ptr, this);
+    }
+  }
+
  private:
+  SerialArena* ExchangeArena(SerialArena* arena) {
+    return std::exchange(arena_, arena);
+  }
+
+  // Parses a heap-allocated submessage of a message which is on an arena.
+  PROTOBUF_NOINLINE const char* ParseHeapSubmessage(MessageLite* msg,
+                                                    const char* ptr);
+
   // Out-of-line routine to save space in ParseContext::ParseMessage<T>
   //   LimitToken old;
   //   ptr = ReadSizeAndPushLimitAndDepth(ptr, &old)
@@ -829,6 +881,7 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
   // is intentionally used to avoid decrementing INT_MIN, which is UB.
   int group_depth_ = std::numeric_limits<int16_t>::min();
   Data data_;
+  SerialArena* arena_;
 };
 
 // Sink types for AdvancePtrMaybeFlush.

@@ -2866,7 +2866,7 @@ TEST(GeneratedMapFieldTest, Proto2UnknownEnum) {
   to.Clear();
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             false, &ptr, data);
+                             false, to.GetArena(), &ptr, data);
   ptr = WireFormat::_InternalParse(&to, ptr, &ctx);
   ASSERT_TRUE(ptr);
   ASSERT_TRUE(ctx.EndedAtLimit());
@@ -2894,7 +2894,7 @@ TEST(GeneratedMapFieldTest, Proto2UnknownEnumThrowsAwayUnknownData) {
   to.Clear();
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             false, &ptr, data);
+                             false, to.GetArena(), &ptr, data);
   ptr = WireFormat::_InternalParse(&to, ptr, &ctx);
   ASSERT_TRUE(ptr);
   ASSERT_TRUE(ctx.EndedAtLimit());

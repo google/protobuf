@@ -9070,7 +9070,7 @@ bool ParseNoReflection(absl::string_view from, google::protobuf::MessageLite& to
   to.Clear();
   const char* ptr;
   internal::ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(),
-                             false, &ptr, from);
+                             false, to.GetArena(), &ptr, from);
   ptr = to._InternalParse(ptr, &ctx);
   if (ptr == nullptr || !ctx.EndedAtLimit()) return false;
   return to.IsInitializedWithErrors();

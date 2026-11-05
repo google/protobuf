@@ -24,6 +24,7 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
+#include "google/protobuf/serial_arena.h"
 
 
 // clang-format off
@@ -46,12 +47,12 @@ class InlinedStringField::ScopedCheckInvariants {
 
 std::string* InlinedStringField::Mutable(const MessageLite& parent) {
   ScopedCheckInvariants invariants(this);
-  Arena* arena = parent.GetArena();
+  SerialArena* arena = GetSerialArena(parent.GetArena());
   if (arena == nullptr) {
     return UnsafeMutablePointer();
   }
   if (!IsDonated()) {
-    MaybeRegisterForDestruction(arena, get_mutable());
+    RegisterForDestruction(arena, get_mutable());
     return UnsafeMutablePointer();
   }
   return MutableSlow(arena);
@@ -95,9 +96,9 @@ size_t InlinedStringField::Capacity() const {
   return str_.capacity();
 }
 
-void InlinedStringField::RegisterForDestruction(Arena* arena,
+void InlinedStringField::RegisterForDestruction(SerialArena* arena,
                                                 std::string* str) {
-  arena->OwnCustomDestructor(str, DestroyArenaString);
+  arena->AddCleanup(str, DestroyArenaString);
 }
 
 void InlinedStringField::DestroyArenaString(void* p) {
@@ -109,7 +110,7 @@ void InlinedStringField::DestroyArenaString(void* p) {
   ::new (p) std::string();
 }
 
-std::string* InlinedStringField::MutableSlow(::google::protobuf::Arena* arena) {
+std::string* InlinedStringField::MutableSlow(SerialArena* arena) {
   if (arena != nullptr) {
     RegisterForDestruction(arena, get_mutable());
   }
@@ -120,7 +121,7 @@ void InlinedStringField::SetAllocated(std::string* value,
                                       const MessageLite& parent) {
   Arena* arena = parent.GetArena();
   if (arena != nullptr && value != nullptr) {
-    MaybeRegisterForDestruction(arena, get_mutable());
+    MaybeRegisterForDestruction(GetSerialArena(arena), get_mutable());
   }
   SetAllocatedNoArena(value);
 }
@@ -128,7 +129,7 @@ void InlinedStringField::SetAllocated(std::string* value,
 void InlinedStringField::Set(std::string&& value, const MessageLite& parent) {
   Arena* arena = parent.GetArena();
   if (arena != nullptr) {
-    MaybeRegisterForDestruction(arena, get_mutable());
+    MaybeRegisterForDestruction(GetSerialArena(arena), get_mutable());
   }
   SetNoArena(std::move(value));
 }
@@ -153,7 +154,7 @@ void InlinedStringField::ClearToDefault(const LazyString& default_value,
                                         const MessageLite& parent, bool) {
   Arena* arena = parent.GetArena();
   if (arena != nullptr) {
-    MaybeRegisterForDestruction(arena, get_mutable());
+    MaybeRegisterForDestruction(GetSerialArena(arena), get_mutable());
   }
   get_mutable()->assign(default_value.get());
 }

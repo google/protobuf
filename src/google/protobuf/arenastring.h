@@ -22,6 +22,7 @@
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/port.h"
+#include "google/protobuf/serial_arena.h"
 
 // must be last:
 #include "google/protobuf/port_def.inc"
@@ -403,12 +404,13 @@ class PROTOBUF_EXPORT ArenaStringPtr {
 
  private:
   template <typename... Args>
-  std::string* NewString(Arena* arena, Args&&... args) {
+  std::string* NewString(SerialArena* arena, Args&&... args) {
     if (arena == nullptr) {
       auto* s = new std::string(std::forward<Args>(args)...);
       return tagged_ptr_.SetAllocated(s);
     } else {
-      auto* s = Arena::Create<std::string>(arena, std::forward<Args>(args)...);
+      void* storage = arena->AllocateFromStringBlock();
+      auto* s = new (storage) std::string(std::forward<Args>(args)...);
       return tagged_ptr_.SetMutableArena(s);
     }
   }

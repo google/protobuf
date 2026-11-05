@@ -469,12 +469,18 @@ const char* ParseContext::ReadSizeAndPushLimitAndDepth(const char* ptr,
   return ReadSizeAndPushLimitAndDepthInlined(ptr, old_limit);
 }
 
+const char* ParseContext::ParseHeapSubmessage(MessageLite* msg,
+                                              const char* ptr) {
+  ScopedHeapSubmessageUnderArenaParent scoped_arena(this);
+  return msg->_InternalParse(ptr, this);
+}
+
 const char* ParseContext::ParseMessage(MessageLite* msg, const char* ptr) {
   LimitToken old;
   ptr = ReadSizeAndPushLimitAndDepth(ptr, &old);
   if (ptr == nullptr) return ptr;
   auto old_depth = depth_;
-  ptr = msg->_InternalParse(ptr, this);
+  ptr = InternalParseMessage(msg, ptr);
   if (ptr != nullptr) ABSL_DCHECK_EQ(old_depth, depth_);
   depth_++;
   if (!PopLimit(std::move(old))) return nullptr;
