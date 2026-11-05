@@ -51,8 +51,43 @@ popd
 # Put the Bazel-built protoc at the beginning of $PATH
 PATH=$(dirname $(rlocation com_google_protobuf/protoc)):$PATH
 
-export RUSTFLAGS="-Dwarnings"
-
 cd "$WORKSPACE_ROOT"
+
+# Install the active Rust toolchain declared by RUSTUP_TOOLCHAIN (e.g. `stable`
+# on the Linux `latest` CI leg) or by workspace `rust-toolchain.toml` (`1.90.0`
+# on Linux `floor`, Windows CI, and release builds).
+RUSTUP_MAX_RETRIES=10 rustup toolchain install --profile minimal --no-self-update
+rustc -vV
+cargo -V
+
+if [[ "${CARGO_TEST_ALLOW_WARNINGS:-}" == "1" ]]; then
+  RUSTFLAGS=""
+else
+  RUSTFLAGS="-Dwarnings"
+fi
+
+# On Linux with Clang (`test/linux/composite`), `google_protobuf/build.rs`
+# compiles `upb` C sources with `-flto=thin`. Route linking through the
+# container's `clang` and `lld` rather than Rust's bundled `rust-lld` so Clang
+# and Rust LLVM major versions are decoupled (leaving Windows MSVC untouched).
+if [[ "$(uname -s)" == "Linux" && "${CC:-}" == clang* ]]; then
+  HOST_TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
+  TRIPLE_UPPER="$(echo "${HOST_TRIPLE}" | tr '[:lower:]-' '[:upper:]_')"
+  export "CARGO_TARGET_${TRIPLE_UPPER}_LINKER=${CC}"
+  RUSTFLAGS="${RUSTFLAGS:+${RUSTFLAGS} }-Clink-arg=-fuse-ld=lld"
+fi
+export RUSTFLAGS
+
 CARGO_HOME=$CARGO_HOME cargo test
 CARGO_HOME=$CARGO_HOME cargo publish --dry-run --workspace
+
+if [[ -n "${CARGO_TEST_MSRV:-}" ]]; then
+  RUSTUP_MAX_RETRIES=10 rustup toolchain install "${CARGO_TEST_MSRV}" --profile minimal --no-self-update
+  RUSTUP_TOOLCHAIN="${CARGO_TEST_MSRV}" rustc -vV
+  MSRV_RUSTFLAGS=""
+  if [[ "$(uname -s)" == "Linux" && "${CC:-}" == clang* ]]; then
+    MSRV_RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
+  fi
+  CARGO_HOME=$CARGO_HOME RUSTUP_TOOLCHAIN="${CARGO_TEST_MSRV}" RUSTFLAGS="${MSRV_RUSTFLAGS}" \
+    cargo check --workspace --lib --bins
+fi

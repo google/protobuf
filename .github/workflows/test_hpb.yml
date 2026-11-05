@@ -17,15 +17,25 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        # Runs on both profiles of the composite Linux image (`latest`: Clang 23 /
+        # Bazel 9.2.0, `floor`: Clang 14 / Bazel 8.7.0).
+        profile: [latest, floor]
         config:
           - { name: Optimized, flags: --config=opt }
 
         include:
           - targets: "//hpb/... //hpb_generator/..."
-          - image: "us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8"
           - bazel_cmd: "test"
+          # Image and Bazel version per profile (explicit USE_BAZEL_VERSION
+          # overrides the repo-root `.bazeliskrc`), pinned by digest.
+          - profile: latest
+            bazel: "9.2.0"
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:3b4ba7714b69dfc78cb6cd1ec9c71c1a830e78248abe40a1f5c11314f6667248"
+          - profile: floor
+            bazel: "8.7.0"
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:e22a3b313e1ab90785c18cfd9c948d547bad1501b72a2dd68c14777cce3d30c8"
 
-    name: Linux ${{ matrix.config.name }}
+    name: Linux ${{ matrix.config.name }}${{ matrix.profile == 'floor' && ' (floor)' || '' }}
     runs-on: ubuntu-22-4core
     steps:
       - name: Checkout pending changes
@@ -38,6 +48,7 @@ jobs:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: hpb_linux
-          bazel: >-
-            ${{ matrix.bazel_cmd }}
-            ${{ matrix.targets }} ${{ matrix.config.flags }}
+          bash: >-
+            USE_BAZEL_VERSION=${{ matrix.bazel }}
+            bazel ${{ matrix.bazel_cmd }}
+            ${{ matrix.targets }} ${{ matrix.config.flags }} $BAZEL_FLAGS

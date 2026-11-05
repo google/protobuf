@@ -3,6 +3,12 @@ name: Rust Tests
 on:
   workflow_call:
     inputs:
+      continuous-run:
+        required: false
+        default: ""
+        description: "Boolean string denoting whether this run is continuous --
+          empty string for presubmit, non-empty string for continuous."
+        type: string
       safe-checkout:
         required: true
         description: "The SHA key for the commit we want to run over"
@@ -17,25 +23,31 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        # Runs on both profiles of the composite Linux image (`latest`: Clang 23 /
+        # Bazel 9.2.0, `floor`: Clang 14 / Bazel 8.7.0). Bazel targets use
+        # hermetic `@rules_rust` toolchains; the standalone `Cargo` row installs
+        # live Rust `stable` on `latest` and `rust-toolchain.toml`'s `1.90.0` plus
+        # a `1.82.0` MSRV `cargo check` pass on `floor` via `rustup`.
+        profile: [latest, floor]
         config:
           - { name: "Bzlmod and Workspace", flags: --enable_bzlmod --enable_workspace }
           - { name: Optimized, flags: --config=opt }
           - { name: ASAN, flags: --config=asan }
+          - { name: Cargo, bazel_cmd: run, targets: "//rust/release_crates:cargo_test" }
 
         include:
           - targets: "//rust/... //src/google/protobuf/compiler/rust/..."
-          - image: "us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8"
           - bazel_cmd: "test"
+          # Image and Bazel version per profile (explicit USE_BAZEL_VERSION
+          # overrides the repo-root `.bazeliskrc`), pinned by digest.
+          - profile: latest
+            bazel: "9.2.0"
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:3b4ba7714b69dfc78cb6cd1ec9c71c1a830e78248abe40a1f5c11314f6667248"
+          - profile: floor
+            bazel: "8.7.0"
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:e22a3b313e1ab90785c18cfd9c948d547bad1501b72a2dd68c14777cce3d30c8"
 
-          # Override cases with custom images
-          - config: { name: Cargo }
-            # We need Rust 1.90 so that we can use the new workspace publishing
-            # feature.
-            image: "us-docker.pkg.dev/protobuf-build/containers/release/linux/rust:9.0.0-1.90.0-98863a45066747115144a8a8fb4818189d1e0761"
-            bazel_cmd: "run"
-            targets: "//rust/release_crates:cargo_test"
-
-    name: Linux ${{ matrix.config.name }}
+    name: Linux ${{ matrix.config.name }}${{ matrix.profile == 'floor' && ' (floor)' || '' }}
     runs-on: ubuntu-22-4core
     steps:
       - name: Checkout pending changes
@@ -48,9 +60,10 @@ jobs:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: rust_linux
-          bazel: >-
-            ${{ matrix.bazel_cmd }} --crosstool_top=//toolchain:clang_suite --@rules_rust//rust/settings:experimental_use_cc_common_link=True
-            ${{ matrix.targets }} ${{ matrix.config.flags }}
+          bash: >-
+            ${{ matrix.config.name == 'Cargo' && (matrix.profile == 'latest' && format('RUSTUP_TOOLCHAIN=stable CARGO_TEST_ALLOW_WARNINGS={0} ', inputs.continuous-run && '0' || '1') || 'CARGO_TEST_MSRV=1.82.0 ') || '' }}USE_BAZEL_VERSION=${{ matrix.bazel }}
+            bazel ${{ matrix.config.bazel_cmd || matrix.bazel_cmd }}
+            ${{ matrix.config.targets || matrix.targets }} ${{ matrix.config.flags }} $BAZEL_FLAGS
 
   windows:
     strategy:
@@ -65,11 +78,6 @@ jobs:
       - name: Windows startup flags
         shell: bash
         run: echo "startup --output_user_root=C:/ --windows_enable_symlinks" >> .bazelrc
-      - name: Install Rust
-        shell: bash
-        # We need Rust 1.90 so that we can use the new workspace publishing
-        # feature.
-        run: rustup default 1.90
       - name: Run tests
         uses: protocolbuffers/protobuf-ci/bazel@v7
         with:

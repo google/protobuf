@@ -102,7 +102,20 @@ jobs:
   bazel-tests-ubuntu:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
-    name: Bazel Tests ubuntu
+      matrix:
+        # Runs on both profiles of the composite Linux image (`latest`: Bazel
+        # 9.2.0, `floor`: Bazel 8.7.0).
+        profile: [latest, floor]
+        include:
+          # Image and Bazel version per profile (explicit USE_BAZEL_VERSION
+          # overrides the repo-root `.bazeliskrc`), pinned by digest.
+          - profile: latest
+            bazel: "9.2.0"
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:3b4ba7714b69dfc78cb6cd1ec9c71c1a830e78248abe40a1f5c11314f6667248
+          - profile: floor
+            bazel: "8.7.0"
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:e22a3b313e1ab90785c18cfd9c948d547bad1501b72a2dd68c14777cce3d30c8
+    name: Bazel Tests ubuntu${{ matrix.profile == 'floor' && ' (floor)' || '' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout pending changes
@@ -112,10 +125,10 @@ jobs:
       - name: Run tests
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8
+          image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: "bazel-tests"
-          bazel: test //bazel/...
+          bash: USE_BAZEL_VERSION=${{ matrix.bazel }} bazel test //bazel/... $BAZEL_FLAGS
 
   bazel-tests-windows-macos:
     strategy:

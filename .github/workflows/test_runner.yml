@@ -213,6 +213,7 @@ jobs:
     needs: [set-vars]
     uses: ./.github/workflows/test_rust.yml
     with:
+      continuous-run: ${{ needs.set-vars.outputs.continuous-run }}
       safe-checkout: ${{ needs.set-vars.outputs.checkout-sha }}
     secrets: inherit
 
