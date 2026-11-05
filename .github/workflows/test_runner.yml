@@ -12,8 +12,8 @@ name: Tests
 on:
   # continuous
   schedule:
-    # Run every hour
-    - cron: "0 * * * *"
+    # Run every 2 hours
+    - cron: "0 */2 * * *"
 
   # postsubmit
   push:
