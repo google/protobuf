@@ -1778,6 +1778,30 @@ class MessageTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       m.repeated_int32.extend([5, 6, 'hi', 7])
 
+  def testExtendBytesWithMemoryViewReleasedDuringIteration(
+      self, message_module
+  ):
+    m = message_module.TestAllTypes()
+    data = bytearray(b'abc')
+
+    def values():
+      view = memoryview(data)
+      yield view
+      # With no other exports left, the bytearray can now be resized, which
+      # reallocates (and frees) the storage that `view` pointed to.
+      view.release()
+      data.extend(b'x' * 100000)
+      yield b'def'
+
+    if api_implementation.Type() == 'upb':
+      # upb converts the elements only after iterating, when the view has
+      # already been released.
+      with self.assertRaises(ValueError):
+        m.repeated_bytes.extend(values())
+    else:
+      m.repeated_bytes.extend(values())
+      self.assertSequenceEqual([b'abc', b'def'], m.repeated_bytes)
+
   def testExtendFloatWithPythonList(self, message_module):
     """Test extending repeated float fields with python lists."""
     m = message_module.TestAllTypes()

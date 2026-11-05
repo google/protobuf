@@ -25,6 +25,7 @@
 #include "google/protobuf/pyext/free_threading/guarded.h"
 #include "google/protobuf/pyext/lazy_unique_ptr.h"
 #include "google/protobuf/pyext/message_tree.h"
+#include "google/protobuf/pyext/scoped_pyobject_ptr.h"
 #include "google/protobuf/pyext/weak_value_map.h"
 
 namespace google {
@@ -424,8 +425,15 @@ bool CheckAndGetBool(PyObject* arg, bool* value);
 
 // Validates arg for a string or bytes field, and returns the string view if
 // valid. Returns std::nullopt and sets a Python exception on failure.
+//
+// For `str` and `bytes`, which are immutable, the result points into `arg`. A
+// `memoryview` can be released (and its exporter then resized or freed) at any
+// time, so its contents are copied into a new `bytes` object that is stored in
+// `*copy`, and the result points into that instead. The result is valid as long
+// as both `arg` and `*copy` are alive.
 std::optional<absl::string_view> CheckString(PyObject* arg,
-                                             const FieldDescriptor* descriptor);
+                                             const FieldDescriptor* descriptor,
+                                             ScopedPyObjectPtr* copy);
 bool CheckAndSetString(PyObject* arg, Message* message,
                        const FieldDescriptor* descriptor,
                        const Reflection* reflection, bool append, int index);

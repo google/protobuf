@@ -422,12 +422,14 @@ absl::Span<const T> SourceSpanFromPyIterable(
         return absl::MakeConstSpan(values);
       }
     } else if constexpr (std::is_same_v<T, absl::string_view>) {
+      ScopedPyObjectPtr copy;
       std::optional<absl::string_view> string_value =
-          CheckString(arg, field_descriptor);
+          CheckString(arg, field_descriptor, &copy);
       if (!string_value.has_value()) {
         return absl::MakeConstSpan(values);
       }
-      keep_objects.emplace_back(next.release());
+      keep_objects.emplace_back(copy != nullptr ? copy.release()
+                                                : next.release());
       values.push_back(*string_value);
     } else {
       static_assert(sizeof(T) == -1,

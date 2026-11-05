@@ -92,7 +92,10 @@ Message* MapContainer::GetMutableMessage() {
   return cmessage::AssureWritable(parent);
 }
 
-static bool PythonToMapKey(MapContainer* self, PyObject* obj, MapKey* key) {
+// For string keys, `key` may point into `*key_copy` (see CheckString()), so
+// `*key_copy` must outlive `key`.
+static bool PythonToMapKey(MapContainer* self, PyObject* obj, MapKey* key,
+                           ScopedPyObjectPtr* key_copy) {
   const FieldDescriptor* field_descriptor =
       self->parent_field_descriptor->message_type()->map_key();
   switch (field_descriptor->cpp_type()) {
@@ -123,7 +126,7 @@ static bool PythonToMapKey(MapContainer* self, PyObject* obj, MapKey* key) {
     }
     case FieldDescriptor::CPPTYPE_STRING: {
       std::optional<absl::string_view> key_view =
-          CheckString(obj, field_descriptor);
+          CheckString(obj, field_descriptor, key_copy);
       if (!key_view.has_value()) {
         return false;
       }
@@ -237,8 +240,9 @@ static bool PythonToMapValueRef(MapContainer* self, PyObject* obj,
       return true;
     }
     case FieldDescriptor::CPPTYPE_STRING: {
+      ScopedPyObjectPtr copy;
       std::optional<absl::string_view> value =
-          CheckString(obj, field_descriptor);
+          CheckString(obj, field_descriptor, &copy);
       if (value.has_value()) {
         value_ref.SetStringValue(*value);
       }
@@ -403,8 +407,9 @@ int MapReflectionFriend::Contains(PyObject* _self, PyObject* key) {
   const Message* message = self->parent->message;
   const Reflection* reflection = message->GetReflection();
   MapKey map_key;
+  ScopedPyObjectPtr key_copy;  // Must outlive map_key.
 
-  if (!PythonToMapKey(self, key, &map_key)) {
+  if (!PythonToMapKey(self, key, &map_key, &key_copy)) {
     return -1;
   }
 
@@ -446,8 +451,9 @@ PyObject* MapReflectionFriend::ScalarMapGetItem(PyObject* _self,
   MapContainer* self = GetMap(_self);
 
   MapKey map_key;
+  ScopedPyObjectPtr key_copy;  // Must outlive map_key.
 
-  if (!PythonToMapKey(self, key, &map_key)) {
+  if (!PythonToMapKey(self, key, &map_key, &key_copy)) {
     return nullptr;
   }
   // 1. Read-only lookup without mutation if key exists.
@@ -480,8 +486,9 @@ int MapReflectionFriend::ScalarMapSetItem(PyObject* _self, PyObject* key,
   if (message == nullptr) return -1;
   const Reflection* reflection = message->GetReflection();
   MapKey map_key;
+  ScopedPyObjectPtr key_copy;  // Must outlive map_key.
 
-  if (!PythonToMapKey(self, key, &map_key)) {
+  if (!PythonToMapKey(self, key, &map_key, &key_copy)) {
     return -1;
   }
 
@@ -702,10 +709,11 @@ int MapReflectionFriend::MessageMapSetItem(PyObject* _self, PyObject* key,
   if (message == nullptr) return -1;
   const Reflection* reflection = message->GetReflection();
   MapKey map_key;
+  ScopedPyObjectPtr key_copy;  // Must outlive map_key.
 
   self->version++;
 
-  if (!PythonToMapKey(self, key, &map_key)) {
+  if (!PythonToMapKey(self, key, &map_key, &key_copy)) {
     return -1;
   }
 
@@ -741,8 +749,9 @@ PyObject* MapReflectionFriend::MessageMapGetItem(PyObject* _self,
   MessageMapContainer* self = GetMessageMap(_self);
 
   MapKey map_key;
+  ScopedPyObjectPtr key_copy;  // Must outlive map_key.
 
-  if (!PythonToMapKey(self, key, &map_key)) {
+  if (!PythonToMapKey(self, key, &map_key, &key_copy)) {
     return nullptr;
   }
 
