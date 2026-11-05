@@ -7785,7 +7785,7 @@ int upb_JsonDecodeDetectingNonconformance(const char* buf, size_t size,
 typedef struct {
   char *buf, *ptr, *end;
   size_t overflow;
-  int indent_depth;
+  int depth;
   int options;
   const upb_DefPool* ext_pool;
   jmp_buf err;
@@ -7817,6 +7817,12 @@ UPB_NORETURN static void jsonenc_errf(jsonenc* e, const char* fmt, ...) {
   upb_Status_VSetErrorFormat(e->status, fmt, argp);
   va_end(argp);
   UPB_LONGJMP(e->err, 1);
+}
+
+static void jsonenc_checkdepth(jsonenc* e) {
+  if (--e->depth < 0) {
+    jsonenc_err(e, "Max depth exceeded");
+  }
 }
 
 static upb_Arena* jsonenc_arena(jsonenc* e) {
@@ -8144,6 +8150,8 @@ badurl:
 
 static void jsonenc_any(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
+
   const upb_FieldDef* type_url_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_FieldDef* value_f = upb_MessageDef_FindFieldByNumber(m, 2);
   upb_StringView type_url = upb_Message_GetFieldByDef(msg, type_url_f).str_val;
@@ -8177,6 +8185,7 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
@@ -8236,6 +8245,7 @@ static void jsonenc_fieldmask(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
                            const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
 
   const upb_FieldDef* fields_f = upb_MessageDef_FindFieldByNumber(m, 1);
@@ -8258,10 +8268,12 @@ static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
                               const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   const upb_FieldDef* values_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_MessageDef* values_m = upb_FieldDef_MessageSubDef(values_f);
   const upb_Array* values = upb_Message_GetFieldByDef(msg, values_f).array_val;
@@ -8281,6 +8293,7 @@ static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "]");
+  e->depth++;
 }
 
 static void jsonenc_value(jsonenc* e, const upb_Message* msg,
@@ -8525,9 +8538,11 @@ static void jsonenc_msgfields(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_msg(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
   jsonenc_msgfields(e, msg, m, true);
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static size_t jsonenc_nullz(jsonenc* e, size_t size) {
@@ -8545,7 +8560,10 @@ static size_t upb_JsonEncoder_Encode(jsonenc* const e,
                                      const upb_Message* const msg,
                                      const upb_MessageDef* const m,
                                      const size_t size) {
-  if (UPB_SETJMP(e->err) != 0) return -1;
+  if (UPB_SETJMP(e->err) != 0) {
+    if (e->arena) upb_Arena_Free(e->arena);
+    return -1;
+  }
 
   jsonenc_msgfield(e, msg, m);
   if (e->arena) upb_Arena_Free(e->arena);
@@ -8561,6 +8579,7 @@ size_t upb_JsonEncode(const upb_Message* msg, const upb_MessageDef* m,
   e.ptr = buf;
   e.end = UPB_PTRADD(buf, size);
   e.overflow = 0;
+  e.depth = upb_JsonEncodeOptions_GetEffectiveMaxDepth(options);
   e.options = options;
   e.ext_pool = ext_pool;
   e.status = status;
