@@ -289,7 +289,13 @@ std::vector<std::string>& RecordedCustomPrintedTypes() {
   return *v;
 }
 
-#if __cplusplus >= 202002L
+std::vector<std::string>& RecordedTypeBeforeMultipleValues() {
+  static auto* v = new std::vector<std::string>();
+  return *v;
+}
+
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L) || \
+    (!defined(_MSVC_LANG) && __cplusplus >= 202002L)
 std::vector<std::string>& RecordedExplicitTypeNames() {
   static auto* v = new std::vector<std::string>();
   return *v;
@@ -299,7 +305,7 @@ std::vector<std::string>& RecordedPrefixedTypes() {
   static auto* v = new std::vector<std::string>();
   return *v;
 }
-#endif  // __cplusplus >= 202002L
+#endif  // C++20+
 
 std::vector<std::string>& RecordedTupleTypes() {
   static auto* v = new std::vector<std::string>();
@@ -534,7 +540,8 @@ PB_TEST(ProtobufStandaloneTest, CustomTypePrinter) {
       ::testing::UnitTest::GetInstance()->current_test_info()->name()));
 }
 
-#if __cplusplus >= 202002L
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L) || \
+    (!defined(_MSVC_LANG) && __cplusplus >= 202002L)
 PB_TEST(ProtobufStandaloneTest, ExplicitTypeNames) {
   using T1 =
       PB_TEST_CHOOSE_TYPE((std::array<int, 5>, int64_t), {"arr5", "i64"});
@@ -562,7 +569,16 @@ PB_TEST(ProtobufStandaloneTest, TypeNamePrefix) {
       sizeof(T4), ":", *GetTypeName<T5>(), ":",
       ::testing::UnitTest::GetInstance()->current_test_info()->name()));
 }
-#endif  // __cplusplus >= 202002L
+#endif  // C++20+
+
+PB_TEST(ProtobufStandaloneTest, TypeBeforeMultipleValues) {
+  using T = PB_TEST_CHOOSE_TYPE((uint32_t, uint64_t));
+  T block_size = PB_TEST_CHOOSE_VALUE((T{1}, T{2}));
+  bool existing = PB_TEST_CHOOSE_VALUE((false, true), "existing");
+  RecordedTypeBeforeMultipleValues().push_back(absl::StrCat(
+      *GetTypeName<T>(), ":", block_size, ":", existing, ":",
+      ::testing::UnitTest::GetInstance()->current_test_info()->name()));
+}
 
 PB_TEST(ProtobufStandaloneTest, ConditionalChooseFromType) {
   using T1 = PB_TEST_CHOOSE_TYPE((int32_t, double, char));
@@ -761,11 +777,11 @@ TEST(ProtobufDeathTest, EmptyChooseValueDimensionTerminates) {
   EXPECT_DEATH(
       PartialTestRegistry::Get().AddValueDimension<ProtobufTestFixture>(
           static_cast<CounterT>(999999), nullptr,
-          ChooseValueImpl(std::vector<int>{}), {"std::vector<int>{}"}),
+          ChooseValueImpl(std::vector<int>{}), {"std::vector<int>{}", {}}),
       "PB_TEST_CHOOSE_VALUE requires at least one element");
   EXPECT_DEATH(
       PartialTestRegistry::Get().AddValueDimension<ProtobufTestFixture>(
-          static_cast<CounterT>(999999), nullptr, 0, {"()"}),
+          static_cast<CounterT>(999999), nullptr, 0, {"()", {}}),
       "PB_TEST_CHOOSE_VALUE requires at least one element");
 }
 
@@ -1082,7 +1098,6 @@ class VerificationEnvironment : public ::testing::Environment {
         ElementsAre("SanitizesTypeNames/int32_t", "SanitizesTypeNames/uint32_t",
                     "SanitizesTypeNames/int32_tPtr",
                     "SanitizesTypeNames/ForeignEnum"));
-#if __cplusplus >= 202002L
     EXPECT_THAT(RecordedUnprintableTypeTestNames(),
                 ElementsAre("UnprintableTypesUseIndex/array_int_5/0",
                             "UnprintableTypesUseIndex/array_int_5/int32_t",
@@ -1090,21 +1105,13 @@ class VerificationEnvironment : public ::testing::Environment {
                             "UnprintableTypesUseIndex/int32_t/int32_t",
                             "UnprintableTypesUseIndex/array_int_10/0",
                             "UnprintableTypesUseIndex/array_int_10/int32_t"));
-#else
-    EXPECT_THAT(RecordedUnprintableTypeTestNames(),
-                ElementsAre("UnprintableTypesUseIndex/0/0",
-                            "UnprintableTypesUseIndex/0/int32_t",
-                            "UnprintableTypesUseIndex/int32_t/0",
-                            "UnprintableTypesUseIndex/int32_t/int32_t",
-                            "UnprintableTypesUseIndex/2/0",
-                            "UnprintableTypesUseIndex/2/int32_t"));
-#endif  // __cplusplus >= 202002L
     EXPECT_THAT(RecordedCustomPrintedTypes(),
                 ElementsAre("20:1:CustomTypePrinter/idx0_size20/idx0_size1",
                             "20:2:CustomTypePrinter/idx0_size20/idx1_size2",
                             "8:1:CustomTypePrinter/idx1_size8/idx0_size1",
                             "8:2:CustomTypePrinter/idx1_size8/idx1_size2"));
-#if __cplusplus >= 202002L
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L) || \
+    (!defined(_MSVC_LANG) && __cplusplus >= 202002L)
     EXPECT_THAT(
         RecordedExplicitTypeNames(),
         ElementsAre("20:1:4:4:ExplicitTypeNames/arr5/tup_i8/single_i32/u32",
@@ -1126,7 +1133,18 @@ class VerificationEnvironment : public ::testing::Environment {
             "int64_t:bool:20:2:uint32_t:"
             "TypeNamePrefix/first_int64_t/second_bool/third_idx0_size20/"
             "fourth_idx0_size2/fifth_uint32_t"));
-#endif  // __cplusplus >= 202002L
+#endif  // C++20+
+    EXPECT_THAT(
+        RecordedTypeBeforeMultipleValues(),
+        ElementsAre(
+            "uint32_t:1:0:TypeBeforeMultipleValues/uint32_t/1/no_existing",
+            "uint32_t:2:0:TypeBeforeMultipleValues/uint32_t/2/no_existing",
+            "uint32_t:1:1:TypeBeforeMultipleValues/uint32_t/1/existing",
+            "uint32_t:2:1:TypeBeforeMultipleValues/uint32_t/2/existing",
+            "uint64_t:1:0:TypeBeforeMultipleValues/uint64_t/1/no_existing",
+            "uint64_t:2:0:TypeBeforeMultipleValues/uint64_t/2/no_existing",
+            "uint64_t:1:1:TypeBeforeMultipleValues/uint64_t/1/existing",
+            "uint64_t:2:1:TypeBeforeMultipleValues/uint64_t/2/existing"));
     EXPECT_THAT(RecordedConditionalTypes(),
                 ElementsAre("int32_t:bool", "int32_t:float", "double:10",
                             "double:20", "char:int16_t", "char:uint16_t"));
@@ -1334,26 +1352,18 @@ TEST(ProtobufTestRegistryTest, RegistersExpectedTestsWithoutDummySuite) {
       "SanitizesTypeNames/uint32_t",
       "SanitizesTypeNames/int32_tPtr",
       "SanitizesTypeNames/ForeignEnum",
-#if __cplusplus >= 202002L
       "UnprintableTypesUseIndex/array_int_5/0",
       "UnprintableTypesUseIndex/array_int_5/int32_t",
       "UnprintableTypesUseIndex/int32_t/0",
       "UnprintableTypesUseIndex/int32_t/int32_t",
       "UnprintableTypesUseIndex/array_int_10/0",
       "UnprintableTypesUseIndex/array_int_10/int32_t",
-#else
-      "UnprintableTypesUseIndex/0/0",
-      "UnprintableTypesUseIndex/0/int32_t",
-      "UnprintableTypesUseIndex/int32_t/0",
-      "UnprintableTypesUseIndex/int32_t/int32_t",
-      "UnprintableTypesUseIndex/2/0",
-      "UnprintableTypesUseIndex/2/int32_t",
-#endif  // __cplusplus >= 202002L
       "CustomTypePrinter/idx0_size20/idx0_size1",
       "CustomTypePrinter/idx0_size20/idx1_size2",
       "CustomTypePrinter/idx1_size8/idx0_size1",
       "CustomTypePrinter/idx1_size8/idx1_size2",
-#if __cplusplus >= 202002L
+#if (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L) || \
+    (!defined(_MSVC_LANG) && __cplusplus >= 202002L)
       "ExplicitTypeNames/arr5/tup_i8/single_i32/u32",
       "ExplicitTypeNames/arr5/tup_i16/single_i32/u32",
       "ExplicitTypeNames/i64/tup_i8/single_i32/u32",
@@ -1366,7 +1376,15 @@ TEST(ProtobufTestRegistryTest, RegistersExpectedTestsWithoutDummySuite) {
       "fourth_idx0_size2/fifth_uint32_t",
       "TypeNamePrefix/first_int64_t/second_bool/third_idx0_size20/"
       "fourth_idx0_size2/fifth_uint32_t",
-#endif  // __cplusplus >= 202002L
+#endif  // C++20+
+      "TypeBeforeMultipleValues/uint32_t/1/no_existing",
+      "TypeBeforeMultipleValues/uint32_t/2/no_existing",
+      "TypeBeforeMultipleValues/uint32_t/1/existing",
+      "TypeBeforeMultipleValues/uint32_t/2/existing",
+      "TypeBeforeMultipleValues/uint64_t/1/no_existing",
+      "TypeBeforeMultipleValues/uint64_t/2/no_existing",
+      "TypeBeforeMultipleValues/uint64_t/1/existing",
+      "TypeBeforeMultipleValues/uint64_t/2/existing",
       "ConditionalChooseFromType/int32_t/bool",
       "ConditionalChooseFromType/int32_t/float",
       "ConditionalChooseFromType/double/10",
@@ -1699,6 +1717,46 @@ TEST(ProtobufTestRegistryTest, ChooseValueImplNoAmbiguityForDifferentN) {
                 long_str_literal.values.size(),
                 "(too_long_str_a, too_long_str_b)", long_str_literal_names),
             "too_long_str_b");
+}
+
+TEST(ProtobufTestRegistryTest, TypeLiteralHandlesBoundaries) {
+  EXPECT_EQ((PB_TEST_STR_512_("")::Get()), "");
+  EXPECT_EQ((PB_TEST_STR_512_("(int, double)")::Get()), "(int, double)");
+
+  constexpr char kLen32[] = "0123456789abcdef0123456789abcdef";
+  constexpr char kLen33[] = "0123456789abcdef0123456789abcdefX";
+  constexpr char kLen128[] =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  constexpr char kLen129[] =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefX";
+  constexpr char kLen512[] =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  constexpr char kLen520[] =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      "TRUNCATE";
+
+  EXPECT_EQ((PB_TEST_STR_512_(kLen32)::Get()), kLen32);
+  EXPECT_EQ((PB_TEST_STR_512_(kLen33)::Get()), kLen33);
+  EXPECT_EQ((PB_TEST_STR_512_(kLen128)::Get()), kLen128);
+  EXPECT_EQ((PB_TEST_STR_512_(kLen129)::Get()), kLen129);
+  EXPECT_EQ((PB_TEST_STR_512_(kLen512)::Get()), kLen512);
+  EXPECT_EQ((PB_TEST_STR_512_(kLen520)::Get()), kLen512);
 }
 
 }  // namespace

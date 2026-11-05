@@ -141,3 +141,35 @@ cc_test(
         "@googletest//:gtest",
     ],
 )
+
+################################################################################
+# Distribution packaging
+################################################################################
+
+filegroup(
+    name = "test_srcs",
+    srcs = glob(
+        include = [
+            "*_test.cc",
+            "*unittest.cc",
+        ],
+        allow_empty = True,
+        exclude = [
+            "protobuf_test_output_test.cc",
+            "protobuf_test_test.cc",
+        ],
+    ),
+    visibility = ["//pkg:__pkg__"],
+)
+
+filegroup(
+    name = "protobuf_test_test_srcs",
+    srcs = ["protobuf_test_test.cc"],
+    visibility = ["//pkg:__pkg__"],
+)
+
+filegroup(
+    name = "protobuf_test_output_test_srcs",
+    srcs = ["protobuf_test_output_test.cc"],
+    visibility = ["//pkg:__pkg__"],
+)

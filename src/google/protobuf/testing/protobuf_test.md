@@ -141,23 +141,27 @@ Selects one type from a parenthesized list `(T1, T2, ...)` or a
 ```c++
 // Parenthesized list of types:
 using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...));
-using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix");
-using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), {"name1", "name2", ...});
-using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", {"name1", "name2", ...});
 using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), Printer);
-using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", Printer);
+using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix");                  // C++20+
+using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", Printer);         // C++20+
+using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), {"name1", "name2", ...});   // C++20+
+using T = PB_TEST_CHOOSE_TYPE((T1, T2, ...), "prefix", {"name1", ...});  // C++20+
 
 // std::tuple<T1, T2, ...> type alias:
 using T = PB_TEST_CHOOSE_TYPE(TupleType);
-using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix");
-using T = PB_TEST_CHOOSE_TYPE(TupleType, {"name1", "name2", ...});
-using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix", {"name1", "name2", ...});
 using T = PB_TEST_CHOOSE_TYPE(TupleType, Printer);
-using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix", Printer);
+using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix");                  // C++20+
+using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix", Printer);         // C++20+
+using T = PB_TEST_CHOOSE_TYPE(TupleType, {"name1", "name2", ...});   // C++20+
+using T = PB_TEST_CHOOSE_TYPE(TupleType, "prefix", {"name1", ...});  // C++20+
 ```
 
-*   `Printer` is a struct/class providing `template <typename T> static
-    std::string Print(size_t index)`.
+*   `"prefix"` and `{"name1", "name2", ...}` require C++20+ (because they pass
+    string values as template non-type arguments). For C++17 portability (such
+    as OSS-exported tests), use `Printer` or `PB_TEST_CHOOSE_CONSTEXPR` instead.
+*   `Printer` is a struct/class providing
+    `template <typename T> static std::string Print(size_t index)` (works in
+    C++17 and C++20).
 
 ### Test Naming Rules
 
@@ -187,8 +191,8 @@ ordered by the lexical order of the `PB_TEST_CHOOSE_*` calls (if a test has no
     *   Falls back to the underlying integer value for non-proto enums, or
         0-based indices (`0`, `1`, ...).
 2.  **Types (`PB_TEST_CHOOSE_TYPE`)**:
-    *   Uses explicit names `{"name1", ...}` or `Printer::Print<T>(index)` if
-        provided.
+    *   Uses explicit names `{"name1", ...}` (C++20+) or
+        `Printer::Print<T>(index)` if provided.
     *   Otherwise uses `GetTypeName<T>()`, falling back to the literal type list
         tokens, and strips redundant outer namespace qualifications when short
         type names are unambiguous.

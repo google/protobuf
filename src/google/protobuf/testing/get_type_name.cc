@@ -25,25 +25,53 @@ namespace protobuf {
 namespace internal {
 namespace {
 
-// Uses a known `probe` instantiation (whose argument is `target`) to determine
-// the compiler-specific prefix and suffix in `RawPrettyFunction` output.
+// Uses `RawPrettyFunction::Get<double>()` as a probe to determine the
+// compiler-specific prefix and suffix in `RawPrettyFunction` output.
 absl::optional<absl::string_view> ExtractRaw(
-    absl::optional<absl::string_view> raw,
-    absl::optional<absl::string_view> probe, absl::string_view target) {
+    absl::optional<absl::string_view> raw) {
+  absl::optional<absl::string_view> probe = RawPrettyFunction::Get<double>();
   if (!raw.has_value() || !probe.has_value()) return absl::nullopt;
-  size_t prefix = probe->find(target);
+  constexpr absl::string_view kTarget = "double";
+  size_t prefix = probe->find(kTarget);
   if (prefix == absl::string_view::npos) return absl::nullopt;
-  size_t suffix = probe->size() - prefix - target.size();
-  // On MSVC, `__FUNCSIG__` precedes `TypeIdentity` with `"struct "` (7 chars),
-  // whereas template arguments may begin with `"class "` (6 chars). Exclude the
-  // tag keyword from `prefix` so `CleanTypeName` can strip whichever tag is
-  // present.
-  if (absl::EndsWith(probe->substr(0, prefix), "struct ")) {
-    prefix -= 7;
-  }
+  size_t suffix = probe->size() - prefix - kTarget.size();
+  if (raw->size() < prefix + suffix) return absl::nullopt;
   raw->remove_prefix(prefix);
   raw->remove_suffix(suffix);
   return *raw;
+}
+
+// Strips the trailing `<...>` template argument list from a template
+// instantiation name, or returns `absl::nullopt` if none is balanced at the
+// end.
+absl::optional<absl::string_view> StripTrailingTemplateArgs(
+    absl::string_view str) {
+  str = absl::StripTrailingAsciiWhitespace(str);
+  if (str.empty() || str.back() != '>') return absl::nullopt;
+  std::vector<char> to_open = {'<'};
+  for (size_t i = str.size() - 1; i-- > 0;) {
+    char c = str[i];
+    if (c == ')') {
+      to_open.push_back('(');
+    } else if (c == '}') {
+      to_open.push_back('{');
+    } else if (c == ']') {
+      to_open.push_back('[');
+    } else if (c == '(' || c == '{' || c == '[') {
+      if (to_open.back() != c) return absl::nullopt;
+      to_open.pop_back();
+    } else if (to_open.back() == '<') {
+      if (c == '>' && (i == 0 || str[i - 1] != '-')) {
+        to_open.push_back('<');
+      } else if (c == '<') {
+        to_open.pop_back();
+        if (to_open.empty()) {
+          return i > 0 ? absl::make_optional(str.substr(0, i)) : absl::nullopt;
+        }
+      }
+    }
+  }
+  return absl::nullopt;
 }
 
 absl::optional<std::string> CleanTypeName(absl::string_view str) {
@@ -70,8 +98,7 @@ absl::optional<std::string> CleanTypeName(absl::string_view str) {
 
 absl::optional<std::string> CleanRawTypeName(
     absl::optional<absl::string_view> raw) {
-  absl::optional<absl::string_view> extracted =
-      ExtractRaw(raw, RawPrettyFunction::Get<double>(), "double");
+  absl::optional<absl::string_view> extracted = ExtractRaw(raw);
   if (!extracted.has_value()) return absl::nullopt;
   return CleanTypeName(*extracted);
 }
@@ -79,11 +106,12 @@ absl::optional<std::string> CleanRawTypeName(
 absl::optional<std::string> FormatTemplateTypeName(
     absl::optional<absl::string_view> raw,
     absl::Span<const absl::optional<std::string>> args) {
-  absl::optional<absl::string_view> extracted =
-      ExtractRaw(raw, RawPrettyFunction::Get<TypeIdentity>(),
-                 "google::protobuf::internal::TypeIdentity");
+  absl::optional<absl::string_view> extracted = ExtractRaw(raw);
   if (!extracted.has_value()) return absl::nullopt;
-  absl::optional<std::string> base = CleanTypeName(*extracted);
+  absl::optional<absl::string_view> base_raw =
+      StripTrailingTemplateArgs(*extracted);
+  if (!base_raw.has_value()) return absl::nullopt;
+  absl::optional<std::string> base = CleanTypeName(*base_raw);
   if (!base.has_value()) return absl::nullopt;
 
   std::vector<absl::string_view> unwrapped_args;
