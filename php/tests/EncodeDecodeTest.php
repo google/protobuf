@@ -2458,4 +2458,88 @@ class EncodeDecodeTest extends TestBase
         $this->assertFalse($m2->getA());
         $this->assertEquals('', $m2->getZ());
     }
+
+    public function testDecodeBoolForFloatWarns()
+    {
+        $m = new TestMessage();
+
+        // On upb this case raises an exception, on pure PHP we currently only
+        // trigger a warning and don't throw an exception.
+        if (extension_loaded('protobuf')) {
+            $this->expectException(Exception::class);
+            $m->mergeFromJsonString('{"optionalFloat": true}');
+        } else {
+            $warnings = [];
+            set_error_handler(function($errno, $errstr) use (&$warnings) {
+                $warnings[] = $errstr;
+                return true;
+            }, E_USER_WARNING);
+
+            try {
+                $m->mergeFromJsonString('{"optionalFloat": true}');
+            } finally {
+                restore_error_handler();
+            }
+
+            $this->assertCount(1, $warnings);
+            $this->assertStringContainsString("Invalid data type for float field", $warnings[0]);
+            $this->assertSame(1.0, $m->getOptionalFloat());
+        }
+    }
+
+    public function testDecodeBoolForDoubleWarns()
+    {
+        $m = new TestMessage();
+
+        // On upb this case raises an exception, on pure PHP we currently only
+        // trigger a warning and don't throw an exception.
+        if (extension_loaded('protobuf')) {
+            $this->expectException(Exception::class);
+            $m->mergeFromJsonString('{"optionalDouble": false}');
+        } else {
+            $warnings = [];
+            set_error_handler(function($errno, $errstr) use (&$warnings) {
+                $warnings[] = $errstr;
+                return true;
+            }, E_USER_WARNING);
+
+            try {
+                $m->mergeFromJsonString('{"optionalDouble": false}');
+            } finally {
+                restore_error_handler();
+            }
+
+            $this->assertCount(1, $warnings);
+            $this->assertStringContainsString("Invalid data type for float field", $warnings[0]);
+            $this->assertSame(0.0, $m->getOptionalDouble());
+        }
+    }
+
+    public function testDecodeNonArrayForRepeatedFieldWarns()
+    {
+        $m = new TestMessage();
+
+        // On upb this case raises an exception, on pure PHP we currently only
+        // trigger a warning and don't throw an exception.
+        if (extension_loaded('protobuf')) {
+            $this->expectException(Exception::class);
+            $m->mergeFromJsonString('{"repeatedInt32": 123}');
+        } else {
+            $warnings = [];
+            set_error_handler(function($errno, $errstr) use (&$warnings) {
+                $warnings[] = $errstr;
+                return true;
+            }, E_USER_WARNING);
+
+            try {
+                $m->mergeFromJsonString('{"repeatedInt32": 123}');
+            } finally {
+                restore_error_handler();
+            }
+
+            $this->assertCount(1, $warnings);
+            $this->assertStringContainsString("Invalid data type for repeated field", $warnings[0]);
+            $this->assertSame(0, count($m->getRepeatedInt32()));
+        }
+    }
 }

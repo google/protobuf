@@ -933,6 +933,13 @@ class Message
                 if ($value === "NaN") {
                     return NAN;
                 }
+                if (!is_numeric($value)) {
+                    trigger_error(
+                        "Invalid data type for float field. " .
+                        "This will fail in a future version of Protobuf.",
+                        E_USER_WARNING
+                    );
+                }
                 return $value;
             case GPBType::INT32:
             case GPBType::SINT32:
@@ -1283,6 +1290,14 @@ class Message
                 }
             } else if ($field->isRepeated()) {
                 if (is_null($value)) {
+                    continue;
+                }
+                if (!is_array($value)) {
+                    trigger_error(
+                        "Invalid data type for repeated field. " .
+                        "This will fail in a future version of Protobuf.",
+                        E_USER_WARNING
+                    );
                     continue;
                 }
                 foreach ($value as $tmp) {
