@@ -3096,6 +3096,24 @@ void BinaryAndJsonConformanceSuiteImpl<
                    R"({"optionalFloat": "Infinity"})", "optional_float: inf");
   RunValidJsonTest("FloatFieldNegativeInfinity", REQUIRED,
                    R"({"optionalFloat": "-Infinity"})", "optional_float: -inf");
+  RunValidJsonTestWithValidator(
+      "FloatFieldNanValidator", REQUIRED, R"({"optionalFloat": "NaN"})",
+      [](const Json::Value& value) {
+        return value["optionalFloat"].type() == Json::stringValue &&
+               value["optionalFloat"].asString() == "NaN";
+      });
+  RunValidJsonTestWithValidator(
+      "FloatFieldInfinityValidator", REQUIRED,
+      R"({"optionalFloat": "Infinity"})", [](const Json::Value& value) {
+        return value["optionalFloat"].type() == Json::stringValue &&
+               value["optionalFloat"].asString() == "Infinity";
+      });
+  RunValidJsonTestWithValidator(
+      "FloatFieldNegativeInfinityValidator", REQUIRED,
+      R"({"optionalFloat": "-Infinity"})", [](const Json::Value& value) {
+        return value["optionalFloat"].type() == Json::stringValue &&
+               value["optionalFloat"].asString() == "-Infinity";
+      });
   // Non-canonical Nan will be correctly normalized.
   {
     MessageType message;
@@ -3219,6 +3237,24 @@ void BinaryAndJsonConformanceSuiteImpl<
   RunValidJsonTest("DoubleFieldNegativeInfinity", REQUIRED,
                    R"({"optionalDouble": "-Infinity"})",
                    "optional_double: -inf");
+  RunValidJsonTestWithValidator(
+      "DoubleFieldNanValidator", REQUIRED, R"({"optionalDouble": "NaN"})",
+      [](const Json::Value& value) {
+        return value["optionalDouble"].type() == Json::stringValue &&
+               value["optionalDouble"].asString() == "NaN";
+      });
+  RunValidJsonTestWithValidator(
+      "DoubleFieldInfinityValidator", REQUIRED,
+      R"({"optionalDouble": "Infinity"})", [](const Json::Value& value) {
+        return value["optionalDouble"].type() == Json::stringValue &&
+               value["optionalDouble"].asString() == "Infinity";
+      });
+  RunValidJsonTestWithValidator(
+      "DoubleFieldNegativeInfinityValidator", REQUIRED,
+      R"({"optionalDouble": "-Infinity"})", [](const Json::Value& value) {
+        return value["optionalDouble"].type() == Json::stringValue &&
+               value["optionalDouble"].asString() == "-Infinity";
+      });
   // Non-canonical Nan will be correctly normalized.
   {
     MessageType message;
