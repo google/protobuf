@@ -22,6 +22,7 @@ import base64
 from collections import OrderedDict
 import json
 import math
+import warnings
 from operator import methodcaller
 import re
 
@@ -1178,7 +1179,9 @@ def _ConvertFloat(value, field):
   # The proto3 JSON mapping only allows the exact spellings "NaN", "Infinity"
   # and "-Infinity".  Python's float() accepts many other spellings ("NAN",
   # "+nan", "inf", "INF", "+Infinity", " NaN ", ...), which no other
-  # implementation accepts, so reject them here.
+  # implementation accepts.  Rejecting them outright is a breaking change, so
+  # for now they parse as before but warn that a future release will reject
+  # them; the warning is deduplicated per spelling by the warnings machinery.
   if isinstance(value, str) and value.strip().lower() in (
       'nan',
       'inf',
@@ -1191,9 +1194,12 @@ def _ConvertFloat(value, field):
       '-infinity',
   ):
     if value not in (_NAN, _INFINITY, _NEG_INFINITY):
-      raise ParseError(
-          'Couldn\'t parse float "%s", use "NaN", "Infinity" or "-Infinity"'
-          ' instead' % value
+      warnings.warn(
+          'Non finite float "%s" uses a non canonical spelling; only "NaN",'
+          ' "Infinity" and "-Infinity" are part of the proto3 JSON mapping.'
+          ' A future release will reject this input.' % value,
+          category=FutureWarning,
+          stacklevel=5,
       )
   try:
     # Assume Python compatible syntax.
