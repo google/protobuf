@@ -615,6 +615,9 @@
 //   for (int i = 0; i < public_dep->message_type_count(); ++i)
 #pragma clang diagnostic ignored "-Wshadow"
 #pragma clang diagnostic ignored "-Wextra-semi"
+// We sometimes use "unnecessary" parenthesis in codegen to prevent ambiguity or
+// conflicts with contextual keywords.
+#pragma clang diagnostic ignored "-Wredundant-parens"
 // Ensure we don't regress nullability annotations (related: b/383569842)
 #pragma clang diagnostic error "-Wnullability-completeness"
 #endif
