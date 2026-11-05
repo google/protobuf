@@ -3670,7 +3670,7 @@ Type* Reflection::AddField(Message* message,
   RepeatedPtrField<Type>* repeated =
       MutableRaw<RepeatedPtrField<Type>>(message, field);
   SetHasBit(message, field);
-  return repeated->AddWithArena(message->GetArena());
+  return repeated->AddWithArena(internal::GetSerialArena(message));
 }
 
 MessageFactory* Reflection::GetMessageFactory() const {

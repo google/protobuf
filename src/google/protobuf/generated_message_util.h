@@ -36,6 +36,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "google/protobuf/any.h"
+#include "google/protobuf/arena.h"
 #include "google/protobuf/class_data.h"
 #include "google/protobuf/has_bits.h"
 #include "google/protobuf/implicit_weak_message.h"
@@ -385,7 +386,7 @@ template <typename Arg, typename... Args>
 void AddToRepeatedPtrField(InternalVisibility visibility, google::protobuf::Arena* arena,
                            google::protobuf::RepeatedPtrField<std::string>& dest,
                            Arg&& value, Args... args) {
-  AssignToString(*dest.InternalAddWithArena(visibility, arena),
+  AssignToString(*dest.InternalAddWithArena(visibility, GetSerialArena(arena)),
                  std::forward<Arg>(value), args...);
 }
 inline void AddToRepeatedPtrField(InternalVisibility visibility,
@@ -393,7 +394,8 @@ inline void AddToRepeatedPtrField(InternalVisibility visibility,
                                   google::protobuf::RepeatedPtrField<std::string>& dest,
                                   std::string&& value,
                                   BytesTag /*tag*/ = BytesTag{}) {
-  dest.InternalAddWithArena(visibility, arena, std::move(value));
+  dest.InternalAddWithArena(visibility, GetSerialArena(arena),
+                            std::move(value));
 }
 
 }  // namespace internal

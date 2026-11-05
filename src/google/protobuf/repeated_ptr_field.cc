@@ -23,10 +23,12 @@
 #include "absl/log/absl_check.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/class_data.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/message_traits.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/repeated_field.h"
+#include "google/protobuf/serial_arena.h"
 #include "google/protobuf/type_id.h"
 
 // Must be included last.
@@ -47,13 +49,13 @@ std::string* CloneSlow(Arena* arena, const std::string& value) {
 }
 
 void** RepeatedPtrFieldBase::InternalExtend(int extend_amount, Arena* arena) {
-  return InternalExtend(extend_amount, GetSerialArena(arena));
+  return InternalExtend(extend_amount, internal::GetSerialArena(arena));
 }
 
 void** RepeatedPtrFieldBase::InternalExtend(int extend_amount,
                                             SerialArena* arena) {
   ABSL_DCHECK(extend_amount > 0);
-  ABSL_DCHECK_EQ(arena, GetSerialArena(GetArena()));
+  ABSL_DCHECK_EQ(arena, GetSerialArena());
   constexpr size_t kPtrSize = sizeof(rep()->elements[0]);
   constexpr size_t kMaxSize = std::numeric_limits<size_t>::max();
   constexpr size_t kMaxCapacity = (kMaxSize - kRepHeaderSize) / kPtrSize;
@@ -63,7 +65,7 @@ void** RepeatedPtrFieldBase::InternalExtend(int extend_amount,
   int new_capacity = internal::CalculateReserveSize<void*, kRepHeaderSize>(
       old_capacity, internal::CheckedAdd(old_capacity, extend_amount));
   {
-    ABSL_DCHECK_LE(new_capacity, kMaxCapacity)
+    ABSL_DCHECK_LE(static_cast<size_t>(new_capacity), kMaxCapacity)
         << "New capacity is too large to fit into internal representation";
     size_t bytes = kRepHeaderSize + kPtrSize * new_capacity;
     if (arena == nullptr) {
@@ -116,8 +118,8 @@ void** RepeatedPtrFieldBase::InternalExtend(int extend_amount,
   return &new_rep->elements[current_size_];
 }
 
-void RepeatedPtrFieldBase::ReserveWithArena(Arena* arena, int capacity) {
-  ABSL_DCHECK_EQ(arena, GetArena());
+void RepeatedPtrFieldBase::ReserveWithArena(SerialArena* arena, int capacity) {
+  ABSL_DCHECK_EQ(arena, GetSerialArena());
   int delta = capacity - Capacity();
   if (delta > 0) {
     InternalExtend(delta, arena);

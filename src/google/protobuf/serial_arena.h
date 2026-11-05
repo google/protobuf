@@ -33,6 +33,9 @@
 
 namespace google {
 namespace protobuf {
+
+class Arena;
+
 namespace internal {
 
 // Arena blocks are variable length malloc-ed objects.  The following structure
@@ -293,6 +296,8 @@ class PROTOBUF_EXPORT SerialArena {
     return true;
   }
 
+  Arena* parent() const { return reinterpret_cast<Arena*>(&parent_); }
+
  private:
   friend class ThreadSafeArena;
   friend class cleanup::ChunkList;
@@ -480,6 +485,11 @@ SerialArena::AllocateFromStringBlock() {
   void* p;
   if (ABSL_PREDICT_TRUE(MaybeAllocateString(p))) return p;
   return AllocateFromStringBlockFallback();
+}
+
+inline Arena* ParentArena(SerialArena* arena) {
+  if (arena == nullptr) return nullptr;
+  return arena->parent();
 }
 
 }  // namespace internal

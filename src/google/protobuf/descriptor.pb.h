@@ -12418,7 +12418,8 @@ inline ::google::protobuf::FileDescriptorProto* PROTOBUF_NONNULL FileDescriptorS
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FileDescriptorProto* _add =
       _internal_mutable_file()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileDescriptorSet.file)
   return _add;
@@ -12607,7 +12608,8 @@ inline ::std::string* PROTOBUF_NONNULL FileDescriptorProto::add_dependency()
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_dependency()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.FileDescriptorProto.dependency)
   return _s;
@@ -12781,7 +12783,8 @@ inline ::std::string* PROTOBUF_NONNULL FileDescriptorProto::add_option_dependenc
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_option_dependency()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.FileDescriptorProto.option_dependency)
   return _s;
@@ -12863,7 +12866,8 @@ inline ::google::protobuf::DescriptorProto* PROTOBUF_NONNULL FileDescriptorProto
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::DescriptorProto* _add =
       _internal_mutable_message_type()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileDescriptorProto.message_type)
   return _add;
@@ -12918,7 +12922,8 @@ inline ::google::protobuf::EnumDescriptorProto* PROTOBUF_NONNULL FileDescriptorP
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::EnumDescriptorProto* _add =
       _internal_mutable_enum_type()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileDescriptorProto.enum_type)
   return _add;
@@ -12973,7 +12978,8 @@ inline ::google::protobuf::ServiceDescriptorProto* PROTOBUF_NONNULL FileDescript
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::ServiceDescriptorProto* _add =
       _internal_mutable_service()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileDescriptorProto.service)
   return _add;
@@ -13028,7 +13034,8 @@ inline ::google::protobuf::FieldDescriptorProto* PROTOBUF_NONNULL FileDescriptor
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FieldDescriptorProto* _add =
       _internal_mutable_extension()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileDescriptorProto.extension)
   return _add;
@@ -13675,7 +13682,8 @@ inline ::google::protobuf::FieldDescriptorProto* PROTOBUF_NONNULL DescriptorProt
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FieldDescriptorProto* _add =
       _internal_mutable_field()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.field)
   return _add;
@@ -13730,7 +13738,8 @@ inline ::google::protobuf::FieldDescriptorProto* PROTOBUF_NONNULL DescriptorProt
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FieldDescriptorProto* _add =
       _internal_mutable_extension()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.extension)
   return _add;
@@ -13785,7 +13794,8 @@ inline ::google::protobuf::DescriptorProto* PROTOBUF_NONNULL DescriptorProto::ad
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::DescriptorProto* _add =
       _internal_mutable_nested_type()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.nested_type)
   return _add;
@@ -13840,7 +13850,8 @@ inline ::google::protobuf::EnumDescriptorProto* PROTOBUF_NONNULL DescriptorProto
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::EnumDescriptorProto* _add =
       _internal_mutable_enum_type()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.enum_type)
   return _add;
@@ -13895,7 +13906,8 @@ inline ::google::protobuf::DescriptorProto_ExtensionRange* PROTOBUF_NONNULL Desc
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::DescriptorProto_ExtensionRange* _add =
       _internal_mutable_extension_range()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.extension_range)
   return _add;
@@ -13950,7 +13962,8 @@ inline ::google::protobuf::OneofDescriptorProto* PROTOBUF_NONNULL DescriptorProt
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::OneofDescriptorProto* _add =
       _internal_mutable_oneof_decl()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.oneof_decl)
   return _add;
@@ -14104,7 +14117,8 @@ inline ::google::protobuf::DescriptorProto_ReservedRange* PROTOBUF_NONNULL Descr
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::DescriptorProto_ReservedRange* _add =
       _internal_mutable_reserved_range()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_add:google.protobuf.DescriptorProto.reserved_range)
   return _add;
@@ -14149,7 +14163,8 @@ inline ::std::string* PROTOBUF_NONNULL DescriptorProto::add_reserved_name()
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_reserved_name()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.DescriptorProto.reserved_name)
   return _s;
@@ -14494,7 +14509,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL ExtensionRangeO
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.ExtensionRangeOptions.uninterpreted_option)
   return _add;
@@ -14549,7 +14565,8 @@ inline ::google::protobuf::ExtensionRangeOptions_Declaration* PROTOBUF_NONNULL E
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::ExtensionRangeOptions_Declaration* _add =
       _internal_mutable_declaration()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.ExtensionRangeOptions.declaration)
   return _add;
@@ -15640,7 +15657,8 @@ inline ::google::protobuf::EnumValueDescriptorProto* PROTOBUF_NONNULL EnumDescri
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::EnumValueDescriptorProto* _add =
       _internal_mutable_value()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.EnumDescriptorProto.value)
   return _add;
@@ -15794,7 +15812,8 @@ inline ::google::protobuf::EnumDescriptorProto_EnumReservedRange* PROTOBUF_NONNU
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::EnumDescriptorProto_EnumReservedRange* _add =
       _internal_mutable_reserved_range()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.EnumDescriptorProto.reserved_range)
   return _add;
@@ -15839,7 +15858,8 @@ inline ::std::string* PROTOBUF_NONNULL EnumDescriptorProto::add_reserved_name()
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_reserved_name()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.EnumDescriptorProto.reserved_name)
   return _s;
@@ -16227,7 +16247,8 @@ inline ::google::protobuf::MethodDescriptorProto* PROTOBUF_NONNULL ServiceDescri
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::MethodDescriptorProto* _add =
       _internal_mutable_method()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.ServiceDescriptorProto.method)
   return _add;
@@ -17808,7 +17829,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL FileOptions::ad
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00100000U);
   // @@protoc_insertion_point(field_add:google.protobuf.FileOptions.uninterpreted_option)
   return _add;
@@ -18106,7 +18128,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL MessageOptions:
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_add:google.protobuf.MessageOptions.uninterpreted_option)
   return _add;
@@ -18825,7 +18848,8 @@ inline ::google::protobuf::FieldOptions_EditionDefault* PROTOBUF_NONNULL FieldOp
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FieldOptions_EditionDefault* _add =
       _internal_mutable_edition_defaults()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.FieldOptions.edition_defaults)
   return _add;
@@ -19078,7 +19102,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL FieldOptions::a
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.FieldOptions.uninterpreted_option)
   return _add;
@@ -19236,7 +19261,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL OneofOptions::a
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.OneofOptions.uninterpreted_option)
   return _add;
@@ -19478,7 +19504,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL EnumOptions::ad
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_add:google.protobuf.EnumOptions.uninterpreted_option)
   return _add;
@@ -19791,7 +19818,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL EnumValueOption
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.EnumValueOptions.uninterpreted_option)
   return _add;
@@ -19977,7 +20005,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL ServiceOptions:
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.ServiceOptions.uninterpreted_option)
   return _add;
@@ -20194,7 +20223,8 @@ inline ::google::protobuf::UninterpretedOption* PROTOBUF_NONNULL MethodOptions::
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption* _add =
       _internal_mutable_uninterpreted_option()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.MethodOptions.uninterpreted_option)
   return _add;
@@ -20355,7 +20385,8 @@ inline ::google::protobuf::UninterpretedOption_NamePart* PROTOBUF_NONNULL Uninte
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::UninterpretedOption_NamePart* _add =
       _internal_mutable_name()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.UninterpretedOption.name)
   return _add;
@@ -21232,7 +21263,8 @@ inline ::google::protobuf::FeatureSetDefaults_FeatureSetEditionDefault* PROTOBUF
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FeatureSetDefaults_FeatureSetEditionDefault* _add =
       _internal_mutable_defaults()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.FeatureSetDefaults.defaults)
   return _add;
@@ -21585,7 +21617,8 @@ inline ::std::string* PROTOBUF_NONNULL SourceCodeInfo_Location::add_leading_deta
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_leading_detached_comments()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.SourceCodeInfo.Location.leading_detached_comments)
   return _s;
@@ -21671,7 +21704,8 @@ inline ::google::protobuf::SourceCodeInfo_Location* PROTOBUF_NONNULL SourceCodeI
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::SourceCodeInfo_Location* _add =
       _internal_mutable_location()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.SourceCodeInfo.location)
   return _add;
@@ -21942,7 +21976,8 @@ inline ::google::protobuf::GeneratedCodeInfo_Annotation* PROTOBUF_NONNULL Genera
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::GeneratedCodeInfo_Annotation* _add =
       _internal_mutable_annotation()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.GeneratedCodeInfo.annotation)
   return _add;

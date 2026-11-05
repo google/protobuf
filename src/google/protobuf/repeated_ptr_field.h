@@ -48,6 +48,7 @@
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
+#include "google/protobuf/message_traits.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
 
@@ -202,7 +203,7 @@ PROTOBUF_EXPORT inline void RuntimeAssertInBoundsGE(int64_t value,
 template <typename Type>
 class GenericTypeHandler;
 
-using ElementNewFn = void(Arena*, void*& ptr);
+using ElementNewFn = void(SerialArena*, void*& ptr);
 
 // This is the common base class for RepeatedPtrFields.  It deals only in void*
 // pointers.  Users should not use this interface directly.
@@ -297,12 +298,12 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   }
 
   template <typename TypeHandler>
-  Value<TypeHandler>* Add(Arena* arena) {
+  Value<TypeHandler>* Add(SerialArena* arena) {
     return cast<TypeHandler>(AddInternal(arena, TypeHandler::GetNewFunc()));
   }
 
   template <typename TypeHandler>
-  Value<TypeHandler>* Add(Arena* arena, Value<TypeHandler>&& value) {
+  Value<TypeHandler>* Add(SerialArena* arena, Value<TypeHandler>&& value) {
     if (ClearedCount() > 0) {
       auto* result =
           cast<TypeHandler>(element_at(ExchangeCurrentSize(current_size_ + 1)));
@@ -315,7 +316,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   }
 
   template <typename TypeHandler>
-  Value<TypeHandler>* Add(Arena* arena, const Value<TypeHandler>& value) {
+  Value<TypeHandler>* Add(SerialArena* arena, const Value<TypeHandler>& value) {
     if (ClearedCount() > 0) {
       auto* result =
           cast<TypeHandler>(element_at(ExchangeCurrentSize(current_size_ + 1)));
@@ -337,7 +338,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
       return result;
     } else {
       return cast<TypeHandler>(AddInternal(
-          arena,
+          internal::GetSerialArena(arena),
           TypeHandler::GetNewWithEmplaceFunc(std::forward<Args>(args)...)));
     }
   }
@@ -408,7 +409,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   // Pre-condition: prototype must not be nullptr.
   template <typename TypeHandler>
   PROTOBUF_ALWAYS_INLINE Value<TypeHandler>* AddFromPrototype(
-      Arena* arena, const Value<TypeHandler>* prototype) {
+      SerialArena* arena, const Value<TypeHandler>* prototype) {
     using H = CommonHandler<TypeHandler>;
     Value<TypeHandler>* result = cast<TypeHandler>(
         AddInternal(arena, H::GetNewFromPrototypeFunc(prototype)));
@@ -422,7 +423,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
       const Value<TypeHandler>* prototype) {
     using H = CommonHandler<TypeHandler>;
     auto func = H::GetNewFromPrototypeFunc(prototype);
-    return [this, func](Arena* arena) {
+    return [this, func](SerialArena* arena) {
       return cast<TypeHandler>(AddInternal(arena, func));
     };
   }
@@ -436,7 +437,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   // Pre-condition: `class_data` must not be nullptr.
   template <typename TypeHandler>
   PROTOBUF_ALWAYS_INLINE Value<TypeHandler>* AddFromClassData(
-      Arena* arena, const ClassData* class_data) {
+      SerialArena* arena, const ClassData* class_data) {
     using H = CommonHandler<TypeHandler>;
     Value<TypeHandler>* result = cast<TypeHandler>(
         AddInternal(arena, H::GetNewFromClassDataFunc(class_data)));
@@ -502,7 +503,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   }
 
   // Trim the array if possible.
-  void TryShrinkToFit(internal::SerialArena* arena) {
+  void TryShrinkToFit(SerialArena* arena) {
     if (using_sso() || arena == nullptr) return;
     auto* r = rep();
     size_t desired_capacity =
@@ -541,7 +542,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
 
   void CloseGap(int start, int num);
 
-  void ReserveWithArena(Arena* arena, int capacity);
+  void ReserveWithArena(SerialArena* arena, int capacity);
 
   template <typename TypeHandler>
   static Value<TypeHandler>* copy(const Value<TypeHandler>* value) {
@@ -743,6 +744,10 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
     return ResolveArena<&RepeatedPtrFieldBase::resolver_>(this);
   }
 
+  SerialArena* GetSerialArena() const {
+    return internal::GetSerialArena(GetArena());
+  }
+
  private:
   // Tests that need to access private methods.
   friend class RepeatedPtrFieldTest;
@@ -818,8 +823,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
 
   static constexpr size_t kRepHeaderSize = offsetof(Rep, elements);
   static constexpr size_t kMinNonSsoCapacity =
-      (internal::SerialArena::kMinimumReturnedArraySize - kRepHeaderSize) /
-      sizeof(void*);
+      (SerialArena::kMinimumReturnedArraySize - kRepHeaderSize) / sizeof(void*);
 
   // Replaces current_size_ with new_size and returns the previous value of
   // current_size_. This function is intended to be the only place where
@@ -939,7 +943,8 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   // Common implementation used by various Add* methods. `factory` is an object
   // used to construct a new element unless there are spare cleared elements
   // ready for reuse. Returns pointer to the new element.
-  void* AddInternal(Arena* arena, absl::FunctionRef<ElementNewFn> factory);
+  void* AddInternal(SerialArena* arena,
+                    absl::FunctionRef<ElementNewFn> factory);
 
   // A few notes on internal representation:
   //
@@ -976,8 +981,8 @@ PROTOBUF_EXPORT void RepeatedPtrFieldBase::MergeFrom<std::string>(
 
 
 inline void* RepeatedPtrFieldBase::AddInternal(
-    Arena* arena, absl::FunctionRef<ElementNewFn> factory) {
-  ABSL_DCHECK_EQ(arena, GetArena());
+    SerialArena* arena, absl::FunctionRef<ElementNewFn> factory) {
+  ABSL_DCHECK_EQ(arena, GetSerialArena());
   if (tagged_rep_or_elem_ == nullptr) {
     ExchangeCurrentSize(1);
     factory(arena, tagged_rep_or_elem_);
@@ -1087,7 +1092,7 @@ void RepeatedPtrFieldBase::ResizeImpl(int new_size, AddOne add_one) {
   int diff = new_size - size();
   if (diff > 0) {
     // We need to add.
-    auto* arena = GetArena();
+    auto* arena = GetSerialArena();
     ReserveWithArena(arena, new_size);
     for (; diff > 0; --diff) {
       add_one(arena);
@@ -1125,40 +1130,41 @@ class GenericTypeHandler {
   // are forced to assert in every function that needs it.
 
   static constexpr auto GetNewFunc() {
-    return [](Arena* arena, void*& ptr) {
-      ptr = Arena::DefaultConstruct<Type>(arena);
+    return [](SerialArena* arena, void*& ptr) {
+      ptr = Arena::DefaultConstruct<Type>(ParentArena(arena));
     };
   }
   static constexpr auto GetNewWithMoveFunc(
       Type&& from ABSL_ATTRIBUTE_LIFETIME_BOUND) {
-    return [&from](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, std::move(from));
+    return [&from](SerialArena* arena, void*& ptr) {
+      ptr = Arena::Create<Type>(ParentArena(arena), std::move(from));
     };
   }
   static constexpr auto GetNewWithCopyFunc(
       const Type& from ABSL_ATTRIBUTE_LIFETIME_BOUND) {
-    return [&from](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, from);
+    return [&from](SerialArena* arena, void*& ptr) {
+      ptr = Arena::Create<Type>(ParentArena(arena), from);
     };
   }
   template <typename... Args>
   static constexpr auto GetNewWithEmplaceFunc(Args&&... args) {
-    return [&args...](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, std::forward<Args>(args)...);
+    return [&args...](SerialArena* arena, void*& ptr) {
+      ptr =
+          Arena::Create<Type>(ParentArena(arena), std::forward<Args>(args)...);
     };
   }
   static constexpr auto GetNewFromPrototypeFunc(const Type* prototype) {
     static_assert(std::is_base_of_v<MessageLite, Type>);
     ABSL_DCHECK(prototype != nullptr);
-    return [prototype](Arena* arena, void*& ptr) {
-      ptr = GetClassData(*prototype)->New(arena);
+    return [prototype](SerialArena* arena, void*& ptr) {
+      ptr = GetClassData(*prototype)->New(ParentArena(arena));
     };
   }
   static constexpr auto GetNewFromClassDataFunc(
       const ClassData* class_data ABSL_ATTRIBUTE_LIFETIME_BOUND) {
     ABSL_DCHECK(class_data != nullptr);
-    return [class_data](Arena* arena, void*& ptr) {
-      ptr = class_data->New(arena);
+    return [class_data](SerialArena* arena, void*& ptr) {
+      ptr = class_data->New(ParentArena(arena));
     };
   }
 
@@ -1204,24 +1210,32 @@ class GenericTypeHandler<std::string> {
   using CopyConstructReferenceType = absl::string_view;
 
   static constexpr auto GetNewFunc() {
-    return [](Arena* arena, void*& ptr) { ptr = Arena::Create<Type>(arena); };
+    return [](SerialArena* arena, void*& ptr) {
+      if (arena == nullptr) {
+        ptr = Arena::Create<Type>(nullptr);
+      } else {
+        void* mem = arena->AllocateFromStringBlock();
+        ptr = new (mem) Type();
+      }
+    };
   }
   static constexpr auto GetNewWithMoveFunc(
       Type&& from ABSL_ATTRIBUTE_LIFETIME_BOUND) {
-    return [&from](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, std::move(from));
+    return [&from](SerialArena* arena, void*& ptr) {
+      ptr = Arena::Create<Type>(ParentArena(arena), std::move(from));
     };
   }
   static constexpr auto GetNewWithCopyFunc(
       const Type& from ABSL_ATTRIBUTE_LIFETIME_BOUND) {
-    return [&from](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, from);
+    return [&from](SerialArena* arena, void*& ptr) {
+      ptr = Arena::Create<Type>(ParentArena(arena), from);
     };
   }
   template <typename... Args>
   static constexpr auto GetNewWithEmplaceFunc(Args&&... args) {
-    return [&args...](Arena* arena, void*& ptr) {
-      ptr = Arena::Create<Type>(arena, std::forward<Args>(args)...);
+    return [&args...](SerialArena* arena, void*& ptr) {
+      ptr =
+          Arena::Create<Type>(ParentArena(arena), std::forward<Args>(args)...);
     };
   }
   static constexpr auto GetNewFromPrototypeFunc(const Type* /*prototype*/) {
@@ -1575,15 +1589,16 @@ class ABSL_ATTRIBUTE_WARN_UNUSED RepeatedPtrField final
   // is the responsibility of the caller to ensure that this arena is the same
   // as the arena returned from `GetArena()`.
   pointer InternalAddWithArena(internal::InternalVisibility,
-                               Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND;
+                               internal::SerialArena* arena)
+      ABSL_ATTRIBUTE_LIFETIME_BOUND;
 
   // For internal use only.
   //
   // Like `Add(Element&&)`, but uses the given arena instead of calling
   // `GetArena()`. It is the responsibility of the caller to ensure that this
   // arena is the same as the arena returned from `GetArena()`.
-  void InternalAddWithArena(internal::InternalVisibility, Arena* arena,
-                            Element&& value);
+  void InternalAddWithArena(internal::InternalVisibility,
+                            internal::SerialArena* arena, Element&& value);
 
   // For internal use only.
   //
@@ -1644,15 +1659,16 @@ class ABSL_ATTRIBUTE_WARN_UNUSED RepeatedPtrField final
                    RepeatedPtrField&& rhs);
 
 
-  pointer AddWithArena(Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND;
+  pointer AddWithArena(internal::SerialArena* arena)
+      ABSL_ATTRIBUTE_LIFETIME_BOUND;
 
-  pointer AddWithArena(Arena* arena, Element&& value);
+  pointer AddWithArena(internal::SerialArena* arena, Element&& value);
 
   // Private-only. Copies `value` into a newly allocated element.
-  pointer AddWithArena(Arena* arena, const Element& value);
+  pointer AddWithArena(internal::SerialArena* arena, const Element& value);
 
   template <typename Iter>
-  void AddWithArena(Arena* arena, Iter begin, Iter end);
+  void AddWithArena(internal::SerialArena* arena, Iter begin, Iter end);
 
   // Private-only. Constructs an element in-place from `args`.
   template <typename... Args>
@@ -1826,41 +1842,45 @@ inline Element* RepeatedPtrField<Element>::Mutable(int index)
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::Add()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  return AddWithArena(GetArena());
+  return AddWithArena(GetSerialArena());
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::InternalAddWithArena(
-    internal::InternalVisibility, Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    internal::InternalVisibility,
+    internal::SerialArena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
   return AddWithArena(arena);
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::AddWithArena(
-    Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    internal::SerialArena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
   return RepeatedPtrFieldBase::Add<TypeHandler>(arena);
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE void RepeatedPtrField<Element>::Add(Element&& value) {
-  AddWithArena(GetArena(), std::move(value));
+  AddWithArena(GetSerialArena(), std::move(value));
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE void RepeatedPtrField<Element>::InternalAddWithArena(
-    internal::InternalVisibility, Arena* arena, Element&& value) {
+    internal::InternalVisibility, internal::SerialArena* arena,
+    Element&& value) {
   AddWithArena(arena, std::move(value));
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE typename RepeatedPtrField<Element>::pointer
-RepeatedPtrField<Element>::AddWithArena(Arena* arena, Element&& value) {
+RepeatedPtrField<Element>::AddWithArena(internal::SerialArena* arena,
+                                        Element&& value) {
   return RepeatedPtrFieldBase::Add<TypeHandler>(arena, std::move(value));
 }
 
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE typename RepeatedPtrField<Element>::pointer
-RepeatedPtrField<Element>::AddWithArena(Arena* arena, const Element& value) {
+RepeatedPtrField<Element>::AddWithArena(internal::SerialArena* arena,
+                                        const Element& value) {
   return RepeatedPtrFieldBase::Add<TypeHandler>(arena, value);
 }
 
@@ -1876,13 +1896,13 @@ template <typename Element>
 template <typename Iter>
 PROTOBUF_NDEBUG_INLINE void RepeatedPtrField<Element>::Add(Iter begin,
                                                            Iter end) {
-  AddWithArena(GetArena(), std::move(begin), std::move(end));
+  AddWithArena(GetSerialArena(), std::move(begin), std::move(end));
 }
 
 template <typename Element>
 template <typename Iter>
 PROTOBUF_NDEBUG_INLINE void RepeatedPtrField<Element>::AddWithArena(
-    Arena* arena, Iter begin, Iter end) {
+    internal::SerialArena* arena, Iter begin, Iter end) {
   if (std::is_base_of_v<
           std::forward_iterator_tag,
           typename std::iterator_traits<Iter>::iterator_category>) {
@@ -2119,7 +2139,7 @@ inline Element* RepeatedPtrField<Element>::UnsafeArenaReleaseLast() {
 
 template <typename Element>
 inline void RepeatedPtrField<Element>::Reserve(int new_size) {
-  return RepeatedPtrFieldBase::ReserveWithArena(GetArena(), new_size);
+  return RepeatedPtrFieldBase::ReserveWithArena(GetSerialArena(), new_size);
 }
 
 template <typename Element>
@@ -2179,7 +2199,7 @@ class RustRepeatedMessageHelper {
 
   static auto Add(RepeatedPtrFieldBase& field, const MessageLite* prototype) {
     return field.AddFromPrototype<GenericTypeHandler<MessageLite>>(
-        field.GetArena(), prototype);
+        field.GetSerialArena(), prototype);
   }
 
   static void Truncate(RepeatedPtrFieldBase& field, size_t new_size) {
@@ -2195,7 +2215,7 @@ class RustRepeatedMessageHelper {
   }
 
   static void Reserve(RepeatedPtrFieldBase& field, size_t additional) {
-    field.ReserveWithArena(field.GetArena(),
+    field.ReserveWithArena(field.GetSerialArena(),
                            internal::CheckedAdd(field.size(), additional));
   }
 
@@ -2615,7 +2635,7 @@ class RepeatedPtrFieldBackInsertIterator {
   using difference_type = std::ptrdiff_t;
 
   RepeatedPtrFieldBackInsertIterator(RepeatedPtrField<T>* const mutable_field)
-      : field_(mutable_field), arena_(mutable_field->GetArena()) {}
+      : field_(mutable_field), arena_(mutable_field->GetSerialArena()) {}
   RepeatedPtrFieldBackInsertIterator<T>& operator=(const T& value) {
     *field_->AddWithArena(arena_) = value;
     return *this;
@@ -2637,7 +2657,7 @@ class RepeatedPtrFieldBackInsertIterator {
 
  private:
   RepeatedPtrField<T>* field_;
-  Arena* arena_;
+  SerialArena* arena_;
 };
 
 // A back inserter for RepeatedPtrFields that inserts by transferring ownership

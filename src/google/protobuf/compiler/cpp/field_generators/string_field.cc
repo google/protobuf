@@ -778,7 +778,8 @@ void RepeatedString::GenerateInlineAccessorDefinitions(io::Printer* p) const {
           $TsanDetectConcurrentMutation$;
           ::std::string* _s =
               _internal_mutable_$name_internal$()->InternalAddWithArena(
-                  $pb$::MessageLite::internal_visibility(), GetArena());
+                  $pb$::MessageLite::internal_visibility(),
+                  $pbi$::GetSerialArena(GetArena()));
           $set_hasbit$;
           $annotate_add_mutable$;
           // @@protoc_insertion_point(field_add_mutable:$pkg.Msg.field$)

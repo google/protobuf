@@ -1153,6 +1153,7 @@ cc_library(
     strip_include_prefix = "/src",
     visibility = ["//visibility:public"],
     deps = [
+        ":arena",
         ":port",
         ":protobuf_lite",
         ":repeated_field_proxy_iterator",

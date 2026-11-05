@@ -811,7 +811,8 @@ void RepeatedMessage::GenerateInlineAccessorDefinitions(io::Printer* p) const {
       $TsanDetectConcurrentMutation$;
       $Submsg$* _add =
           _internal_mutable_$name_internal$()->InternalAddWithArena(
-              $pb$::MessageLite::internal_visibility(), GetArena());
+              $pb$::MessageLite::internal_visibility(),
+              $pbi$::GetSerialArena(GetArena()));
       $set_hasbit$;
       $annotate_add_mutable$;
       // @@protoc_insertion_point(field_add:$pkg.Msg.field$)

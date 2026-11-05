@@ -18,11 +18,13 @@
 #include "absl/log/absl_check.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/arena.h"
 #include "google/protobuf/raw_ptr.h"
 #include "google/protobuf/repeated_field.h"
 #include "google/protobuf/repeated_field_proxy_iterator.h"
 #include "google/protobuf/repeated_field_proxy_traits.h"
 #include "google/protobuf/repeated_ptr_field.h"
+#include "google/protobuf/serial_arena.h"
 
 
 // Must be included last.
@@ -544,7 +546,7 @@ class PROTOBUF_DECLSPEC_EMPTY_BASES MutableRepeatedFieldProxyImpl
                       std::forward_iterator_tag,
                       typename std::iterator_traits<Iter>::iterator_category>) {
       int distance = static_cast<int>(std::distance(begin, end));
-      field().ReserveWithArena(arena(), distance);
+      field().ReserveWithArena(GetSerialArena(), distance);
     }
     for (; begin != end; ++begin) {
       this->push_back(*begin);
@@ -555,7 +557,7 @@ class PROTOBUF_DECLSPEC_EMPTY_BASES MutableRepeatedFieldProxyImpl
   // This may allow the container to make optimizations to avoid reallocations,
   // but may also be ignored.
   void reserve(size_type new_size) const {
-    field().ReserveWithArena(arena(), new_size);
+    field().ReserveWithArena(GetSerialArena(), new_size);
   }
 
   // Resizes the repeated field to `new_size` elements. If `new_size` is smaller
@@ -576,15 +578,19 @@ class PROTOBUF_DECLSPEC_EMPTY_BASES MutableRepeatedFieldProxyImpl
 
   Arena* PROTOBUF_NULLABLE arena() const { return arena_; }
 
+  SerialArena* PROTOBUF_NULLABLE GetSerialArena() const {
+    return internal::GetSerialArena(arena_);
+  }
+
   // The following methods all forward to the backing repeated fields. This is
   // done here for access to private members of the legacy containers, which
   // only need to friend `MutableRepeatedFieldProxyImpl`.
-  auto& Add() const { return *field().AddWithArena(arena()); }
+  auto& Add() const { return *field().AddWithArena(GetSerialArena()); }
   auto& Add(ElementType&& value) const {
-    return *field().AddWithArena(arena(), std::move(value));
+    return *field().AddWithArena(GetSerialArena(), std::move(value));
   }
   auto& Add(const ElementType& value) const {
-    return *field().AddWithArena(arena(), value);
+    return *field().AddWithArena(GetSerialArena(), value);
   }
   template <typename... Args>
   auto& Emplace(Args&&... args) const {

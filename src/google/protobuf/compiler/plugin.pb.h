@@ -1317,7 +1317,8 @@ inline ::std::string* PROTOBUF_NONNULL CodeGeneratorRequest::add_file_to_generat
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::std::string* _s =
       _internal_mutable_file_to_generate()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add_mutable:google.protobuf.compiler.CodeGeneratorRequest.file_to_generate)
   return _s;
@@ -1464,7 +1465,8 @@ inline ::google::protobuf::FileDescriptorProto* PROTOBUF_NONNULL CodeGeneratorRe
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FileDescriptorProto* _add =
       _internal_mutable_proto_file()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_add:google.protobuf.compiler.CodeGeneratorRequest.proto_file)
   return _add;
@@ -1514,7 +1516,8 @@ inline ::google::protobuf::FileDescriptorProto* PROTOBUF_NONNULL CodeGeneratorRe
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::FileDescriptorProto* _add =
       _internal_mutable_source_file_descriptors()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_add:google.protobuf.compiler.CodeGeneratorRequest.source_file_descriptors)
   return _add;
@@ -2134,7 +2137,8 @@ inline ::google::protobuf::compiler::CodeGeneratorResponse_File* PROTOBUF_NONNUL
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::google::protobuf::compiler::CodeGeneratorResponse_File* _add =
       _internal_mutable_file()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+          ::google::protobuf::MessageLite::internal_visibility(),
+          ::google::protobuf::internal::GetSerialArena(GetArena()));
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_add:google.protobuf.compiler.CodeGeneratorResponse.file)
   return _add;

@@ -217,7 +217,7 @@ MessageLite* ExtensionSet::AddMessage(Arena* arena,
       prototype = &extension->ptr.repeated_message_value->Get(0);
     }
     result = repeated->AddFromPrototype<GenericTypeHandler<MessageLite>>(
-        arena, prototype);
+        GetSerialArena(arena), prototype);
   }
   return result;
 }
