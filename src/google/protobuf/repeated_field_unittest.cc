@@ -278,6 +278,33 @@ TEST_F(RepeatedFieldIsFullTest, ParsedPackedOverflow) {
       HasSubstr("Integer overflow in CheckedAdd: "));
 }
 
+TEST_F(RepeatedFieldIsFullTest, ParsedPackedFixedOverflow) {
+  proto2_unittest::TestPackedTypes msg;
+  msg.mutable_packed_fixed32()->resize(10);
+  std::string str10 = msg.SerializeAsString();
+
+  EXPECT_DEATH(
+      {
+        SetFakeCapacityAndSize(*msg.mutable_packed_fixed32(),
+                               std::numeric_limits<int>::max() - 4,
+                               std::numeric_limits<int>::max() - 4);
+        (void)msg.MergeFromString(str10);
+      },
+      HasSubstr("Integer overflow in CheckedAdd: "));
+  EXPECT_DEATH(
+      {
+        SetFakeCapacityAndSize(*msg.mutable_packed_fixed32(),
+                               std::numeric_limits<int>::max() - 4,
+                               std::numeric_limits<int>::max() - 4);
+        io::ArrayInputStream stream(str10.data(),
+                                    static_cast<int>(str10.size()),
+                                    /*block_size=*/24);
+        io::CodedInputStream coded(&stream);
+        (void)msg.MergePartialFromCodedStream(&coded);
+      },
+      HasSubstr("Integer overflow in CheckedAdd: "));
+}
+
 TEST_F(RepeatedFieldIsFullTest, RepeatedVarintOverflow) {
   if (!internal::RunLargeMemoryTests()) {
     GTEST_SKIP() << "Not enough memory for this test.";
