@@ -940,11 +940,8 @@ class Message
                     return NAN;
                 }
                 if (!is_numeric($value)) {
-                    trigger_error(
-                        "Invalid data type for float field. " .
-                        "This will fail in a future version of Protobuf.",
-                        E_USER_WARNING
-                    );
+                    throw new GPBDecodeException(
+                        "Invalid data type for float field");
                 }
                 return $value;
             case GPBType::INT32:
@@ -1299,12 +1296,8 @@ class Message
                     continue;
                 }
                 if (!is_array($value)) {
-                    trigger_error(
-                        "Invalid data type for repeated field. " .
-                        "This will fail in a future version of Protobuf.",
-                        E_USER_WARNING
-                    );
-                    continue;
+                    throw new GPBDecodeException(
+                        "Invalid data type for repeated field");
                 }
                 foreach ($value as $tmp) {
                     if (is_null($tmp)) {
