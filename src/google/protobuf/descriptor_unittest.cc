@@ -17181,6 +17181,98 @@ TEST_F(DatabaseBackedPoolTest, DoesntFallbackOnWrongType) {
   EXPECT_EQ(0, call_counter.call_count_);
 }
 
+TEST_F(DatabaseBackedPoolTest,
+       SuppressesFallbackDatabaseErrorsForUnloadedOptionDependencies) {
+  class SuppressionTrackingDatabase : public DescriptorDatabase {
+   public:
+    explicit SuppressionTrackingDatabase(DescriptorDatabase* wrapped_db)
+        : wrapped_db_(wrapped_db) {}
+
+    bool FindFileByName(absl::string_view filename,
+                        FileDescriptorProto* output) override {
+      file_lookups_.emplace_back(
+          filename,
+          internal::ScopedFallbackDatabaseErrorSuppressor::IsSuppressed());
+      return wrapped_db_->FindFileByName(filename, output);
+    }
+
+    bool FindFileContainingSymbol(absl::string_view symbol_name,
+                                  FileDescriptorProto* output) override {
+      symbol_lookups_.emplace_back(
+          symbol_name,
+          internal::ScopedFallbackDatabaseErrorSuppressor::IsSuppressed());
+      return wrapped_db_->FindFileContainingSymbol(symbol_name, output);
+    }
+
+    bool FindFileContainingExtension(absl::string_view containing_type,
+                                     int field_number,
+                                     FileDescriptorProto* output) override {
+      extension_lookups_.emplace_back(
+          containing_type, field_number,
+          internal::ScopedFallbackDatabaseErrorSuppressor::IsSuppressed());
+      return wrapped_db_->FindFileContainingExtension(containing_type,
+                                                      field_number, output);
+    }
+
+    DescriptorDatabase* wrapped_db_;
+    std::vector<std::pair<std::string, bool>> file_lookups_;
+    std::vector<std::pair<std::string, bool>> symbol_lookups_;
+    std::vector<std::tuple<std::string, int, bool>> extension_lookups_;
+  };
+
+  {
+    FileDescriptorProto proto;
+    FileDescriptorProto::descriptor()->file()->CopyTo(&proto);
+    database_.Add(proto);
+  }
+  AddToDatabase(&database_, R"pb(
+    name: "use_option_dep.proto"
+    syntax: "editions"
+    edition: EDITION_2024
+    option_dependency: "unloaded_option.proto"
+    options {
+      [proto2_unittest.file_opt1]: 1234
+    }
+    message_type { name: "OptionDepUser" }
+  )pb");
+
+  SuppressionTrackingDatabase tracking_db(&database_);
+  MockErrorCollector error_collector;
+  DescriptorPool pool(&tracking_db, &error_collector);
+
+  const FileDescriptor* file = pool.FindFileByName("use_option_dep.proto");
+  ASSERT_NE(file, nullptr);
+  EXPECT_EQ(error_collector.text_, "");
+
+  // Direct lookup of the target file is not suppressed, whereas speculative
+  // lookups of option_dependency files and option extension types during build
+  // and feature-lifetime validation are suppressed.
+  EXPECT_THAT(
+      tracking_db.file_lookups_,
+      testing::ElementsAre(testing::Pair("use_option_dep.proto", false),
+                           testing::Pair("unloaded_option.proto", true)));
+  EXPECT_THAT(tracking_db.symbol_lookups_,
+              testing::ElementsAre(testing::Pair("google.protobuf.FileOptions", true)));
+  EXPECT_THAT(tracking_db.extension_lookups_,
+              testing::ElementsAre(
+                  testing::FieldsAre("google.protobuf.FileOptions", 7736974, true)));
+
+  // Subsequent direct lookups on the pool outside BuildFile must not have
+  // fallback database error suppression active.
+  tracking_db.file_lookups_.clear();
+  tracking_db.extension_lookups_.clear();
+  EXPECT_EQ(pool.FindFileByName("missing_direct.proto"), nullptr);
+  EXPECT_THAT(tracking_db.file_lookups_, testing::ElementsAre(testing::Pair(
+                                             "missing_direct.proto", false)));
+  const Descriptor* file_options_desc =
+      pool.FindMessageTypeByName("google.protobuf.FileOptions");
+  ASSERT_NE(file_options_desc, nullptr);
+  EXPECT_EQ(pool.FindExtensionByNumber(file_options_desc, 999999), nullptr);
+  EXPECT_THAT(tracking_db.extension_lookups_,
+              testing::ElementsAre(
+                  testing::FieldsAre("google.protobuf.FileOptions", 999999, false)));
+}
+
 // ===================================================================
 
 class AbortingErrorCollector : public DescriptorPool::ErrorCollector {
