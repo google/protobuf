@@ -1828,7 +1828,7 @@ auto DescriptorPool::LookupWithFallback(
 
   // 1. Fast path: reader lock on cached tables.
   if (absl::Mutex* mu = mutex()) {
-    absl::ReaderMutexLock lock(mu);
+    absl::ReaderMutexLock lock(*mu);
     ResultT result = find_in_table(*tables_);
     if (result != nullptr) return result;
   }
