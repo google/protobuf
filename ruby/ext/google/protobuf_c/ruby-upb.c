@@ -6534,7 +6534,7 @@ int upb_JsonDecodeDetectingNonconformance(const char* buf, size_t size,
 typedef struct {
   char *buf, *ptr, *end;
   size_t overflow;
-  int indent_depth;
+  int depth;
   int options;
   const upb_DefPool* ext_pool;
   jmp_buf err;
@@ -6566,6 +6566,12 @@ UPB_NORETURN static void jsonenc_errf(jsonenc* e, const char* fmt, ...) {
   upb_Status_VSetErrorFormat(e->status, fmt, argp);
   va_end(argp);
   UPB_LONGJMP(e->err, 1);
+}
+
+static void jsonenc_checkdepth(jsonenc* e) {
+  if (--e->depth < 0) {
+    jsonenc_err(e, "Max depth exceeded");
+  }
 }
 
 static upb_Arena* jsonenc_arena(jsonenc* e) {
@@ -6893,6 +6899,8 @@ badurl:
 
 static void jsonenc_any(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
+
   const upb_FieldDef* type_url_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_FieldDef* value_f = upb_MessageDef_FindFieldByNumber(m, 2);
   upb_StringView type_url = upb_Message_GetFieldByDef(msg, type_url_f).str_val;
@@ -6906,7 +6914,9 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
     return;
   }
 
-  if (upb_Decode(value.data, value.size, any, any_layout, NULL, 0, arena) !=
+  const upb_ExtensionRegistry* extreg =
+      upb_DefPool_ExtensionRegistry(e->ext_pool);
+  if (upb_Decode(value.data, value.size, any, any_layout, extreg, 0, arena) !=
       kUpb_DecodeStatus_Ok) {
     jsonenc_err(e, "Error decoding message in Any");
   }
@@ -6924,6 +6934,7 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
@@ -6983,6 +6994,7 @@ static void jsonenc_fieldmask(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
                            const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
 
   const upb_FieldDef* fields_f = upb_MessageDef_FindFieldByNumber(m, 1);
@@ -7005,10 +7017,12 @@ static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
                               const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   const upb_FieldDef* values_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_MessageDef* values_m = upb_FieldDef_MessageSubDef(values_f);
   const upb_Array* values = upb_Message_GetFieldByDef(msg, values_f).array_val;
@@ -7028,6 +7042,7 @@ static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "]");
+  e->depth++;
 }
 
 static void jsonenc_value(jsonenc* e, const upb_Message* msg,
@@ -7227,14 +7242,17 @@ static void jsonenc_fieldval(jsonenc* e, const upb_FieldDef* f,
     // TODO: For MessageSet, I would have expected this to print the message
     // name here, but Python doesn't appear to do this. We should do more
     // research here about what various implementations do.
-    jsonenc_printf(e, "\"[%s]\":", upb_FieldDef_FullName(f));
+    jsonenc_putstr(e, "\"[");
+    jsonenc_stringbody(e, upb_StringView_FromString(upb_FieldDef_FullName(f)));
+    jsonenc_putstr(e, "]\":");
   } else {
     if (e->options & upb_JsonEncode_UseProtoNames) {
       name = upb_FieldDef_Name(f);
     } else {
       name = upb_FieldDef_JsonName(f);
     }
-    jsonenc_printf(e, "\"%s\":", name);
+    jsonenc_string(e, upb_StringView_FromString(name));
+    jsonenc_putstr(e, ":");
   }
 
   if (upb_FieldDef_IsMap(f)) {
@@ -7272,9 +7290,11 @@ static void jsonenc_msgfields(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_msg(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
   jsonenc_msgfields(e, msg, m, true);
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static size_t jsonenc_nullz(jsonenc* e, size_t size) {
@@ -7292,7 +7312,10 @@ static size_t upb_JsonEncoder_Encode(jsonenc* const e,
                                      const upb_Message* const msg,
                                      const upb_MessageDef* const m,
                                      const size_t size) {
-  if (UPB_SETJMP(e->err) != 0) return -1;
+  if (UPB_SETJMP(e->err) != 0) {
+    if (e->arena) upb_Arena_Free(e->arena);
+    return -1;
+  }
 
   jsonenc_msgfield(e, msg, m);
   if (e->arena) upb_Arena_Free(e->arena);
@@ -7308,6 +7331,7 @@ size_t upb_JsonEncode(const upb_Message* msg, const upb_MessageDef* m,
   e.ptr = buf;
   e.end = UPB_PTRADD(buf, size);
   e.overflow = 0;
+  e.depth = upb_JsonEncodeOptions_GetEffectiveMaxDepth(options);
   e.options = options;
   e.ext_pool = ext_pool;
   e.status = status;
@@ -7862,7 +7886,11 @@ bool upb_Arena_HasRefChain(const upb_Arena* from, const upb_Arena* to) {
 #endif
 
 static void* _upb_Arena_AllocBlockInternal(upb_alloc* alloc, size_t* size) {
-  size_t sz = *size + kUpb_MemblockReserve;
+  size_t sz;
+  if (UPB_UNLIKELY(!UPB_PRIVATE(_upb_Arena_CheckedAdd)(
+          *size, kUpb_MemblockReserve, &sz))) {
+    return NULL;
+  }
   upb_SizedPtr alloc_result = upb_SizeReturningMalloc(alloc, sz);
   if (!alloc_result.p) return NULL;
   upb_MemBlock* block = alloc_result.p;
@@ -7874,6 +7902,7 @@ static void* _upb_Arena_AllocBlockInternal(upb_alloc* alloc, size_t* size) {
 void* UPB_PRIVATE(_upb_Arena_AllocBlock)(upb_Arena* a, size_t* size) {
   upb_ArenaInternal* ai = upb_Arena_Internal(a);
 #if UPB_HWASAN
+  if (UPB_UNLIKELY(*size > SIZE_MAX - (UPB_MALLOC_ALIGN - 1))) return NULL;
   *size = UPB_ALIGN_UP(*size, UPB_MALLOC_ALIGN);
 #endif
   void* ret =
@@ -8060,11 +8089,16 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
     return NULL;
   }
   if (!alloc) return NULL;
+  if (UPB_UNLIKELY(first_size > _UPB_ARENA_MAX_ALLOC_SIZE)) return NULL;
 
   // We need to malloc the initial block.
-  size_t block_size = kUpb_ArenaStateReserve +
-                      UPB_MAX(256, UPB_ALIGN_MALLOC(first_size) +
-                                       UPB_PRIVATE(kUpb_Asan_GuardSize));
+  size_t payload_size = UPB_MAX(
+      256, UPB_ALIGN_MALLOC(first_size) + UPB_PRIVATE(kUpb_Asan_GuardSize));
+  size_t block_size;
+  if (UPB_UNLIKELY(!UPB_PRIVATE(_upb_Arena_CheckedAdd)(
+          kUpb_ArenaStateReserve, payload_size, &block_size))) {
+    return NULL;
+  }
   void* block = _upb_Arena_AllocBlockInternal(alloc, &block_size);
   if (!block) return NULL;
 
@@ -9246,8 +9280,8 @@ bool _upb_mapsorter_pushmap(_upb_mapsorter* s, upb_FieldType key_type,
 }
 
 static int _upb_mapsorter_cmpext(const void* _a, const void* _b) {
-  const upb_Extension* const* a = _a;
-  const upb_Extension* const* b = _b;
+  const upb_AuxField* const* a = _a;
+  const upb_AuxField* const* b = _b;
   uint32_t a_num = upb_MiniTableField_Number(upb_Extension_MiniTableField(*a));
   uint32_t b_num = upb_MiniTableField_Number(upb_Extension_MiniTableField(*b));
   UPB_ASSERT(a_num != b_num);
@@ -9262,8 +9296,7 @@ bool _upb_mapsorter_pushexts(_upb_mapsorter* s, const upb_Message_Internal* in,
   }
   if (!_upb_mapsorter_resize(s, sorted, count)) return false;
   if (count == 0) return true;
-  const upb_Extension** entry =
-      (const upb_Extension**)&s->entries[sorted->start];
+  const upb_AuxField** entry = (const upb_AuxField**)&s->entries[sorted->start];
   for (size_t i = 0; i < in->size; i++) {
     upb_TaggedAuxPtr tagged_ptr = in->aux_data[i];
     if (upb_TaggedAuxPtr_IsCanonicalExtension(tagged_ptr)) {
@@ -9482,8 +9515,7 @@ void upb_Message_Freeze(upb_Message* msg, const upb_MiniTable* m) {
   // TODO: b/376969853 - use iterator API
   uint32_t size = in ? in->size : 0;
   for (size_t i = 0; i < size; i++) {
-    const upb_Extension* ext =
-        upb_TaggedAuxPtr_TryGetExtension(in->aux_data[i]);
+    const upb_AuxField* ext = upb_TaggedAuxPtr_TryGetExtension(in->aux_data[i]);
     if (!ext) continue;
     const upb_MiniTableField* f = upb_Extension_MiniTableField(ext);
     const upb_MiniTable* m2 = upb_MiniTable_SubMessage(f);
@@ -9890,7 +9922,7 @@ static bool _upb_Message_ExtensionsAreEqual(const upb_Message* msg1,
   size_t count1 = 0;
   size_t iter2 = kUpb_Message_ExtensionBegin;
   while (upb_Message_NextExtensionField(msg2, &f, &val2, &iter2)) {
-    const upb_Extension* ext1 = UPB_PRIVATE(_upb_Message_GetExtension)(msg1, f);
+    const upb_AuxField* ext1 = UPB_PRIVATE(_upb_Message_GetExtension)(msg1, f);
     if (!ext1) return false;
 
     count1++;
@@ -10214,7 +10246,7 @@ static upb_UnknownFields* upb_UnknownFields_Build(upb_UnknownField_Context* ctx,
       char* enc_buf = upb_BackAlloc_Init(&ctx->encoder.alloc, ctx->arena);
       ctx->encoder.status = kUpb_EncodeStatus_Ok;
       // Encode non-canonical extension to buffer.
-      const upb_Extension* ext = (const upb_Extension*)data.value.extension;
+      const upb_AuxField* ext = (const upb_AuxField*)data.value.extension;
       bool is_message_set = false;
       const upb_MiniTableExtension* ext_mt =
           upb_Extension_MiniTableExtension(ext);
@@ -10544,8 +10576,8 @@ static bool upb_Message_Array_DeepClone(const upb_Array* array,
 }
 
 static bool upb_Clone_ExtensionValue(const upb_MiniTableField* field,
-                                     const upb_Extension* source,
-                                     upb_Extension* dest, upb_Arena* arena) {
+                                     const upb_AuxField* source,
+                                     upb_AuxField* dest, upb_Arena* arena) {
   upb_MessageValue val = upb_Extension_GetValue(source);
   if (!upb_Clone_MessageValue(&val, upb_MiniTableField_CType(field),
                               upb_MiniTable_SubMessage(field), arena)) {
@@ -10625,7 +10657,7 @@ upb_Message* _upb_Message_Copy(upb_Message* dst, const upb_Message* src,
       // That schema is not guaranteed to outlive the clone, so we must not
       // copy the pointer. Instead, serialize the extension into the
       // destination arena and store it as unknown bytes, preserving order.
-      const upb_Extension* msg_ext =
+      const upb_AuxField* msg_ext =
           upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
       upb_StringView encoded;
       if (upb_EncodeExtension(msg_ext, arena, &encoded, /*encode_options=*/0) !=
@@ -10638,10 +10670,10 @@ upb_Message* _upb_Message_Copy(upb_Message* dst, const upb_Message* src,
         goto err;
       }
     } else if (upb_TaggedAuxPtr_IsCanonicalExtension(tagged_ptr)) {
-      const upb_Extension* msg_ext =
+      const upb_AuxField* msg_ext =
           upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
       const upb_MiniTableField* field = upb_Extension_MiniTableField(msg_ext);
-      upb_Extension* dst_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+      upb_AuxField* dst_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
           dst, upb_Extension_MiniTableExtension(msg_ext), arena);
       if (!dst_ext) goto err;
 
@@ -10756,7 +10788,7 @@ bool upb_Message_MergeFrom(upb_Message* dst, const upb_Message* src,
 
 // Must be last.
 
-const upb_Extension* UPB_PRIVATE(_upb_Message_GetExtension)(
+const upb_AuxField* UPB_PRIVATE(_upb_Message_GetExtension)(
     const struct upb_Message* msg, const upb_MiniTableField* f) {
   upb_Message_Internal* in = UPB_PRIVATE(_upb_Message_GetInternal)(msg);
   if (!in) return NULL;
@@ -10764,8 +10796,7 @@ const upb_Extension* UPB_PRIVATE(_upb_Message_GetExtension)(
   for (size_t i = 0; i < in->size; i++) {
     upb_TaggedAuxPtr tagged_ptr = in->aux_data[i];
     if (upb_TaggedAuxPtr_IsCanonicalExtension(tagged_ptr)) {
-      const upb_Extension* ext =
-          upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
+      const upb_AuxField* ext = upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
       if (upb_Extension_MiniTableField(ext) == f) {
         return ext;
       }
@@ -10775,13 +10806,13 @@ const upb_Extension* UPB_PRIVATE(_upb_Message_GetExtension)(
   return NULL;
 }
 
-const upb_Extension* UPB_PRIVATE(_upb_Message_Getext)(
+const upb_AuxField* UPB_PRIVATE(_upb_Message_Getext)(
     const struct upb_Message* msg, const upb_MiniTableExtension* e) {
   return UPB_PRIVATE(_upb_Message_GetExtension)(
       msg, upb_MiniTableExtension_ToField(e));
 }
 
-upb_Extension* UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
+upb_AuxField* UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
     struct upb_Message* msg, const upb_MiniTableExtension* e, upb_Arena* a,
     upb_TaggedAuxType tag) {
   UPB_ASSERT(!upb_Message_IsFrozen(msg));
@@ -10794,25 +10825,24 @@ upb_Extension* UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
   // of adding a unknown StringView (through `_upb_Message_AddUnknown`) which
   // accumulates.
   if (tag == kUpb_TaggedAuxType_CanonicalExtension) {
-    upb_Extension* ext =
-        (upb_Extension*)UPB_PRIVATE(_upb_Message_Getext)(msg, e);
+    upb_AuxField* ext = (upb_AuxField*)UPB_PRIVATE(_upb_Message_Getext)(msg, e);
     if (ext) return ext;
   }
   if (!UPB_PRIVATE(_upb_Message_ReserveSlot)(msg, a)) return NULL;
   upb_Message_Internal* in = UPB_PRIVATE(_upb_Message_GetInternal)(msg);
-  upb_Extension* ext = UPB_PRIVATE(_upb_Extension_New)(e, a);
+  upb_AuxField* ext = UPB_PRIVATE(_upb_Extension_New)(e, a);
   if (!ext) return NULL;
   in->aux_data[in->size++] = upb_TaggedAuxPtr_MakeExtension(ext, tag);
   return ext;
 }
 
-upb_Extension* UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+upb_AuxField* UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
     struct upb_Message* msg, const upb_MiniTableExtension* e, upb_Arena* a) {
   return UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
       msg, e, a, kUpb_TaggedAuxType_CanonicalExtension);
 }
 
-upb_Extension* UPB_PRIVATE(_upb_Message_CreateNonCanonicalExtension)(
+upb_AuxField* UPB_PRIVATE(_upb_Message_CreateNonCanonicalExtension)(
     struct upb_Message* msg, const upb_MiniTableExtension* e, upb_Arena* a) {
   return UPB_PRIVATE(_upb_Message_GetOrCreateExtensionWithTag)(
       msg, e, a, kUpb_TaggedAuxType_NonCanonicalExtension);
@@ -10941,9 +10971,8 @@ bool UPB_PRIVATE(_upb_Message_CopyInternal)(struct upb_Message* dst,
   for (size_t i = 0; i < in->size; i++) {
     upb_TaggedAuxPtr tagged_ptr = in->aux_data[i];
     if (upb_TaggedAuxPtr_IsExtension(tagged_ptr)) {
-      const upb_Extension* msg_ext = upb_TaggedAuxPtr_Extension(tagged_ptr);
-      upb_Extension* dst_ext =
-          UPB_PRIVATE(_upb_Extension_Clone)(msg_ext, arena);
+      const upb_AuxField* msg_ext = upb_TaggedAuxPtr_Extension(tagged_ptr);
+      upb_AuxField* dst_ext = UPB_PRIVATE(_upb_Extension_Clone)(msg_ext, arena);
       if (!dst_ext) return false;
       dst_in->aux_data[dst_in->size++] = upb_TaggedAuxPtr_MakeExtension(
           dst_ext, upb_TaggedAuxPtr_Type(tagged_ptr));
@@ -11062,7 +11091,7 @@ static upb_MiniTableEnum* _upb_MiniTable_AddEnumDataMember(upb_MdEnumDecoder* d,
 static void upb_MiniTableEnum_BuildValue(upb_MdEnumDecoder* d, uint32_t val) {
   upb_MiniTableEnum* table = d->enum_table;
   d->enum_value_count++;
-  if (table->UPB_PRIVATE(value_count) ||
+  if (table->UPB_PRIVATE(value_count) || val > UINT32_MAX - 32 ||
       (val > 512 && d->enum_value_count < val / 32)) {
     if (table->UPB_PRIVATE(value_count) == 0) {
       UPB_ASSERT(d->enum_data_count == table->UPB_PRIVATE(mask_limit) / 32);
@@ -15529,8 +15558,10 @@ void _upb_FileDef_Create(upb_DefBuilder* ctx,
     // We are building ext layouts from scratch.
     file->ext_layouts = _upb_DefBuilder_Alloc(
         ctx, sizeof(*file->ext_layouts) * file->ext_count);
-    memset((void*)file->ext_layouts, 0,
-           sizeof(*file->ext_layouts) * file->ext_count);
+    if (file->ext_count != 0) {
+      memset((void*)file->ext_layouts, 0,
+             sizeof(*file->ext_layouts) * file->ext_count);
+    }
   }
 
   upb_StringView name = google_protobuf_FileDescriptorProto_name(file_proto);
@@ -16286,7 +16317,7 @@ bool upb_Message_Next(const upb_Message* msg, const upb_MessageDef* m,
     for (; (i - n) < in->size; i++) {
       upb_TaggedAuxPtr tagged_ptr = in->aux_data[i - n];
       if (upb_TaggedAuxPtr_IsCanonicalExtension(tagged_ptr)) {
-        const upb_Extension* ext =
+        const upb_AuxField* ext =
             upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
         *out_val = upb_Extension_GetValue(ext);
         *out_f = upb_DefPool_FindExtensionByMiniTable(
@@ -18873,7 +18904,7 @@ enum {
 static void upb_Decoder_AddKnownMessageSetItem(
     upb_Decoder* d, upb_Message* msg, const upb_MiniTableExtension* item_mt,
     const char* data, uint32_t size) {
-  upb_Extension* ext =
+  upb_AuxField* ext =
       UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(msg, item_mt, &d->arena);
   if (UPB_UNLIKELY(!ext)) {
     upb_ErrorHandler_ThrowError(d->err, kUpb_DecodeStatus_OutOfMemory);
@@ -19217,7 +19248,7 @@ const char* _upb_Decoder_DecodeKnownField(upb_Decoder* d, const char* ptr,
   if (UPB_UNLIKELY(mode & kUpb_LabelFlags_IsExtension)) {
     const upb_MiniTableExtension* ext_layout =
         (const upb_MiniTableExtension*)field;
-    upb_Extension* ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+    upb_AuxField* ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
         msg, ext_layout, &d->arena);
     if (UPB_UNLIKELY(!ext)) {
       upb_ErrorHandler_ThrowError(d->err, kUpb_DecodeStatus_OutOfMemory);
@@ -19710,7 +19741,7 @@ const char* upb_EncodeStatus_String(upb_EncodeStatus status) {
 // Must be last.
 
 static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
-                                              const struct upb_Extension* ext,
+                                              const struct upb_AuxField* ext,
                                               bool is_message_set,
                                               upb_StringView* view,
                                               int encode_options) {
@@ -19733,7 +19764,7 @@ static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
   return encoder->status;
 }
 
-upb_EncodeStatus upb_EncodeExtension(const struct upb_Extension* ext,
+upb_EncodeStatus upb_EncodeExtension(const struct upb_AuxField* ext,
                                      struct upb_Arena* arena,
                                      upb_StringView* view, int encode_options) {
   const upb_MiniTable* extendee =
@@ -20005,7 +20036,7 @@ UPB_NOINLINE static char* encode_longvarint(char* ptr, upb_encstate* e,
       "br %[addr]\n"
       // Work around llvm/llvm-project#47432, where alignment directives inside
       // functions crash the compiler when generating SEH info on windows.
-      #ifndef __SEH__
+      #if !defined(__SEH__) && !defined(_WIN32)
       ".p2align " UPB_BTI_SHIFT_IMM
       #endif
       "0:\n"
@@ -20551,7 +20582,7 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     if (!_upb_mapsorter_pushexts(&e->sorter, in, &sorted)) {
       encode_err(e, kUpb_EncodeStatus_OutOfMemory);
     }
-    const upb_Extension* ext;
+    const upb_AuxField* ext;
     while (_upb_sortedmap_nextext(&e->sorter, &sorted, &ext)) {
       ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                        upb_Extension_GetValue(ext),
@@ -20596,7 +20627,7 @@ char* encode_message(char* ptr, upb_encstate* e, const upb_Message* msg,
             upb_TaggedPtrAux_StringViewRepr(tagged_ptr);
         ptr = encode_bytes(ptr, e, unknown->data, unknown->size);
       } else if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
-        const upb_Extension* ext =
+        const upb_AuxField* ext =
             upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
         ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                          upb_Extension_GetValue(ext),

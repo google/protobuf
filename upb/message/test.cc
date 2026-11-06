@@ -1306,7 +1306,7 @@ TEST(MessageTest, ExtensionAccessors) {
   upb_test_TestExtensions* msg = upb_test_TestExtensions_new(arena.ptr());
 
   // Scalar extension.
-  upb_Extension* int32_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+  upb_AuxField* int32_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
       UPB_UPCAST(msg), upb_test_TestExtensions_optional_int32_ext_ext,
       arena.ptr());
   ASSERT_NE(int32_ext, nullptr);
@@ -1335,7 +1335,7 @@ TEST(MessageTest, ExtensionAccessors) {
   EXPECT_EQ(got_val, 123);
 
   // Message extension.
-  upb_Extension* msg_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+  upb_AuxField* msg_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
       UPB_UPCAST(msg), upb_test_optional_msg_ext_ext, arena.ptr());
   ASSERT_NE(msg_ext, nullptr);
   EXPECT_EQ(upb_Extension_GetMessage(msg_ext), nullptr);
@@ -1347,7 +1347,7 @@ TEST(MessageTest, ExtensionAccessors) {
   EXPECT_EQ(upb_test_optional_msg_ext(msg), sub_msg);
 
   // Repeated extension.
-  upb_Extension* array_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+  upb_AuxField* array_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
       UPB_UPCAST(msg), upb_test_TestExtensions_Nested_repeated_int32_ext_ext,
       arena.ptr());
   ASSERT_NE(array_ext, nullptr);
@@ -1419,8 +1419,7 @@ TEST(MessageTest, NextUnknown2AndDeleteUnknown2) {
                  kUpb_MessageUnknownType_NonCanonicalExtension) {
         EXPECT_FALSE(found_ext);
         found_ext = true;
-        const upb_Extension* ext =
-            (const upb_Extension*)unknown.value.extension;
+        const upb_AuxField* ext = (const upb_AuxField*)unknown.value.extension;
         EXPECT_EQ(upb_Extension_MiniTableExtension(ext),
                   upb_test_TestExtensions_optional_int32_ext_ext);
         EXPECT_EQ(upb_Extension_GetInt32(ext), 42);
