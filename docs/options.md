@@ -47,7 +47,7 @@ about your project (name and website) so we can add an entry for you.
 
 1.  Unix Domain RPC code generator plugin
 
-    *   Website: http://go/udrpc
+    *   Website: ???
     *   Extensions: 1006
 
 1.  Object-C generator plugin (Plausible Labs)
@@ -613,3 +613,14 @@ about your project (name and website) so we can add an entry for you.
 
     *   Website: https://github.com/willbinge/firestore-proto-codec
     *   Extensions: 1376-1380
+
+1.  buffa
+
+    *   Website: https://github.com/anthropics/buffa
+    *   Extensions: 1381-1390
+
+1.  protoc-gen-go-tag
+
+    *   Website:
+        https://github.com/searKing/golang/tree/master/tools/protoc-gen-go-tag
+    *   Extensions: 1391

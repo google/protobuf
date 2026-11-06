@@ -86,25 +86,7 @@ typedef bool eqlfunc_t(upb_key k1, upb_value v1, lookupkey_t k2);
 
 /* Base table (shared code) ***************************************************/
 
-static uint32_t upb_inthash(uintptr_t key) {
-  UPB_STATIC_ASSERT(sizeof(uintptr_t) == 4 || sizeof(uintptr_t) == 8,
-                    "Pointers don't fit");
-  if (sizeof(uintptr_t) == 8) {
-    return (uint32_t)key ^ (uint32_t)((uint64_t)key >> 32);
-  } else {
-    return (uint32_t)key;
-  }
-}
-
-static upb_tabent* upb_getentry(const upb_table* t, uint32_t hash) {
-  return t->entries + (hash & t->mask);
-}
-
-static bool isfull(upb_table* t) {
-  uint32_t size = upb_table_size(t);
-  // 0.875 load factor
-  return t->count == (size - (size >> 3));
-}
+static bool isfull(upb_table* t) { return upb_table_isfull(t); }
 
 static bool init(upb_table* t, uint8_t size_lg2, upb_Arena* a) {
   if (size_lg2 >= 32) {
@@ -625,8 +607,9 @@ bool upb_strtable_copy(upb_strtable* dest, const upb_strtable* src,
   return true;
 }
 
-bool upb_strtable_insert(upb_strtable* t, const char* k, size_t len,
-                         upb_value v, upb_Arena* a) {
+// Inserts `k`, whose hash is `hash`, which must not already be in the table.
+UPB_FORCEINLINE bool strtable_insert(upb_strtable* t, const char* k, size_t len,
+                                     upb_value v, uint32_t hash, upb_Arena* a) {
   if (isfull(&t->t)) {
     /* Need to resize.  New table of double the size, add old elements to it. */
     if (!upb_strtable_resize(t, _upb_log2_table_size(&t->t) + 1, a)) {
@@ -640,9 +623,30 @@ bool upb_strtable_insert(upb_strtable* t, const char* k, size_t len,
 
   lookupkey_t lookupkey = {.str = sv};
   upb_key key = {.str = size_prefix_string};
-  uint32_t hash = _upb_Hash_NoSeed(k, len);
   insert(&t->t, lookupkey, key, v, hash, &strhash, &streql);
   return true;
+}
+
+bool upb_strtable_insert(upb_strtable* t, const char* k, size_t len,
+                         upb_value v, upb_Arena* a) {
+  return strtable_insert(t, k, len, v, _upb_Hash_NoSeed(k, len), a);
+}
+
+bool upb_strtable_insert_or_replace(upb_strtable* t, const char* k, size_t len,
+                                    upb_value v, bool* replaced, upb_Arena* a) {
+  // Store to `*replaced` before reading the table: the compiler cannot prove
+  // that `replaced` does not point into `*t`, so storing it after the lookup
+  // would force it to reload the table fields.
+  *replaced = false;
+  uint32_t hash = _upb_Hash_NoSeed(k, len);
+  upb_tabent* e = findentry_mutable(&t->t, strkey2(k, len), hash, &streql);
+  if (e) {
+    e->val = v;
+    *replaced = true;
+    return true;
+  }
+  if (UPB_UNLIKELY(t->t.entries == NULL) && !init(&t->t, 3, a)) return false;
+  return strtable_insert(t, k, len, v, hash, a);
 }
 
 bool upb_strtable_lookup2(const upb_strtable* t, const char* key, size_t len,
@@ -817,8 +821,6 @@ static bool inteql(upb_key k1, upb_value v1, lookupkey_t k2) {
   return k1.num == k2.num;
 }
 
-size_t upb_inttable_count(const upb_inttable* t) { return t->t.count; }
-
 static void check(upb_inttable* t) {
   UPB_UNUSED(t);
 #if defined(UPB_DEBUG_TABLE) && !defined(NDEBUG)
@@ -896,27 +898,30 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
   size_t old_bytes = old_size * sizeof(upb_tabent);
   size_t new_size = (size_t)1 << size_lg2;
   size_t new_bytes = new_size * sizeof(upb_tabent);
-  if (new_bytes <= old_bytes || !t->t.entries) {
+  // The entries never overlap `*t`, but the compiler cannot prove that, so
+  // without this local every store to an entry would force `t->t.entries` to
+  // be reloaded.
+  upb_tabent* entries = t->t.entries;
+  if (new_bytes <= old_bytes || !entries) {
     return false;
   }
 
-  if (!upb_Arena_TryExtend(a, t->t.entries, old_bytes, new_bytes)) {
+  if (!upb_Arena_TryExtend(a, entries, old_bytes, new_bytes)) {
     return false;
   }
 
   // Zero out the newly extended region of the table buffer.
-  memset(t->t.entries + old_size, 0,
-         (new_size - old_size) * sizeof(upb_tabent));
+  memset(entries + old_size, 0, (new_size - old_size) * sizeof(upb_tabent));
 
   // This one-past-the-end pointer is guaranteed to be distinct from NULL and
   // any valid internal collision chain pointer in the entire table.
-  upb_tabent* unhashed_marker = t->t.entries + new_size;
+  upb_tabent* unhashed_marker = entries + new_size;
 
   // Mark all existing occupied entries as UNHASHED using the distinct
   // marker. Because e->next != NULL, these pending slots are fully protected
   // from being claimed by emptyent() during collision chain formation.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* e = &t->t.entries[i];
+    upb_tabent* e = &entries[i];
     if (!upb_tabent_isempty(e)) {
       upb_tabent_setnext(e, unhashed_marker);
     }
@@ -928,7 +933,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
 
   // Trace and resolve all destinations.
   for (size_t i = 0; i < old_size; i++) {
-    upb_tabent* current = &t->t.entries[i];
+    upb_tabent* current = &entries[i];
     if (!upb_tabent_hasnext(current) ||
         upb_tabent_next(current) != unhashed_marker) {
       continue;  // Slot is already hashed or empty.
@@ -943,7 +948,7 @@ static bool upb_inttable_trygrow(upb_inttable* t, size_t size_lg2,
     // total O(n) time across the whole rehash.
     while (true) {
       uint32_t hash = inthash(tabkey, val);
-      upb_tabent* target_bucket = &t->t.entries[hash & mask];
+      upb_tabent* target_bucket = &entries[hash & mask];
 
       if (upb_tabent_hasnext(target_bucket) &&
           upb_tabent_next(target_bucket) == unhashed_marker) {
@@ -1008,6 +1013,24 @@ bool upb_inttable_insert(upb_inttable* t, uintptr_t key, upb_value val,
   insert(&t->t, intkey(key), tabkey, val, upb_inthash(key), &inthash, &inteql);
   check(t);
   return true;
+}
+
+bool upb_inttable_insert_or_replace_slow(upb_inttable* t, uintptr_t key,
+                                         upb_value val, bool* replaced,
+                                         upb_Arena* a) {
+  // See upb_strtable_insert_or_replace() for why this is stored first.
+  *replaced = false;
+  upb_tabent* e =
+      findentry_mutable(&t->t, intkey(key), upb_inthash(key), &inteql);
+  if (e) {
+    e->val = val;
+    *replaced = true;
+    return true;
+  }
+  if (UPB_UNLIKELY(t->t.entries == NULL) && !upb_inttable_init(t, a)) {
+    return false;
+  }
+  return upb_inttable_insert(t, key, val, a);
 }
 
 bool upb_inttable_lookup(const upb_inttable* t, uintptr_t key, upb_value* v) {

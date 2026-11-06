@@ -1,7 +1,13 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_CONFORMANCE_TESTEE_H__
 #define GOOGLE_PROTOBUF_CONFORMANCE_TESTEE_H__
 
-#include <limits>
 #include <string>
 #include <utility>
 
@@ -18,7 +24,7 @@
 //
 // Tests should never need to name any of these types directly.  A test
 // obtains a Test object for the global testee from Testee() (see
-// test_environment.h), chains operations on it and passes the final
+// test_fixture.h), chains operations on it and passes the final
 // TestResult to Yields() (see matchers.h):
 //
 //   EXPECT_THAT(Testee()
@@ -48,7 +54,7 @@ namespace conformance {
 // "Recommended" (see PriorityLevelName()).
 //
 // A suite declares its priority with ConformanceTest::DefaultPriority().  A
-// single test overrides it with Testee(priority); see test_environment.h.
+// single test overrides it with Testee(priority); see test_fixture.h.
 // TODO: b/564550230 - rename the levels in test names to P0/P1 once every
 // suite has been triaged.
 enum class TestPriority { kP0 = 0, kP1 = 1 };
@@ -57,14 +63,19 @@ enum class TestPriority { kP0 = 0, kP1 = 1 };
 inline constexpr TestPriority kP0 = TestPriority::kP0;
 inline constexpr TestPriority kP1 = TestPriority::kP1;
 
-// An enforcement level is the highest priority, as an int (0 for kP0, 1 for
-// kP1), whose unlisted failures fail the run.  See TestManager in
-// test_manager.h.  kEnforceAllPriorities, the default, enforces every
-// priority, however many there are.
-inline constexpr int kEnforceAllPriorities = std::numeric_limits<int>::max();
+// The lowest priority there is.  An enforcement level (see ResultLedger in
+// result_ledger.h) is the lowest priority whose unlisted failures fail the run;
+// kLowestPriority, the default, enforces every priority.
+inline constexpr TestPriority kLowestPriority = kP1;
 
 // The name of a priority: "P0" or "P1".
 absl::string_view PriorityName(TestPriority priority);
+
+// Flag support for TestPriority, as the priority's number: "0" is kP0, "1" is
+// kP1.
+bool AbslParseFlag(absl::string_view text, TestPriority* priority,
+                   std::string* error);
+std::string AbslUnparseFlag(TestPriority priority);
 
 // The level a priority is named with in test names, until the rename (see
 // TestPriority): "Required" for kP0, "Recommended" for kP1.
