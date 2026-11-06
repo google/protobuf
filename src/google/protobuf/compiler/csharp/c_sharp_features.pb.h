@@ -36,15 +36,6 @@
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 
-#define PROTOBUF_INTERNAL_EXPORT_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto PROTOC_EXPORT
-
-// Internal implementation detail -- do not use these members.
-struct PROTOC_EXPORT TableStruct_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto {
-  static const ::uint32_t offsets[];
-};
-extern "C" {
-PROTOC_EXPORT extern const ::google::protobuf::internal::DescriptorTable descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto;
-}  // extern "C"
 namespace pb {
 class CSharpFeatures;
 struct CSharpFeaturesGlobalsTypeInternal;
@@ -57,6 +48,9 @@ template <>
 internal::GeneratedMessageTraitsT<&::pb::CSharpFeatures_globals_>
     internal::MessageTraitsImpl::value<::pb::CSharpFeatures>;
 namespace internal {
+template <class T>
+[[nodiscard]] inline ::absl::string_view GetFeatureSetDefaultsData();
+
 template <>
 inline ::absl::string_view GetFeatureSetDefaultsData<::pb::CSharpFeatures>() {
   static constexpr char kDefaults[] = "CiEYhAciA+I+ACoXCAEQAhgCIAMoATACOAJAAUgB4j4CCAAKIRjnByID4j4AKhcIAhABGAEgAigBMAE4AkABSAHiPgIIAAohGOgHIg8IARABGAEgAigBMAHiPgAqCzgCQAFIAeI+AggACiEY6QciEwgBEAEYASACKAEwATgBQALiPgAqB0gB4j4CCAAKIRjqByIXCAEQARgBIAIoATABOANABEgC4j4CCAAqA+I+ACDmByjqBw==";
@@ -65,6 +59,16 @@ inline ::absl::string_view GetFeatureSetDefaultsData<::pb::CSharpFeatures>() {
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
+
+#define PROTOBUF_INTERNAL_EXPORT_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto PROTOC_EXPORT
+
+// Internal implementation detail -- do not use these members.
+struct PROTOC_EXPORT TableStruct_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto {
+  static const ::uint32_t offsets[];
+};
+extern "C" {
+PROTOC_EXPORT extern const ::google::protobuf::internal::DescriptorTable descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto;
+}  // extern "C"
 
 namespace pb {
 

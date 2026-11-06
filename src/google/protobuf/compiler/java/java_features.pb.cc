@@ -39,7 +39,7 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto, /* tracker*/ nullptr,},
         // ::pb::JavaFeatures
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto, /* tracker*/ nullptr,},
-};
+    };
 }  // namespace
 namespace pb {
 class JavaFeatures_NestInFileClassFeature::_Internal {
@@ -305,18 +305,18 @@ const ::uint32_t
         2,
         3,
         4,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::pb::JavaFeatures_NestInFileClassFeature)},
         {1, sizeof(::pb::JavaFeatures)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::JavaFeatures_NestInFileClassFeature_globals_,
         &::pb::JavaFeatures_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n1google/protobuf/compiler/java/java_fea"
@@ -354,7 +354,7 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fjava_2fjava_
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
+    };
 static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcompiler_2fjava_2fjava_5ffeatures_2eproto = {
     false,

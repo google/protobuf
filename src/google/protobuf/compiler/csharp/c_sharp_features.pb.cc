@@ -37,7 +37,7 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::pb::CSharpFeatures
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto, /* tracker*/ nullptr,},
-};
+    };
 }  // namespace
 namespace pb {
 class CSharpFeatures::_Internal {
@@ -164,16 +164,16 @@ const ::uint32_t
         4, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::pb::CSharpFeatures, _impl_.nullable_reference_types_),
         0,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::pb::CSharpFeatures)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::CSharpFeatures_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n6google/protobuf/compiler/csharp/c_shar"
@@ -188,7 +188,7 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
+    };
 static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcompiler_2fcsharp_2fc_5fsharp_5ffeatures_2eproto = {
     false,

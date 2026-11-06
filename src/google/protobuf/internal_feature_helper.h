@@ -94,6 +94,10 @@ class PROTOBUF_EXPORT InternalFeatureHelper {
     return GetEdition(*desc.file());
   }
 
+  static SymbolVisibility GetResolvedSymbolVisibility(const Descriptor& desc);
+  static SymbolVisibility GetResolvedSymbolVisibility(
+      const EnumDescriptor& desc);
+
   // Parses the serialized FeatureSetDefaults and returns the resolved
   // FeatureSet for a given edition.
   static FeatureSet ParseAndGetEditionResolvedFeatureSet(absl::string_view data,

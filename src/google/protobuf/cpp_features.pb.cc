@@ -37,7 +37,7 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::pb::CppFeatures
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto, /* tracker*/ nullptr,},
-};
+    };
 }  // namespace
 namespace pb {
 class CppFeatures::_Internal {
@@ -192,16 +192,16 @@ const ::uint32_t
         0,
         2,
         3,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::pb::CppFeatures)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::CppFeatures_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffeatures_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\"google/protobuf/cpp_features.proto\022\002pb"
@@ -228,7 +228,7 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffeatures_2eproto[
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
+    };
 static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcpp_5ffeatures_2eproto = {
     false,

@@ -21,11 +21,13 @@
 #endif
 
 #include "absl/base/log_severity.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/log/absl_check.h"
 #include "absl/log/globals.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "google/protobuf/compiler/code_generator.h"
 #include "google/protobuf/compiler/plugin.pb.h"
 #include "google/protobuf/descriptor.h"
@@ -145,12 +147,27 @@ bool GenerateCode(const CodeGeneratorRequest& request,
   absl::Status status = pool.SetFeatureSetDefaults(std::move(defaults).value());
   ABSL_CHECK(status.ok()) << status.message();
 
+  absl::flat_hash_map<absl::string_view, const FileDescriptorProto*>
+      source_files;
+  for (const FileDescriptorProto& file_proto :
+       request.source_file_descriptors()) {
+    source_files.emplace(file_proto.name(), &file_proto);
+  }
   for (int i = 0; i < request.proto_file_size(); i++) {
-    FileDescriptorProto file_proto = request.proto_file(i);
-    if (generator.StripDefaultJsonName()) {
-      StripDefaultJsonName(file_proto);
+    auto it = source_files.find(request.proto_file(i).name());
+    const FileDescriptorProto& file_proto =
+        it != source_files.end() ? *it->second : request.proto_file(i);
+    const FileDescriptor* file = nullptr;
+    bool is_message_set = false;
+    if (generator.StripDefaultJsonName() || is_message_set) {
+      FileDescriptorProto stripped_file_proto = file_proto;
+      if (generator.StripDefaultJsonName()) {
+        StripDefaultJsonName(stripped_file_proto);
+      }
+      file = pool.BuildFile(stripped_file_proto);
+    } else {
+      file = pool.BuildFile(file_proto);
     }
-    const FileDescriptor* file = pool.BuildFile(file_proto);
     if (file == nullptr) {
       // BuildFile() already wrote an error message.
       return false;
@@ -171,7 +188,6 @@ bool GenerateCode(const CodeGeneratorRequest& request,
 
   GeneratorResponseContext context(request.compiler_version(), response,
                                    parsed_files);
-
 
   std::string error;
   bool succeeded = generator.GenerateAll(parsed_files, request.parameter(),

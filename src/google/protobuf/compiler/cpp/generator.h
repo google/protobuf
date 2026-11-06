@@ -93,6 +93,7 @@ class PROTOC_EXPORT CppGenerator final : public CodeGenerator {
 
   using CodeGenerator::GetEdition;
   using CodeGenerator::GetResolvedSourceFeatures;
+  using CodeGenerator::GetResolvedSymbolVisibility;
 
  private:
   bool GenerateImpl(const FileDescriptor* file, const std::string& parameter,

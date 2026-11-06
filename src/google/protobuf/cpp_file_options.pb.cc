@@ -37,7 +37,7 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::pb::file::CppFileOptions
         {&::_pbi::kDescriptorMethods, &::descriptor_table_google_2fprotobuf_2fcpp_5ffile_5foptions_2eproto, /* tracker*/ nullptr,},
-};
+    };
 }  // namespace
 namespace pb {
 namespace file {
@@ -170,16 +170,16 @@ const ::uint32_t
         4, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::pb::file::CppFileOptions, _impl_.namespace__),
         0,
-};
+    };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::pb::file::CppFileOptions)},
-};
+    };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::pb::file::CppFileOptions_globals_,
-};
+    };
 const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffile_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n&google/protobuf/cpp_file_options.proto"
@@ -192,7 +192,7 @@ const char descriptor_table_protodef_google_2fprotobuf_2fcpp_5ffile_5foptions_2e
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_google_2fprotobuf_2fcpp_5ffile_5foptions_2eproto_deps[1] = {
         &::descriptor_table_google_2fprotobuf_2fdescriptor_2eproto,
-};
+    };
 static ::absl::once_flag descriptor_table_google_2fprotobuf_2fcpp_5ffile_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_google_2fprotobuf_2fcpp_5ffile_5foptions_2eproto = {
     false,

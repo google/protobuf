@@ -16,6 +16,7 @@
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/feature_resolver.h"
+#include "google/protobuf/symbol.h"
 
 namespace google {
 namespace protobuf {
@@ -29,6 +30,16 @@ FeatureSet InternalFeatureHelper::ParseAndGetEditionResolvedFeatureSet(
   auto edition_feature_set = GetEditionFeatureSetDefaults(edition, defaults);
   ABSL_CHECK_OK(edition_feature_set);
   return *edition_feature_set;
+}
+
+SymbolVisibility InternalFeatureHelper::GetResolvedSymbolVisibility(
+    const Descriptor& desc) {
+  return Symbol(&desc).GetEffectiveVisibility();
+}
+
+SymbolVisibility InternalFeatureHelper::GetResolvedSymbolVisibility(
+    const EnumDescriptor& desc) {
+  return Symbol(&desc).GetEffectiveVisibility();
 }
 }  // namespace internal
 }  // namespace protobuf
