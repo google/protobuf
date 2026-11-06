@@ -9137,7 +9137,11 @@ bool upb_Arena_HasRefChain(const upb_Arena* from, const upb_Arena* to) {
 #endif
 
 static void* _upb_Arena_AllocBlockInternal(upb_alloc* alloc, size_t* size) {
-  size_t sz = *size + kUpb_MemblockReserve;
+  size_t sz;
+  if (UPB_UNLIKELY(!UPB_PRIVATE(_upb_Arena_CheckedAdd)(
+          *size, kUpb_MemblockReserve, &sz))) {
+    return NULL;
+  }
   upb_SizedPtr alloc_result = upb_SizeReturningMalloc(alloc, sz);
   if (!alloc_result.p) return NULL;
   upb_MemBlock* block = alloc_result.p;
@@ -9149,6 +9153,7 @@ static void* _upb_Arena_AllocBlockInternal(upb_alloc* alloc, size_t* size) {
 void* UPB_PRIVATE(_upb_Arena_AllocBlock)(upb_Arena* a, size_t* size) {
   upb_ArenaInternal* ai = upb_Arena_Internal(a);
 #if UPB_HWASAN
+  if (UPB_UNLIKELY(*size > SIZE_MAX - (UPB_MALLOC_ALIGN - 1))) return NULL;
   *size = UPB_ALIGN_UP(*size, UPB_MALLOC_ALIGN);
 #endif
   void* ret =
@@ -9335,11 +9340,16 @@ static upb_Arena* _upb_Arena_InitSlow(upb_alloc* alloc, size_t first_size) {
     return NULL;
   }
   if (!alloc) return NULL;
+  if (UPB_UNLIKELY(first_size > _UPB_ARENA_MAX_ALLOC_SIZE)) return NULL;
 
   // We need to malloc the initial block.
-  size_t block_size = kUpb_ArenaStateReserve +
-                      UPB_MAX(256, UPB_ALIGN_MALLOC(first_size) +
-                                       UPB_PRIVATE(kUpb_Asan_GuardSize));
+  size_t payload_size = UPB_MAX(
+      256, UPB_ALIGN_MALLOC(first_size) + UPB_PRIVATE(kUpb_Asan_GuardSize));
+  size_t block_size;
+  if (UPB_UNLIKELY(!UPB_PRIVATE(_upb_Arena_CheckedAdd)(
+          kUpb_ArenaStateReserve, payload_size, &block_size))) {
+    return NULL;
+  }
   void* block = _upb_Arena_AllocBlockInternal(alloc, &block_size);
   if (!block) return NULL;
 
@@ -12332,7 +12342,7 @@ static upb_MiniTableEnum* _upb_MiniTable_AddEnumDataMember(upb_MdEnumDecoder* d,
 static void upb_MiniTableEnum_BuildValue(upb_MdEnumDecoder* d, uint32_t val) {
   upb_MiniTableEnum* table = d->enum_table;
   d->enum_value_count++;
-  if (table->UPB_PRIVATE(value_count) ||
+  if (table->UPB_PRIVATE(value_count) || val > UINT32_MAX - 32 ||
       (val > 512 && d->enum_value_count < val / 32)) {
     if (table->UPB_PRIVATE(value_count) == 0) {
       UPB_ASSERT(d->enum_data_count == table->UPB_PRIVATE(mask_limit) / 32);
