@@ -41,3 +41,11 @@ message Box {
 extend Box {
   optional int32 ext_tag = 100;
 }
+
+// json_name is not validated when a descriptor is built, so it can carry
+// characters that must be escaped in a JSON object key.
+message JsonNameEscape {
+  optional int32 quoted = 1 [json_name = "a\":1,\"b"];
+  optional int32 control = 2 [json_name = "x\ny\\z\tq"];
+  optional int32 plain = 3;
+}
