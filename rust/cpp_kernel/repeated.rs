@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 use super::*;
 
 unsafe extern "C" {
@@ -47,7 +54,7 @@ impl InnerRepeated {
     }
 
     /// # Safety
-    /// - `raw` must be a valid `proto2::RepeatedField*` or `proto2::RepeatedPtrField*`.
+    /// - `raw` must be a valid `google::protobuf::RepeatedField*` or `google::protobuf::RepeatedPtrField*`.
     pub unsafe fn from_raw(raw: RawRepeatedField) -> Self {
         Self { raw }
     }
@@ -55,7 +62,7 @@ impl InnerRepeated {
 
 /// The raw type-erased pointer version of `RepeatedMut`.
 ///
-/// Contains a `proto2::RepeatedField*` or `proto2::RepeatedPtrField*`.
+/// Contains a `google::protobuf::RepeatedField*` or `google::protobuf::RepeatedPtrField*`.
 #[derive(Clone, Copy, Debug)]
 #[doc(hidden)]
 pub struct InnerRepeatedMut<'msg> {
@@ -74,7 +81,13 @@ pub trait CppTypeConversions: Proxied {
     type InsertElemType;
     type ElemType;
 
-    fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self>;
+    /// Converts an element returned by a C++ repeated field getter thunk into a
+    /// view.
+    ///
+    /// # Safety
+    /// - If `Self::ElemType` borrows memory (e.g. `PtrAndLen`), that memory must be valid and
+    ///   immutable for the lifetime `'msg`.
+    unsafe fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self>;
     fn into_insertelem(v: Self) -> Self::InsertElemType;
 }
 
@@ -85,7 +98,7 @@ macro_rules! impl_cpp_type_conversions_for_scalars {
                 type InsertElemType = Self;
                 type ElemType = Self;
 
-                fn elem_to_view<'msg>(v: Self) -> View<'msg, Self> {
+                unsafe fn elem_to_view<'msg>(v: Self) -> View<'msg, Self> {
                     v
                 }
 
@@ -103,8 +116,9 @@ impl CppTypeConversions for ProtoString {
     type InsertElemType = CppStdString;
     type ElemType = PtrAndLen;
 
-    fn elem_to_view<'msg>(v: PtrAndLen) -> View<'msg, ProtoString> {
-        ptrlen_to_str(v)
+    unsafe fn elem_to_view<'msg>(v: PtrAndLen) -> View<'msg, ProtoString> {
+        // SAFETY: the caller guarantees `v` is valid and immutable for `'msg`.
+        unsafe { ptrlen_to_str(v) }
     }
 
     fn into_insertelem(v: Self) -> CppStdString {
@@ -116,8 +130,9 @@ impl CppTypeConversions for ProtoBytes {
     type InsertElemType = CppStdString;
     type ElemType = PtrAndLen;
 
-    fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self> {
-        ptrlen_to_bytes(v)
+    unsafe fn elem_to_view<'msg>(v: Self::ElemType) -> View<'msg, Self> {
+        // SAFETY: the caller guarantees `v` is valid and immutable for `'msg`.
+        unsafe { ptrlen_to_bytes(v) }
     }
 
     fn into_insertelem(v: Self) -> CppStdString {
@@ -309,6 +324,11 @@ macro_rules! impl_repeated_primitives {
                 }
                 #[inline]
                 unsafe fn repeated_get_unchecked(_private: Private, f: View<Repeated<$t>>, i: usize) -> View<$t> {
+                    // SAFETY:
+                    // - `i` is in bounds, as promised by the caller.
+                    // - The element returned by the getter thunk borrows from
+                    //   the repeated field, which `f` keeps immutable for the
+                    //   lifetime of the returned view.
                     unsafe {
                         <$t as CppTypeConversions>::elem_to_view(
                         $get_thunk(f.as_raw(Private), i))
@@ -354,7 +374,7 @@ impl_repeated_primitives!(i32, u32, i64, u64, f32, f64, bool, ProtoString, Proto
 /// Cast a `RepeatedView<SomeEnum>` to `RepeatedView<c_int>`.
 pub fn cast_enum_repeated_view<E: Enum>(repeated: RepeatedView<E>) -> RepeatedView<c_int> {
     // SAFETY: the implementer of `Enum` has promised that this
-    // raw repeated is a type-erased `proto2::RepeatedField<int>*`.
+    // raw repeated is a type-erased `google::protobuf::RepeatedField<int>*`.
     unsafe { RepeatedView::from_raw(Private, repeated.as_raw(Private)) }
 }
 
@@ -364,7 +384,7 @@ pub fn cast_enum_repeated_view<E: Enum>(repeated: RepeatedView<E>) -> RepeatedVi
 /// are representationally open.
 pub fn cast_enum_repeated_mut<E: Enum>(mut repeated: RepeatedMut<E>) -> RepeatedMut<c_int> {
     // SAFETY: the implementer of `Enum` has promised that this
-    // raw repeated is a type-erased `proto2::RepeatedField<int>*`.
+    // raw repeated is a type-erased `google::protobuf::RepeatedField<int>*`.
     unsafe {
         RepeatedMut::from_inner(
             Private,

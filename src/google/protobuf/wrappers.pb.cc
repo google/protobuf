@@ -85,6 +85,7 @@ constexpr UInt64Value::ParseTableT_ UInt64Value::_Internal::GenerateParseTable(c
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -98,9 +99,10 @@ constexpr UInt64Value::ParseTableT_ UInt64Value::_Internal::GenerateParseTable(c
     }}, {{
       // uint64 value = 1;
       {PROTOBUF_FIELD_OFFSET(UInt64Value, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -159,10 +161,13 @@ struct UInt64ValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(UInt64ValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(UInt64ValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt64ValueGlobalsTypeInternal UInt64Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt64ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) UInt64Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class UInt32Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<UInt32Value>()._impl_._has_bits_);
@@ -191,6 +196,7 @@ constexpr UInt32Value::ParseTableT_ UInt32Value::_Internal::GenerateParseTable(c
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -204,9 +210,10 @@ constexpr UInt32Value::ParseTableT_ UInt32Value::_Internal::GenerateParseTable(c
     }}, {{
       // uint32 value = 1;
       {PROTOBUF_FIELD_OFFSET(UInt32Value, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -265,10 +272,13 @@ struct UInt32ValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(UInt32ValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(UInt32ValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt32ValueGlobalsTypeInternal UInt32Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const UInt32ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) UInt32Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class StringValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<StringValue>()._impl_._has_bits_);
@@ -297,6 +307,7 @@ constexpr StringValue::ParseTableT_ StringValue::_Internal::GenerateParseTable(c
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -310,9 +321,9 @@ constexpr StringValue::ParseTableT_ StringValue::_Internal::GenerateParseTable(c
     }}, {{
       // string value = 1;
       {PROTOBUF_FIELD_OFFSET(StringValue, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
       "\33\5\0\0\0\0\0\0"
       "google.protobuf.StringValue"
       "value"
@@ -376,10 +387,13 @@ struct StringValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(StringValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(StringValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const StringValueGlobalsTypeInternal StringValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const StringValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) StringValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class Int64Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<Int64Value>()._impl_._has_bits_);
@@ -408,6 +422,7 @@ constexpr Int64Value::ParseTableT_ Int64Value::_Internal::GenerateParseTable(con
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -421,9 +436,10 @@ constexpr Int64Value::ParseTableT_ Int64Value::_Internal::GenerateParseTable(con
     }}, {{
       // int64 value = 1;
       {PROTOBUF_FIELD_OFFSET(Int64Value, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -482,10 +498,13 @@ struct Int64ValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(Int64ValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(Int64ValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int64ValueGlobalsTypeInternal Int64Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int64ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) Int64Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class Int32Value::_Internal {
  public:
   using HasBits = decltype(::std::declval<Int32Value>()._impl_._has_bits_);
@@ -514,6 +533,7 @@ constexpr Int32Value::ParseTableT_ Int32Value::_Internal::GenerateParseTable(con
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -527,9 +547,10 @@ constexpr Int32Value::ParseTableT_ Int32Value::_Internal::GenerateParseTable(con
     }}, {{
       // int32 value = 1;
       {PROTOBUF_FIELD_OFFSET(Int32Value, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -588,10 +609,13 @@ struct Int32ValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(Int32ValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(Int32ValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int32ValueGlobalsTypeInternal Int32Value_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const Int32ValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) Int32Value_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class FloatValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<FloatValue>()._impl_._has_bits_);
@@ -620,6 +644,7 @@ constexpr FloatValue::ParseTableT_ FloatValue::_Internal::GenerateParseTable(con
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -633,9 +658,10 @@ constexpr FloatValue::ParseTableT_ FloatValue::_Internal::GenerateParseTable(con
     }}, {{
       // float value = 1;
       {PROTOBUF_FIELD_OFFSET(FloatValue, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -694,10 +720,13 @@ struct FloatValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(FloatValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(FloatValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const FloatValueGlobalsTypeInternal FloatValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const FloatValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) FloatValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class DoubleValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<DoubleValue>()._impl_._has_bits_);
@@ -726,6 +755,7 @@ constexpr DoubleValue::ParseTableT_ DoubleValue::_Internal::GenerateParseTable(c
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -739,9 +769,10 @@ constexpr DoubleValue::ParseTableT_ DoubleValue::_Internal::GenerateParseTable(c
     }}, {{
       // double value = 1;
       {PROTOBUF_FIELD_OFFSET(DoubleValue, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -800,10 +831,13 @@ struct DoubleValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(DoubleValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(DoubleValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DoubleValueGlobalsTypeInternal DoubleValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const DoubleValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) DoubleValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class BytesValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<BytesValue>()._impl_._has_bits_);
@@ -832,6 +866,7 @@ constexpr BytesValue::ParseTableT_ BytesValue::_Internal::GenerateParseTable(con
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -845,9 +880,10 @@ constexpr BytesValue::ParseTableT_ BytesValue::_Internal::GenerateParseTable(con
     }}, {{
       // bytes value = 1;
       {PROTOBUF_FIELD_OFFSET(BytesValue, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -908,10 +944,13 @@ struct BytesValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(BytesValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(BytesValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BytesValueGlobalsTypeInternal BytesValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BytesValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) BytesValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class BoolValue::_Internal {
  public:
   using HasBits = decltype(::std::declval<BoolValue>()._impl_._has_bits_);
@@ -940,6 +979,7 @@ constexpr BoolValue::ParseTableT_ BoolValue::_Internal::GenerateParseTable(const
       1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -953,9 +993,10 @@ constexpr BoolValue::ParseTableT_ BoolValue::_Internal::GenerateParseTable(const
     }}, {{
       // bool value = 1;
       {PROTOBUF_FIELD_OFFSET(BoolValue, _impl_.value_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -1014,10 +1055,13 @@ struct BoolValueGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(BoolValueGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(BoolValueGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BoolValueGlobalsTypeInternal BoolValue_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const BoolValueGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) BoolValue_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 }  // namespace protobuf
 }  // namespace google
 static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE

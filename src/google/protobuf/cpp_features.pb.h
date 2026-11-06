@@ -53,7 +53,8 @@ enum CppFeatures_StringType : int;
 PROTOBUF_EXPORT extern const uint32_t CppFeatures_StringType_internal_data_[];
 class CppFeatures;
 struct CppFeaturesGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const CppFeaturesGlobalsTypeInternal CppFeatures_globals_;
+PROTOBUF_EXPORT extern const CppFeaturesGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) CppFeatures_globals_;
 }  // namespace pb
 namespace google {
 namespace protobuf {
@@ -63,6 +64,9 @@ internal::EnumTraitsT<::pb::CppFeatures_RepeatedType_internal_data_>
 template <>
 internal::EnumTraitsT<::pb::CppFeatures_StringType_internal_data_>
     internal::EnumTraitsImpl::value<::pb::CppFeatures_StringType>;
+template <>
+internal::GeneratedMessageTraitsT<&::pb::CppFeatures_globals_>
+    internal::MessageTraitsImpl::value<::pb::CppFeatures>;
 namespace internal {
 template <>
 inline ::absl::string_view GetFeatureSetDefaultsData<::pb::CppFeatures>() {

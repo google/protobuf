@@ -19,6 +19,7 @@
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/port.h"
 
 // must be last:
@@ -216,11 +217,18 @@ class PROTOBUF_EXPORT MicroString {
   }
 
   void Set(const absl::Cord& value, const MessageLite& parent) {
-    SetInChunks(value.size(), parent, [&value](auto append) {
-      for (absl::string_view chunk : value.Chunks()) {
-        append(chunk);
-      }
-    });
+    Set(value, parent, kInlineCapacity);
+  }
+  void Set(const absl::Cord& value, const MessageLite& parent,
+           size_t inline_capacity) {
+    SetInChunks(
+        value.size(), parent,
+        [&value](auto append) {
+          for (absl::string_view chunk : value.Chunks()) {
+            append(chunk);
+          }
+        },
+        inline_capacity);
   }
   void Set(absl::string_view data, const MessageLite& parent,
            size_t inline_capacity) {
@@ -598,7 +606,7 @@ void MicroString::SetInChunks(size_t size, const MessageLite& parent, F setter,
 template <size_t RequestedSpace>
 class MicroStringExtraImpl : private MicroString {
   static constexpr size_t RoundUp(size_t n) {
-    return (n + (alignof(MicroString) - 1)) & ~(alignof(MicroString) - 1);
+    return MemoryAlign{alignof(MicroString)}.Ceil(n);
   }
 
  public:
@@ -637,6 +645,9 @@ class MicroStringExtraImpl : private MicroString {
   }
   void Set(absl::string_view data, const MessageLite& parent) {
     SetMaybeConstant(*this, data, parent);
+  }
+  void Set(const absl::Cord& value, const MessageLite& parent) {
+    MicroString::Set(value, parent, kInlineCapacity);
   }
   void Set(const std::string& data, const MessageLite& parent) {
     Set(absl::string_view(data), parent);

@@ -19,10 +19,10 @@
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
-#include "google/protobuf/arena_align.h"
 #include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/arenaz_sampler.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
 
@@ -126,13 +126,6 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   static SerialArenaChunk* NewSerialArenaChunk(uint32_t prev_capacity, void* id,
                                                SerialArena* serial);
   static SerialArenaChunk* SentrySerialArenaChunk();
-
-  // Returns the first ArenaBlock* for the first SerialArena. If users provide
-  // one, use it if it's acceptable. Otherwise returns a sentry block.
-  ArenaBlock* FirstBlock(void* buf, size_t size);
-  // Same as the above but returns a valid block if "policy" is not default.
-  ArenaBlock* FirstBlock(void* buf, size_t size,
-                         const AllocationPolicy& policy);
 
   // Adds SerialArena to the chunked list. May create a new chunk.
   void AddSerialArena(void* id, SerialArena* serial);
@@ -278,9 +271,9 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   // of 8 to protect the invariant that pos is always at a multiple of 8.
   static constexpr size_t kBlockHeaderSize = SerialArena::kBlockHeaderSize;
   static constexpr size_t kSerialArenaSize =
-      (sizeof(SerialArena) + 7) & static_cast<size_t>(-8);
+      ArenaAlignDefault{}.Ceil(sizeof(SerialArena));
   static constexpr size_t kAllocPolicySize =
-      ArenaAlignDefault::Ceil(sizeof(AllocationPolicy));
+      ArenaAlignDefault{}.Ceil(sizeof(AllocationPolicy));
   static constexpr size_t kMaxCleanupNodeSize = 16;
   static_assert(kBlockHeaderSize % 8 == 0,
                 "kBlockHeaderSize must be a multiple of 8.");

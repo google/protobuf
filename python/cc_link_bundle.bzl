@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 """Bazel 8 workaround: bundle all of `_message`'s deps into a single cc_shared_library node.
 
 Only used in OSS, where `_message` is built with rules_python's py_extension, which links
@@ -91,4 +98,24 @@ def py_extension_with_bundled_deps(name, deps = [], **kwargs):
         # Replace (don't extend) deps: each library must be linked under exactly one owner.
         deps = [":" + name + "_deps"]
 
-    py_extension(name = name, deps = deps, **kwargs)
+    py_extension(
+        name = name,
+        deps = deps,
+        # TODO: Upstream these Windows MinGW linker flags to rules_python.
+        linkopts = select({
+            "//python/dist:windows_x86_32": ["-static-libgcc"],
+            "//conditions:default": [],
+        }) + select({
+            "//python/dist:windows_x86_64_mingw": [
+                "-Wl,--dynamicbase",
+                "-Wl,--nxcompat",
+                "-Wl,--high-entropy-va",
+            ],
+            "//python/dist:windows_x86_32_mingw": [
+                "-Wl,--dynamicbase",
+                "-Wl,--nxcompat",
+            ],
+            "//conditions:default": [],
+        }),
+        **kwargs
+    )
