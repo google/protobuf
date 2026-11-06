@@ -10,7 +10,6 @@
 
 #include <cstdint>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include "absl/base/optimization.h"
@@ -162,29 +161,47 @@ class PROTOBUF_EXPORT InternalMetadata {
   // If ptr_'s tag is kTagContainer, it points to an instance of this struct.
   struct ContainerBase {
     Arena* arena;
-
-    explicit ContainerBase(Arena* input_arena) : arena(input_arena) {}
   };
 
   template <typename T>
-  struct Container;
+  struct Container : public ContainerBase {
+    T unknown_fields;
+  };
 
   template <typename T>
-  PROTOBUF_NOINLINE void DeleteOutOfLineHelper();
+  PROTOBUF_NOINLINE void DeleteOutOfLineHelper() {
+    delete PtrValue<Container<T>>();
+    // TODO:  This store is load-bearing.  Since we are destructing
+    // the message at this point, see if we can eliminate it.
+    ptr_ = nullptr;
+  }
 
   template <typename T>
-  PROTOBUF_NOINLINE T* mutable_unknown_fields_slow();
+  PROTOBUF_NOINLINE T* mutable_unknown_fields_slow() {
+    Arena* my_arena = arena();
+    Container<T>* container = Arena::Create<Container<T>>(my_arena);
+    ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(container) |
+                                   kUnknownFieldsTagMask);
+    container->arena = my_arena;
+    return &(container->unknown_fields);
+  }
 
   // Templated functions.
 
   template <typename T>
-  PROTOBUF_NOINLINE void DoClear();
+  PROTOBUF_NOINLINE void DoClear() {
+    mutable_unknown_fields<T>()->Clear();
+  }
 
   template <typename T>
-  PROTOBUF_NOINLINE void DoMergeFrom(const T& other);
+  PROTOBUF_NOINLINE void DoMergeFrom(const T& other) {
+    mutable_unknown_fields<T>()->MergeFrom(other);
+  }
 
   template <typename T>
-  PROTOBUF_NOINLINE void DoSwap(T* other);
+  PROTOBUF_NOINLINE void DoSwap(T* other) {
+    mutable_unknown_fields<T>()->Swap(other);
+  }
 
   // Private helper with debug checks for ~InternalMetadata()
   void CheckedDestruct();
@@ -193,38 +210,23 @@ class PROTOBUF_EXPORT InternalMetadata {
 // String Template specializations.
 
 template <>
-struct InternalMetadata::Container<std::string> : public ContainerBase {
-  std::string unknown_fields;
-
-  explicit Container(Arena* arena_param) : ContainerBase(arena_param) {}
-
-  using InternalArenaConstructable_ = void;
-};
-
-template <>
 PROTOBUF_EXPORT void InternalMetadata::DoClear<std::string>();
 template <>
 PROTOBUF_EXPORT void InternalMetadata::DoMergeFrom<std::string>(
     const std::string& other);
 template <>
 PROTOBUF_EXPORT void InternalMetadata::DoSwap<std::string>(std::string* other);
-template <>
-PROTOBUF_EXPORT void InternalMetadata::DeleteOutOfLineHelper<std::string>();
-extern template PROTOBUF_EXPORT std::string*
-InternalMetadata::mutable_unknown_fields_slow<std::string>();
 
 // Instantiated once in message.cc (where the definition of UnknownFieldSet is
 // known) to prevent much duplication across translation units of a large build.
-template <>
-PROTOBUF_EXPORT void InternalMetadata::DoClear<UnknownFieldSet>();
-template <>
-PROTOBUF_EXPORT void InternalMetadata::DoMergeFrom<UnknownFieldSet>(
-    const UnknownFieldSet& other);
-template <>
-PROTOBUF_EXPORT void InternalMetadata::DoSwap<UnknownFieldSet>(
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DoClear<UnknownFieldSet>();
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DoMergeFrom<UnknownFieldSet>(const UnknownFieldSet& other);
+extern template PROTOBUF_EXPORT void InternalMetadata::DoSwap<UnknownFieldSet>(
     UnknownFieldSet* other);
-template <>
-PROTOBUF_EXPORT void InternalMetadata::DeleteOutOfLineHelper<UnknownFieldSet>();
+extern template PROTOBUF_EXPORT void
+InternalMetadata::DeleteOutOfLineHelper<UnknownFieldSet>();
 extern template PROTOBUF_EXPORT UnknownFieldSet*
 InternalMetadata::mutable_unknown_fields_slow<UnknownFieldSet>();
 
