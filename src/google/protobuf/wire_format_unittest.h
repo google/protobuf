@@ -1111,7 +1111,7 @@ TYPED_TEST_P(WireFormatTest, MessageSetLargeTypeId) {
   {
     typename TestFixture::TestMessageSet ms;
     const char* ptr;
-    google::protobuf::internal::ParseContext ctx(100, false, &ptr, s);
+    google::protobuf::internal::ParseContext ctx(100, false, ms.GetArena(), &ptr, s);
     ptr = WireFormat::_InternalParse(&ms, ptr, &ctx);
     ASSERT_TRUE(ptr != nullptr && ctx.EndedAtLimit());
     EXPECT_FALSE(ms.unknown_fields().empty());

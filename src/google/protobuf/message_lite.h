@@ -51,6 +51,7 @@
 #include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/raw_ptr.h"
+#include "google/protobuf/serial_arena.h"
 #include "google/protobuf/type_id.h"
 
 
@@ -1150,6 +1151,15 @@ PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(Arena* arena) const {
   return message_creator.PlacementNew(def, def, mem, arena);
 }
 
+PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(SerialArena* arena) const {
+  // Allocate the memory first, to reduce the number of spills.
+  // This way we only spill `this` and `parent_arena`.
+  Arena* parent_arena = ParentArena(arena);
+  void* mem = message_creator.AllocateMessage(arena);
+  const MessageLite* def = default_instance();
+  return message_creator.PlacementNew(def, def, mem, parent_arena);
+}
+
 PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::PlacementNew(
     void* mem, Arena* arena) const {
   const MessageLite* def = default_instance();
@@ -1298,6 +1308,11 @@ inline bool HasArena(const MessageLite& message) {
 
 inline Arena* GetArena(const MessageLite& message) {
   return message.GetArena();
+}
+
+inline MessageLite* NewMessage(const MessageLite& prototype,
+                               internal::SerialArena* arena) {
+  return GetClassData(prototype)->New(arena);
 }
 
 // Takes either a `const char*` string literal as the `To` type name, or a

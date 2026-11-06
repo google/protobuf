@@ -26,6 +26,7 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
+#include "google/protobuf/serial_arena.h"
 
 // clang-format off
 #include "google/protobuf/port_def.inc"
@@ -164,7 +165,7 @@ void ArenaStringPtr::Set(std::string&& value, const MessageLite& parent) {
   ScopedCheckPtrInvariants check(&tagged_ptr_);
   Arena* arena = parent.GetArena();
   if (IsDefault()) {
-    NewString(arena, std::move(value));
+    NewString(GetSerialArena(arena), std::move(value));
   } else if (IsFixedSizeArena()) {
     std::string* current = tagged_ptr_.Get();
     UnpoisonMemoryRegion(current, sizeof(*current));
@@ -203,7 +204,7 @@ std::string* ArenaStringPtr::MutableNoCopy(const MessageLite& parent) {
   } else {
     ABSL_DCHECK(IsDefault());
     // Allocate empty. The contents are not relevant.
-    return NewString(arena);
+    return NewString(GetSerialArena(arena));
   }
 }
 
@@ -216,7 +217,7 @@ std::string* ArenaStringPtr::MutableSlow(const MessageLite& parent,
   // For empty defaults, this ends up calling the default constructor which is
   // more efficient than a copy construction from
   // GetEmptyStringAlreadyInited().
-  return NewString(arena, lazy_default.get()...);
+  return NewString(GetSerialArena(arena), lazy_default.get()...);
 }
 
 std::string* ArenaStringPtr::Release() {
@@ -283,7 +284,7 @@ void ArenaStringPtr::ClearToDefault(const LazyString& default_value,
 
 const char* EpsCopyInputStream::ReadArenaString(const char* ptr,
                                                 ArenaStringPtr* s,
-                                                Arena* arena) {
+                                                SerialArena* arena) {
   ScopedCheckPtrInvariants check(&s->tagged_ptr_);
   ABSL_DCHECK(arena != nullptr);
 

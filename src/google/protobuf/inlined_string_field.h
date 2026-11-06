@@ -17,9 +17,11 @@
 #include "absl/log/absl_check.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/arena.h"
 #include "google/protobuf/arenastring.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/port.h"
+#include "google/protobuf/serial_arena.h"
 
 // Must be included last.
 #include "google/protobuf/port_def.inc"
@@ -229,7 +231,7 @@ class PROTOBUF_EXPORT InlinedStringField {
     char* ptr;
     size_t capacity;
   };
-  static StringBuffer AllocateStringBuffer(Arena& arena, size_t length);
+  static StringBuffer AllocateStringBuffer(SerialArena& arena, size_t length);
   static void DonateForInlineStr(std::string* str, StringBuffer buffer,
                                  size_t length);
 
@@ -237,10 +239,11 @@ class PROTOBUF_EXPORT InlinedStringField {
     std::string str_;
   };
 
-  std::string* MutableSlow(Arena* arena);
+  std::string* MutableSlow(SerialArena* arena);
 
-  static void RegisterForDestruction(Arena* arena, std::string* str);
-  static void MaybeRegisterForDestruction(Arena* arena, std::string* str) {
+  static void RegisterForDestruction(SerialArena* arena, std::string* str);
+  static void MaybeRegisterForDestruction(SerialArena* arena,
+                                          std::string* str) {
     if (IsDonated(*str)) return;
     RegisterForDestruction(arena, str);
   }
@@ -271,8 +274,8 @@ inline InlinedStringField::InlinedStringField([[maybe_unused]] Arena* arena,
                                               const InlinedStringField& rhs) {
   const std::string& src = *rhs.get_const();
   ::new (static_cast<void*>(&str_)) std::string(src);
-  if (arena != nullptr) {
-    MaybeRegisterForDestruction(arena, get_mutable());
+  if (arena != nullptr && !IsDonated()) {
+    RegisterForDestruction(GetSerialArena(arena), get_mutable());
   }
 }
 
@@ -308,19 +311,15 @@ PROTOBUF_NDEBUG_INLINE void InlinedStringField::InternalSwap(
     InlinedStringField* lhs, InlinedStringField* rhs, Arena* arena) {
   const bool lhs_donated = lhs->IsDonated();
   const bool rhs_donated = rhs->IsDonated();
-#ifdef GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL_INLINE
   lhs->get_mutable()->swap(*rhs->get_mutable());
   if (arena != nullptr && lhs_donated != rhs_donated) {
-    if (lhs_donated) lhs->RegisterForDestruction(arena, lhs->get_mutable());
-    if (rhs_donated) rhs->RegisterForDestruction(arena, rhs->get_mutable());
+    if (lhs_donated) {
+      RegisterForDestruction(GetSerialArena(arena), lhs->get_mutable());
+    } else {
+      ABSL_DCHECK(rhs_donated);
+      RegisterForDestruction(GetSerialArena(arena), rhs->get_mutable());
+    }
   }
-#else
-  lhs->get_mutable()->swap(*rhs->get_mutable());
-  if (arena != nullptr && lhs_donated != rhs_donated) {
-    MaybeRegisterForDestruction(arena, lhs->get_mutable());
-    MaybeRegisterForDestruction(arena, rhs->get_mutable());
-  }
-#endif
 }
 
 inline void InlinedStringField::Set(absl::string_view value,

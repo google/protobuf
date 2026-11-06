@@ -646,6 +646,7 @@ cc_library(
     deps = [
         ":arena_allocation_policy",
         ":arena_cleanup",
+        ":class_data",
         ":internal_visibility",
         ":memory_align",
         ":port",
@@ -1990,6 +1991,7 @@ cc_test(
         ":protobuf_lite",
         ":test_util",
         "//src/google/protobuf/io",
+        "//src/google/protobuf/testing:protobuf_test",
         "@abseil-cpp//absl/base:config",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_set",
@@ -2000,7 +2002,6 @@ cc_test(
         "@abseil-cpp//absl/strings:str_format",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/utility",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -2010,6 +2011,7 @@ cc_test(
     name = "arenastring_unittest",
     srcs = ["arenastring_unittest.cc"],
     deps = [
+        ":arena",
         ":cc_test_protos",
         ":port",
         ":protobuf",
@@ -2421,6 +2423,7 @@ cc_test(
     name = "inlined_string_field_unittest",
     srcs = ["inlined_string_field_unittest.cc"],
     deps = [
+        ":arena",
         ":cc_test_protos",
         ":port",
         ":protobuf",
@@ -2459,6 +2462,7 @@ cc_test(
         ],
     }),
     deps = [
+        ":arena",
         ":cc_lite_test_protos",
         ":lite_test_util",
         ":protobuf",
