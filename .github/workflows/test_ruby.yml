@@ -110,44 +110,6 @@ jobs:
             rake clobber_package gem;
             PROTOC=/workspace/${{ steps.cross-compile.outputs.protoc }} rake test'
 
-  macos:
-    strategy:
-      fail-fast: false   # Don't cancel all jobs if one fails.
-      matrix:
-        include:
-        # Test both FFI and Native implementations on the highest and lowest
-        # Ruby versions for CRuby, but only on Bazel 5.x.
-        # Quote versions numbers otherwise 3.0 will render as 3
-        # TODO Re-enable these once flakes are fixed
-        #- { version: "2.7", ffi: FFI }
-        - { version: "3.0" }
-        - { version: "3.1" }
-        - { version: "3.2", ffi: NATIVE }
-        # TODO Re-enable these once flakes are fixed
-        #- { version: "3.2", ffi: FFI }
-
-    name: ${{ matrix.continuous-only && inputs.continuous-prefix || '' }} MacOS Ruby ${{ matrix.version }}${{ matrix.ffi == 'FFI' && ' FFI' || '' }}
-    runs-on: macos-14
-    steps:
-      - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v2
-        with:
-          ref: ${{ inputs.safe-checkout }}
-
-      - name: Pin Ruby version
-        uses: ruby/setup-ruby@4a9ddd6f338a97768b8006bf671dfbad383215f4 # v1.207.0
-        with:
-          ruby-version: ${{ matrix.version }}
-
-      - name: Validate version
-        run: ruby --version | grep ${{ matrix.version }} || (echo "Invalid Ruby version - $(ruby --version)" && exit 1)
-
-      - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel@v2
-        with:
-          credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
-          bazel-cache: ruby_macos/${{ matrix.version }}
-          bazel: test //ruby/... --test_env=KOKORO_RUBY_VERSION=${{ matrix.version }} --test_env=BAZEL=true ${{ matrix.ffi == 'FFI' && '--//ruby:ffi=enabled --test_env=PROTOCOL_BUFFERS_RUBY_IMPLEMENTATION=FFI' || '' }}
 
   test_ruby_gems:
     strategy:

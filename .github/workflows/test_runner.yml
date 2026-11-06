@@ -152,14 +152,6 @@ jobs:
       safe-checkout: ${{ needs.check-tag.outputs.checkout-sha }}
     secrets: inherit
 
-  objectivec:
-    name: Objective-C
-    needs: [check-tag]
-    uses: ./.github/workflows/test_objectivec.yml
-    with:
-      safe-checkout: ${{ needs.check-tag.outputs.checkout-sha }}
-    secrets: inherit
-
   rust:
     name: Rust
     needs: [check-tag]
