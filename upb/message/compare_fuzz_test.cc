@@ -1,7 +1,15 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #include <string>
 
 #include <gtest/gtest.h>
 #include "testing/fuzzing/fuzztest.h"
+#include "absl/base/throw_delegate.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "upb/mem/arena.h"
 #include "upb/message/compare.h"
@@ -15,20 +23,30 @@
 namespace upb {
 namespace {
 
+static void CheckExtRegStatus(upb_ExtensionRegistryStatus status) {
+  if (status == kUpb_ExtensionRegistryStatus_OutOfMemory) {
+    absl::ThrowStdBadAlloc();
+  }
+  EXPECT_EQ(status, kUpb_ExtensionRegistryStatus_Ok);
+}
+
 const upb_ExtensionRegistry* CreateTestExtensionRegistry(upb_Arena* arena) {
   upb_ExtensionRegistry* ext_registry = upb_ExtensionRegistry_New(arena);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension1_model_ext_ext);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension2_model_ext_ext);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension2_model_ext_2_ext);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension2_model_ext_3_ext);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension2_model_ext_4_ext);
-  upb_ExtensionRegistry_Add(ext_registry,
-                            upb_test_ModelExtension2_model_ext_5_ext);
+  if (!ext_registry) {
+    absl::ThrowStdBadAlloc();
+  }
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension1_model_ext_ext));
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension2_model_ext_ext));
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension2_model_ext_2_ext));
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension2_model_ext_3_ext));
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension2_model_ext_4_ext));
+  CheckExtRegStatus(upb_ExtensionRegistry_Add(
+      ext_registry, upb_test_ModelExtension2_model_ext_5_ext));
   return ext_registry;
 }
 

@@ -22,8 +22,9 @@
 #include "absl/base/prefetch.h"
 #include "absl/log/absl_check.h"
 #include "absl/numeric/bits.h"
-#include "google/protobuf/arena_align.h"
+#include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/string_block.h"
 
@@ -32,11 +33,14 @@
 
 namespace google {
 namespace protobuf {
+
+class Arena;
+
 namespace internal {
 
 // Arena blocks are variable length malloc-ed objects.  The following structure
 // describes the common header for all blocks.
-struct ArenaBlock {
+struct alignas(ArenaAlignDefault::align) ArenaBlock {
   // For the sentry block with zero-size where ptr_/limit_ both point to `this`.
   constexpr ArenaBlock() : next(nullptr), size(0) {}
 
@@ -80,7 +84,7 @@ struct FirstSerialArena {
 class PROTOBUF_EXPORT SerialArena {
  public:
   static constexpr size_t kBlockHeaderSize =
-      ArenaAlignDefault::Ceil(sizeof(ArenaBlock));
+      ArenaAlignDefault{}.Ceil(sizeof(ArenaBlock));
 
   void CleanupList() { cleanup_list_.Cleanup(*this); }
   uint64_t SpaceAllocated() const {
@@ -114,7 +118,7 @@ class PROTOBUF_EXPORT SerialArena {
   // from it.
   template <AllocationClient alloc_client = AllocationClient::kDefault>
   void* AllocateAligned(size_t n) {
-    ABSL_DCHECK(internal::ArenaAlignDefault::IsAligned(n));
+    ABSL_DCHECK(internal::ArenaAlignDefault{}.IsAligned(n));
     ABSL_DCHECK_GE(limit_, ptr());
 
     if (alloc_client == AllocationClient::kArray) {
@@ -137,25 +141,27 @@ class PROTOBUF_EXPORT SerialArena {
     // scheme would only waste (align - 8)/2 bytes on average, but requires a
     // dedicated function in the outline arena allocation functions. Possibly
     // re-evaluate tradeoffs later.
-    return a <= 8 ? ArenaAlignDefault::Ceil(n) : ArenaAlignAs(a).Padded(n);
+    return a <= 8 ? ArenaAlignDefault{}.Ceil(n) : ArenaAlignAs(a).Padded(n);
   }
 
   static PROTOBUF_ALWAYS_INLINE void* AlignTo(void* p, size_t a) {
-    return (a <= ArenaAlignDefault::align)
-               ? ArenaAlignDefault::CeilDefaultAligned(p)
+    return (a <= ArenaAlignDefault{}.align)
+               ? ArenaAlignDefault{}.CeilDefaultAligned(p)
                : ArenaAlignAs(a).CeilDefaultAligned(p);
   }
 
  public:
+  static constexpr size_t kMinimumReturnedArraySize = 16;
+
   // See comments on `cached_blocks_` member for details.
   void ReturnArrayMemory(void* p, size_t size) {
     // We only need to check for 32-bit platforms.
     // In 64-bit platforms the minimum allocation size from Repeated*Field will
     // be 16 guaranteed.
     if (sizeof(void*) < 8) {
-      if (ABSL_PREDICT_FALSE(size < 16)) return;
+      if (ABSL_PREDICT_FALSE(size < kMinimumReturnedArraySize)) return;
     } else {
-      PROTOBUF_ASSUME(size >= 16);
+      PROTOBUF_ASSUME(size >= kMinimumReturnedArraySize);
     }
 
     // We round down to the next smaller block in case the memory doesn't match
@@ -199,7 +205,7 @@ class PROTOBUF_EXPORT SerialArena {
 
   // Allocate space if the current region provides enough space.
   bool MaybeAllocateAligned(size_t n, void** out) {
-    ABSL_DCHECK(internal::ArenaAlignDefault::IsAligned(n));
+    ABSL_DCHECK(internal::ArenaAlignDefault{}.IsAligned(n));
     ABSL_DCHECK_GE(limit_, ptr());
     char* ret = ptr();
     if (ABSL_PREDICT_FALSE(static_cast<size_t>(limit_ - ret) < n)) {
@@ -224,8 +230,10 @@ class PROTOBUF_EXPORT SerialArena {
   PROTOBUF_ALWAYS_INLINE
   void* AllocateAlignedWithCleanup(size_t n, size_t align,
                                    void (*destructor)(void*)) {
-    n = ArenaAlignDefault::Ceil(n);
-    char* ret = ArenaAlignAs(align).CeilDefaultAligned(ptr());
+    auto align_as = align <= ArenaAlignDefault::align ? ArenaAlignDefault{}
+                                                      : ArenaAlignAs(align);
+    n = align_as.Ceil(n);
+    char* ret = align_as.CeilDefaultAligned(ptr());
     // See the comment in MaybeAllocateAligned re uintptr_t.
     if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(ret) + n >
                            reinterpret_cast<uintptr_t>(limit_))) {
@@ -250,6 +258,50 @@ class PROTOBUF_EXPORT SerialArena {
 
   std::vector<void*> PeekCleanupListForTesting();
 
+  // Attempts to grow the most recent allocation in place by `desired_growth`
+  // bytes. Succeeds only if `alloc_end` matches the current tail pointer and
+  // the current arena block has enough remaining space. Returns true if the
+  // allocation was grown in place, false otherwise.
+  bool TryGrowTail(void* alloc_end, size_t desired_growth) {
+    char* tail = ptr();
+    if (static_cast<char*>(alloc_end) != tail) {
+      return false;
+    }
+    if (static_cast<size_t>(limit_ - tail) < desired_growth) {
+      return false;
+    }
+    internal::UnpoisonMemoryRegion(tail, desired_growth);
+    set_ptr(tail + desired_growth);
+    return true;
+  }
+
+  // Attempts to trim the most recent allocation in place down to `desired_end`.
+  // Succeeds only if `alloc_end` matches the current tail pointer. Returns true
+  // if the allocation was trimmed in place, false otherwise.
+  // REQUIRES: desired_end <= alloc_end
+  // REQUIRES: desired_end is an aligned pointer within a previous allocation.
+  bool TryTrimTail(void* alloc_end, void* desired_end) {
+    ABSL_DCHECK_LE(desired_end, alloc_end);
+    ABSL_DCHECK(ArenaAlignDefault{}.IsAligned(desired_end));
+
+    char* tail = ptr();
+    if (static_cast<char*>(alloc_end) != tail) {
+      return false;
+    }
+
+    ABSL_DCHECK_LE(static_cast<void*>(head()), desired_end);
+    char* desired = static_cast<char*>(desired_end);
+    internal::PoisonMemoryRegion(desired, tail - desired);
+    set_ptr(desired);
+    return true;
+  }
+
+  Arena* parent() const {
+    Arena* parent = reinterpret_cast<Arena*>(&parent_);
+    PROTOBUF_ASSUME(parent != nullptr);
+    return parent;
+  }
+
  private:
   friend class ThreadSafeArena;
   friend class cleanup::ChunkList;
@@ -266,9 +318,8 @@ class PROTOBUF_EXPORT SerialArena {
   // Constructor is private as only New() should be used.
   inline SerialArena(ArenaBlock* b, ThreadSafeArena& parent);
 
-  // Constructors to handle the first SerialArena.
-  inline explicit SerialArena(ThreadSafeArena& parent);
-  inline SerialArena(FirstSerialArena, ArenaBlock* b, ThreadSafeArena& parent);
+  inline SerialArena(FirstSerialArena, SizedPtr mem,
+                     const AllocationPolicy& policy, ThreadSafeArena& parent);
 
   bool MaybeAllocateString(void*& p);
   ABSL_ATTRIBUTE_RETURNS_NONNULL void* AllocateFromStringBlockFallback();
@@ -377,13 +428,15 @@ class PROTOBUF_EXPORT SerialArena {
   }
 
 
-  // Repeated*Field and Arena play together to reduce memory consumption by
-  // reusing blocks. Currently, natural growth of the repeated field types makes
-  // them allocate blocks of size `8 + 2^N, N>=3`.
-  // When the repeated field grows returns the previous block and we put it in
-  // this free list.
+  // Repeated*Field/Map/etc and Arena play together to reduce memory consumption
+  // by reusing blocks. Currently, natural growth of the repeated field types
+  // makes them allocate blocks of size `8 + 2^N, N>=3`. When the repeated field
+  // grows returns the previous block and we put it in this free list.
   // `cached_blocks_[i]` points to the free list for blocks of size `8+2^(i+3)`.
   // The array of freelists is grown when needed in `ReturnArrayMemory()`.
+  // Note that this optimization somewhat conflicts with TryGrowTail because
+  // allocating from the free list means we won't be able to grow in the tail.
+  // On average, it works out because the free list tends to be mostly empty.
   uint8_t cached_block_length_ = 0;
 
   // Current prefetch positions. Data from `ptr_` up to but not including
@@ -436,6 +489,11 @@ SerialArena::AllocateFromStringBlock() {
   void* p;
   if (ABSL_PREDICT_TRUE(MaybeAllocateString(p))) return p;
   return AllocateFromStringBlockFallback();
+}
+
+inline Arena* ParentArena(SerialArena* arena) {
+  if (arena == nullptr) return nullptr;
+  return arena->parent();
 }
 
 }  // namespace internal

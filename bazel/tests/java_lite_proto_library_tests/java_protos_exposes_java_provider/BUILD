@@ -1,7 +1,14 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 load("@rules_testing//lib:util.bzl", "PREVENT_IMPLICIT_BUILDING_TAGS")
 load("//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
 load("//bazel:proto_library.bzl", "proto_library")
-load("//bazel/tests:java_proto_library_tests/test_utils.bzl", "java_info_subject_factory")
+load("//bazel/tests:java_lite_proto_library_tests/test_utils.bzl", "java_info_subject_factory")
 load("//bazel/tests:proto_bzl_test_suite.bzl", "bzl_test_suite")
 load(":tests.bzl", "TESTS")
 

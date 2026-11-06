@@ -9,6 +9,7 @@
 
 _PROTO_BAZEL_FEATURES = """bazel_features = struct(
   cc = struct(
+    builtin_cc_shared_library = {builtin_cc_shared_library},
     protobuf_on_allowlist = {protobuf_on_allowlist},
   ),
   proto = struct(
@@ -16,6 +17,7 @@ _PROTO_BAZEL_FEATURES = """bazel_features = struct(
   ),
   rules = struct(
     analysis_tests_can_transition_on_experimental_incompatible_flags = {analysis_tests_can_transition_on_experimental_incompatible_flags},
+    has_proto_fragment = {has_proto_fragment},
   ),
   globals = struct(
     PackageSpecificationInfo = {PackageSpecificationInfo},
@@ -40,6 +42,11 @@ def _proto_bazel_features_impl(rctx):
     protobuf_on_allowlist = major_version_int > 7
     ProtoInfo = "ProtoInfo" if major_version_int < 8 else "None"
     cc_proto_aspect = "cc_proto_aspect" if major_version_int < 8 else "None"
+    has_proto_fragment = major_version_int < 9
+
+    # Whether rules_cc's cc_shared_library forwards to Bazel's builtin implementation (Bazel 8),
+    # rather than using rules_cc's own Starlark implementation (Bazel 9+).
+    builtin_cc_shared_library = major_version_int < 9
 
     rctx.file("BUILD.bazel", """
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
@@ -58,6 +65,8 @@ exports_files(["features.bzl"])
         cc_proto_aspect = cc_proto_aspect,
         analysis_tests_can_transition_on_experimental_incompatible_flags =
             "True" if major_version_int > 8 or (major_version_int == 8 and minor_version_int >= 2) else "False",
+        has_proto_fragment = repr(has_proto_fragment),
+        builtin_cc_shared_library = repr(builtin_cc_shared_library),
     ))
 
 proto_bazel_features = repository_rule(

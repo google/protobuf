@@ -63,6 +63,9 @@ if _implementation_type is None:
 _implementation_type = os.getenv(
     'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', _implementation_type
 )
+_force_implementation = os.getenv(
+    'PROTOCOL_BUFFERS_PYTHON_INTERNAL_FORCE_IMPLEMENTATION', None
+)
 
 if _implementation_type not in ('python', 'cpp', 'upb'):
   raise ValueError(
@@ -89,6 +92,8 @@ if _implementation_type == 'cpp':
     _c_module = _message
     del _message
   except ImportError:
+    if _force_implementation:
+      raise
     # TODO: fail back to python
     warnings.warn('Selected implementation cpp is not available.')
     pass
@@ -100,10 +105,16 @@ if _implementation_type == 'upb':
 
     _c_module = _message
     del _message
-  except ImportError:
+  except ImportError as e:
+    if _force_implementation:
+      raise e
+    import traceback
+
+    tb_string = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
     warnings.warn(
         'Selected implementation upb is not available. '
-        'Falling back to the python implementation.'
+        f'Falling back to the python implementation.\n{tb_string}',
+        RuntimeWarning,
     )
     _implementation_type = 'python'
     pass

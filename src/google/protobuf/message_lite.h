@@ -22,6 +22,7 @@
 #ifndef GOOGLE_PROTOBUF_MESSAGE_LITE_H__
 #define GOOGLE_PROTOBUF_MESSAGE_LITE_H__
 
+#include <algorithm>
 #include <atomic>
 #include <climits>
 #include <cstddef>
@@ -38,15 +39,19 @@
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 #include "absl/log/absl_check.h"
+#include "absl/numeric/bits.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/class_data.h"
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_traits.h"
 #include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/port.h"
+#include "google/protobuf/raw_ptr.h"
+#include "google/protobuf/serial_arena.h"
 #include "google/protobuf/type_id.h"
 
 
@@ -177,7 +182,7 @@ struct EnumTraitsImpl {
   // The `enable_if` is there to workaround some compilers/tools that complain
   // on the declaration even with no instantiations.
   template <typename T>
-  static std::enable_if_t<sizeof(T) != 0, Undefined> value;
+  static std::enable_if_t<std::is_void_v<T>, Undefined> value;
 };
 template <typename T>
 using EnumTraits = decltype(EnumTraitsImpl::value<T>);
@@ -247,42 +252,20 @@ PROTOBUF_EXPORT inline const std::string& GetEmptyStringAlreadyInited() {
   return fixed_address_empty_string.get();
 }
 
-#ifndef PROTOBUF_MESSAGE_GLOBALS
+// TODO: Remove unnecessary members, or move into ClassData.
 struct MessageGlobalsBase {
-  template <typename T = MessageLite>
-  static const T* ToDefaultInstance(const void* globals) {
-    return reinterpret_cast<const T*>(globals);
-  }
+  static const size_t kMessageGlobalsAlignment;
 
-  static const MessageGlobalsBase* FromDefaultInstance(
-      const void* default_instance) {
-    return reinterpret_cast<const MessageGlobalsBase*>(default_instance);
-  }
-
-  static const MessageGlobalsBase* FromClassData(const ClassData* class_data) {
-    return FromDefaultInstance(class_data->default_instance());
-  }
-};
-
-template <const auto* kDefault, const auto* kClassData>
-struct GeneratedMessageTraitsT {
-  static constexpr const void* default_instance() { return kDefault; }
-  static constexpr const auto* class_data() { return kClassData->base(); }
-  static constexpr const auto* tc_table() { return class_data()->tc_table; }
-  static constexpr auto StrongPointer() { return default_instance(); }
-};
-#else
-struct MessageGlobalsBase {
   template <size_t R, size_t KnownAlignment = 0>
   static constexpr size_t RoundUpTo(size_t n) {
     static_assert(absl::has_single_bit(R), "Must be power of two");
     if constexpr (KnownAlignment != 0) {
-      assert(n % KnownAlignment == 0);
+      ABSL_DCHECK(MemoryAlign{KnownAlignment}.IsAligned(n));
     }
     if constexpr (KnownAlignment >= R) {
       return n;
     } else {
-      return (n + (R - 1)) & ~(R - 1);
+      return MemoryAlign{R}.Ceil(n);
     }
   }
 
@@ -313,30 +296,33 @@ struct MessageGlobalsBase {
   explicit constexpr MessageGlobalsBase(ClassData class_data)
       : class_data(class_data) {}
 
+  size_t OffsetToParseTable() const {
+    return OffsetToDefault() +
+           RoundUpTo<8, alignof(void*)>(class_data.allocation_size());
+  }
   static const TcParseTableBase* ToParseTableBase(const void* g) {
     const auto* globals = static_cast<const MessageGlobalsBase*>(g);
     ABSL_DCHECK_NE(globals, nullptr);
     ABSL_DCHECK(!globals->class_data.is_dynamic);
     return reinterpret_cast<const TcParseTableBase*>(
-        ToDefaultInstance<char>(g) +
-        RoundUpTo<8, alignof(void*)>(globals->class_data.allocation_size()));
+        reinterpret_cast<const char*>(globals) + globals->OffsetToParseTable());
   }
+
+  // Defined in generated_message_tctable_decl.h
+  size_t SizeOfSelf() const;
 
   ClassData class_data;
 };
 
+inline constexpr const size_t MessageGlobalsBase::kMessageGlobalsAlignment =
+    std::max(alignof(MessageGlobalsBase),
+             static_cast<size_t>(kMaxMessageAlignment));
+
 template <const auto* kGlobals>
 struct GeneratedMessageTraitsT {
-  static const void* default_instance() {
-    return MessageGlobalsBase::ToDefaultInstance(kGlobals);
-  }
   static const auto* class_data() {
     return MessageGlobalsBase::GetClassData(kGlobals);
   }
-  static const auto* tc_table() {
-    return MessageGlobalsBase::ToParseTableBase(kGlobals);
-  }
-  static constexpr const auto* globals() { return kGlobals; }
   static constexpr auto StrongPointer() { return kGlobals; }
 };
 
@@ -345,22 +331,12 @@ inline const MessageLite* ClassData::default_instance() const {
   return MessageGlobalsBase::ToDefaultInstance(this);
 }
 
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
 inline const TcParseTableBase* ClassData::GetTcParseTable() const {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
   if (ABSL_PREDICT_FALSE(is_dynamic)) {
-#else
-  if (ABSL_PREDICT_FALSE(tc_table == nullptr)) {
-#endif
     ABSL_DCHECK(!is_lite);
     return descriptor_methods()->get_tc_table(this);
   }
-#ifdef PROTOBUF_MESSAGE_GLOBALS
   return MessageGlobalsBase::ToParseTableBase(this);
-#else
-  return tc_table;
-#endif
 }
 
 }  // namespace internal
@@ -406,7 +382,7 @@ class PROTOBUF_EXPORT MessageLite {
 
   // Construct a new instance of the same type.  Ownership is passed to the
   // caller.
-  [[nodiscard]] MessageLite* New() const { return New(nullptr); }
+  [[nodiscard]] MessageLite* New() const { return New(/*arena=*/nullptr); }
 
   // Construct a new instance on the arena. Ownership is passed to the caller
   // if arena is a nullptr.
@@ -794,6 +770,50 @@ class PROTOBUF_EXPORT MessageLite {
     return internal::InternalVisibility{};
   }
 
+  // Split helpers
+  template <typename Msg, typename T, typename Split>
+  static PROTOBUF_ALWAYS_INLINE decltype(auto) GetSplitField(
+      const Msg& self, T Split::* address) {
+    const auto& split = *self._impl_._split_;
+    if constexpr (internal::kIsRawPtr<T>) {
+      return *(split.*address);
+    } else if constexpr (std::is_pointer_v<T>) {
+      using SubT = std::remove_pointer_t<T>;
+      return static_cast<const SubT*>(split.*address);
+    } else {
+      return std::as_const(split.*address);
+    }
+  }
+
+  template <typename Msg, typename T, typename Split>
+  static PROTOBUF_ALWAYS_INLINE auto* TryMutableSplitField(Msg& self,
+                                                           T Split::* address) {
+    auto* split = self._impl_._split_;
+    if constexpr (internal::kIsRawPtr<T>) {
+      auto& raw = split->*address;
+      return raw.IsDefault() ? nullptr : &*raw;
+    } else {
+      return self.IsSplitMessageDefault() ? nullptr : &(split->*address);
+    }
+  }
+
+  template <typename Msg, typename T, typename Split>
+  static PROTOBUF_ALWAYS_INLINE auto& MutableSplitField(Msg& self,
+                                                        T Split::* address) {
+    ABSL_DCHECK_NE(&self, &self.default_instance());
+    self.PrepareSplitMessageForWrite();
+    auto* split = self._impl_._split_;
+    if constexpr (internal::kIsRawPtr<T>) {
+      auto& raw = split->*address;
+      if (raw.IsDefault()) {
+        raw.Set(Arena::Create<typename T::value_type>(self.GetArena()));
+      }
+      return *raw;
+    } else {
+      return split->*address;
+    }
+  }
+
   template <typename T>
   PROTOBUF_ALWAYS_INLINE static T* DefaultConstruct(Arena* arena) {
     return static_cast<T*>(Arena::DefaultConstruct<T>(arena));
@@ -835,9 +855,18 @@ class PROTOBUF_EXPORT MessageLite {
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
   explicit constexpr MessageLite(const internal::ClassData* data)
-      : _class_data_(data) {}
+      : _class_data_(data) {
+    // We want to evaluate the aligned-ness of `data` at compile time, which
+    // requires the use of `__builtin_is_aligned`. When message globals are
+    // constructed, the address of `data` has not been synthesized yet, but the
+    // compiler is able to deduce it from the alignment of the forward-declared
+    // message globals value itself.
+    internal::DebugAssertPtrIsAligned(data, internal::kClassDataAlignment);
+  }
   explicit MessageLite(Arena* arena, const internal::ClassData* data)
-      : _internal_metadata_(arena), _class_data_(data) {}
+      : _internal_metadata_(arena), _class_data_(data) {
+    internal::DebugAssertPtrIsAligned(data, internal::kClassDataAlignment);
+  }
 #else   // PROTOBUF_CUSTOM_VTABLE
   constexpr MessageLite() {}
   explicit MessageLite(Arena* arena) : _internal_metadata_(arena) {}
@@ -1122,6 +1151,15 @@ PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(Arena* arena) const {
   return message_creator.PlacementNew(def, def, mem, arena);
 }
 
+PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(SerialArena* arena) const {
+  // Allocate the memory first, to reduce the number of spills.
+  // This way we only spill `this` and `parent_arena`.
+  Arena* parent_arena = ParentArena(arena);
+  void* mem = message_creator.AllocateMessage(arena);
+  const MessageLite* def = default_instance();
+  return message_creator.PlacementNew(def, def, mem, parent_arena);
+}
+
 PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::PlacementNew(
     void* mem, Arena* arena) const {
   const MessageLite* def = default_instance();
@@ -1263,6 +1301,20 @@ PROTOBUF_FUTURE_ADD_EARLY_NODISCARD T* DynamicCastMessage(MessageLite* from) {
 }
 
 namespace internal {
+
+inline bool HasArena(const MessageLite& message) {
+  return message.GetArena() != nullptr;
+}
+
+inline Arena* GetArena(const MessageLite& message) {
+  return message.GetArena();
+}
+
+inline MessageLite* NewMessage(const MessageLite& prototype,
+                               internal::SerialArena* arena) {
+  return GetClassData(prototype)->New(arena);
+}
+
 // Takes either a `const char*` string literal as the `To` type name, or a
 // pointer to a message prototype that we can call `GetTypeName()` on. This is
 // done to minimize code bloat in the caller, since dynamic casts are inlined.

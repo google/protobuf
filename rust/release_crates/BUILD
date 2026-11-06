@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 # Protobuf Rust crate packaging for release.
 
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
@@ -16,6 +23,9 @@ pkg_tar(
         ":Cargo.toml",
         "//rust/release_crates/google_protobuf:google_protobuf_crate",
         "//rust/release_crates/google_protobuf_codegen:google_protobuf_codegen_crate",
+        "//rust/release_crates/google_protobuf_example:google_protobuf_example_crate",
+        "//rust/release_crates/google_protobuf_macros:google_protobuf_macros_crate",
+        "//rust/release_crates/google_protobuf_well_known_types:google_protobuf_well_known_types_crate",
         "//rust/release_crates/protobuf:protobuf_crate",
         "//rust/release_crates/protobuf_codegen:protobuf_codegen_crate",
         "//rust/release_crates/protobuf_example:protobuf_example_crate",

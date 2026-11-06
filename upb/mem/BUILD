@@ -1,5 +1,5 @@
-# Copyright (c) 2009-2021, Google LLC
-# All rights reserved.
+# Protocol Buffers - Google's data interchange format
+# Copyright 2009 Google LLC
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -27,6 +27,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":internal",
+        "//upb/base:internal",
         "//upb/port",
     ],
 )
@@ -41,6 +42,7 @@ cc_library(
     features = UPB_DEFAULT_FEATURES,
     visibility = ["//visibility:public"],
     deps = [
+        "//upb/base:internal",
         "//upb/port",
     ],
 )

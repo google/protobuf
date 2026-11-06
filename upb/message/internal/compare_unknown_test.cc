@@ -162,12 +162,12 @@ TEST(CompareTest, MessageIsEqualWithIdenticalNonCanonicalExtensions) {
                                    upb_StringView_FromString("World"));
 
   // 3. Attach identical non-canonical extensions to both messages
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg1), upb_test_ModelExtension1_model_ext_ext, &extension1,
-      arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+      arena.ptr()));
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg2), upb_test_ModelExtension1_model_ext_ext, &extension2,
-      arena.ptr());
+      arena.ptr()));
 
   // 4. Verify upb_Message_IsEqual yields true
   bool is_equal = upb_Message_IsEqual(UPB_UPCAST(msg1), UPB_UPCAST(msg2),
@@ -198,12 +198,12 @@ TEST(CompareTest, MessageIsEqualWithDifferentNonCanonicalExtensions) {
                                    upb_StringView_FromString("Hello"));
 
   // 4. Attach different non-canonical extensions to the two messages
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg1), upb_test_ModelExtension1_model_ext_ext, &extension1,
-      arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+      arena.ptr()));
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg2), upb_test_ModelExtension1_model_ext_ext, &extension2,
-      arena.ptr());
+      arena.ptr()));
 
   // Verify that NextUnknown2 successfully yields the non-canonical extension
   upb_MessageUnknown udata;
@@ -234,9 +234,9 @@ TEST(CompareTest, MessageIsEqualWithOnlyOneHavingNonCanonicalExtension) {
                                    upb_StringView_FromString("World"));
 
   // 3. Attach only to msg1
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg1), upb_test_ModelExtension1_model_ext_ext, &extension1,
-      arena.ptr());
+      arena.ptr()));
 
   // 4. Verify upb_Message_IsEqual yields false with IncludeUnknownFields
   bool is_equal_with_unknowns =
@@ -264,9 +264,9 @@ TEST(CompareTest, MessageIsEqualWithNonCanonicalExtensionMatchingRawUnknown) {
   // 2. Obtain encoded raw wire bytes of Extension A by serializing tmp_msg
   upb_test_ModelWithExtensions* tmp_msg =
       upb_test_ModelWithExtensions_new(arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(tmp_msg), upb_test_ModelExtension1_model_ext_ext, &extension1,
-      arena.ptr());
+      arena.ptr()));
 
   char* buf;
   size_t size;
@@ -279,9 +279,9 @@ TEST(CompareTest, MessageIsEqualWithNonCanonicalExtensionMatchingRawUnknown) {
   // 3. Create msg1 with non-canonical extension A
   upb_test_ModelWithExtensions* msg1 =
       upb_test_ModelWithExtensions_new(arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg1), upb_test_ModelExtension1_model_ext_ext, &extension1,
-      arena.ptr());
+      arena.ptr()));
 
   // 4. Create msg2 with raw unknown bytes representing A
   upb_test_ModelWithExtensions* msg2 =
@@ -306,9 +306,9 @@ TEST(CompareTest, MessageSetNonCanonicalExtMatchesUnknown) {
 
   // 2. Obtain encoded raw wire bytes of Extension A by serializing tmp_msg
   upb_test_TestMessageSet* tmp_msg = upb_test_TestMessageSet_new(arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(tmp_msg), upb_test_MessageSetMember_message_set_extension_ext,
-      &extension1, arena.ptr());
+      &extension1, arena.ptr()));
 
   char* buf;
   size_t size;
@@ -320,9 +320,9 @@ TEST(CompareTest, MessageSetNonCanonicalExtMatchesUnknown) {
 
   // 3. Create msg1 with non-canonical extension A
   upb_test_TestMessageSet* msg1 = upb_test_TestMessageSet_new(arena.ptr());
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg1), upb_test_MessageSetMember_message_set_extension_ext,
-      &extension1, arena.ptr());
+      &extension1, arena.ptr()));
 
   // 4. Create msg2 with raw unknown bytes representing A
   upb_test_TestMessageSet* msg2 = upb_test_TestMessageSet_new(arena.ptr());
@@ -355,15 +355,46 @@ TEST(CompareTest, MessageIsEqualWithCanonicalAndNonCanonicalExtensions) {
       upb_test_ModelExtension1_new(arena.ptr());
   upb_test_ModelExtension1_set_str(ext_msg2,
                                    upb_StringView_FromString("World"));
-  UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
+  EXPECT_TRUE(UPB_PRIVATE(_upb_Message_SetNonCanonicalExtension)(
       UPB_UPCAST(msg2), upb_test_ModelExtension1_model_ext_ext, &ext_msg2,
-      arena.ptr());
+      arena.ptr()));
 
   // 3. Verify upb_Message_IsEqual registers them as NOT equal
   bool is_equal = upb_Message_IsEqual(UPB_UPCAST(msg1), UPB_UPCAST(msg2),
                                       &upb_0test__ModelWithExtensions_msg_init,
                                       kUpb_CompareOption_IncludeUnknownFields);
   EXPECT_FALSE(is_equal);
+}
+
+// Test with enough fields to trigger reallocation in the merge sort tmp buffer
+// (initial capacity is 8). Also exercises the right-half remainder path in
+// upb_UnknownFields_Merge where ptr2 < end2.
+TEST(CompareTest, SortReallocation) {
+  // 20 fields in descending order forces merge sort to reallocate beyond the
+  // initial tmp buffer of 8, and the reversed ordering ensures the right-half
+  // remainder branch is exercised during merges.
+  WireMessage descending = {
+      {20, Varint(20)}, {19, Varint(19)}, {18, Varint(18)}, {17, Varint(17)},
+      {16, Varint(16)}, {15, Varint(15)}, {14, Varint(14)}, {13, Varint(13)},
+      {12, Varint(12)}, {11, Varint(11)}, {10, Varint(10)}, {9, Varint(9)},
+      {8, Varint(8)},   {7, Varint(7)},   {6, Varint(6)},   {5, Varint(5)},
+      {4, Varint(4)},   {3, Varint(3)},   {2, Varint(2)},   {1, Varint(1)},
+  };
+  WireMessage ascending = {
+      {1, Varint(1)},   {2, Varint(2)},   {3, Varint(3)},   {4, Varint(4)},
+      {5, Varint(5)},   {6, Varint(6)},   {7, Varint(7)},   {8, Varint(8)},
+      {9, Varint(9)},   {10, Varint(10)}, {11, Varint(11)}, {12, Varint(12)},
+      {13, Varint(13)}, {14, Varint(14)}, {15, Varint(15)}, {16, Varint(16)},
+      {17, Varint(17)}, {18, Varint(18)}, {19, Varint(19)}, {20, Varint(20)},
+  };
+  EXPECT_EQ(kUpb_UnknownCompareResult_Equal,
+            CompareUnknown(descending, ascending));
+
+  // Verify inequality still detected after sort.
+  WireMessage ascending_modified = ascending;
+  ascending_modified.back() = {20, Varint(999)};
+  EXPECT_EQ(kUpb_UnknownCompareResult_NotEqual,
+            CompareUnknown(descending, ascending_modified));
 }
 
 }  // namespace

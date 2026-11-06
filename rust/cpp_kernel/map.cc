@@ -1,8 +1,16 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #include "google/protobuf/map.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <new>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -198,9 +206,11 @@ size_t proto2_rust_map_size(google::protobuf::internal::UntypedMapBase* m) {
   return m->size();
 }
 
-google::protobuf::internal::UntypedMapIterator proto2_rust_map_iter(
-    google::protobuf::internal::UntypedMapBase* m) {
-  return m->begin();
+// Uses an out-param rather than returning by value. An `sret` return from Rust
+// leaves `__msan_param_tls` stale, which MSAN misreports inside `begin()`. See
+// b/563626875.
+void proto2_rust_map_iter(google::protobuf::internal::UntypedMapBase* m, void* iter_mem) {
+  ::new (iter_mem) google::protobuf::internal::UntypedMapIterator(m->begin());
 }
 
 void proto2_rust_map_free(google::protobuf::internal::UntypedMapBase* m) {

@@ -35,8 +35,9 @@ public abstract class AbstractMessageLite<
         MessageType extends AbstractMessageLite<MessageType, BuilderType>,
         BuilderType extends AbstractMessageLite.Builder<MessageType, BuilderType>>
     implements MessageLite {
-  protected
-  int memoizedHashCode = 0;
+  // This is a transient field that is used to optimize the hashCode() method.
+  // Marking transient to exclude it from output of incorrectly applied GSON.
+  protected transient int memoizedHashCode = 0;
 
   @Override
   public ByteString toByteString() {
@@ -52,7 +53,11 @@ public abstract class AbstractMessageLite<
   @Override
   public byte[] toByteArray() {
     try {
-      final byte[] result = new byte[getSerializedSize()];
+      final int size = getSerializedSize();
+      if (size == 0) {
+        return Internal.EMPTY_BYTE_ARRAY;
+      }
+      final byte[] result = new byte[size];
       final CodedOutputStream output = CodedOutputStream.newInstance(result);
       writeTo(output);
       output.checkNoSpaceLeft();

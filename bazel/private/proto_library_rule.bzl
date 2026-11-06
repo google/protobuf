@@ -181,9 +181,7 @@ def _write_descriptor_set(ctx, proto_info, deps, option_deps, exports, descripto
         args.add("--include_source_info")
     args.add("--retain_options")
 
-    strict_proto_deps = ctx.attr._strict_proto_deps[BuildSettingInfo].value
-
-    if strict_proto_deps:
+    if True:
         if proto_info.direct_sources:
             # Direct sources can be option imported in addition to `deps`.
             strict_importable_sources = depset(
@@ -386,20 +384,17 @@ for use with MessageSet.
         # buildifier: disable=attr-license (calling attr.license())
         "licenses": attr.license() if hasattr(attr, "license") else attr.string_list(),
         "_experimental_proto_descriptor_sets_include_source_info": attr.label(
-            default = "//bazel/flags:experimental_proto_descriptor_sets_include_source_info",
-        ),
-        "_strict_proto_deps": attr.label(
-            default = "//bazel/flags:strict_proto_deps",
+            default = Label("//bazel/flags:experimental_proto_descriptor_sets_include_source_info"),
         ),
         "_strict_public_imports": attr.label(
-            default = "//bazel/flags:strict_public_imports",
+            default = Label("//bazel/flags:strict_public_imports"),
         ),
     } | toolchains.if_legacy_toolchain({
         "_proto_compiler": attr.label(
             cfg = "exec",
             executable = True,
             allow_files = True,
-            default = "//src/google/protobuf/compiler:protoc_minimal",
+            default = Label("//src/google/protobuf/compiler:protoc_minimal"),
         ),
     }),  # buildifier: disable=attr-licenses (attribute called licenses)
     fragments = [

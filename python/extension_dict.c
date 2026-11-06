@@ -7,10 +7,21 @@
 
 #include "python/extension_dict.h"
 
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "google/protobuf/breaking_changes.h"
+#include "python/descriptor.h"
 #include "python/message.h"
 #include "python/protobuf.h"
+#include "upb/message/array.h"
+#include "upb/message/message.h"
+#include "upb/mini_table/extension.h"
+#include "upb/mini_table/extension_registry.h"
+#include "upb/mini_table/message.h"
 #include "upb/reflection/def.h"
+#include "upb/reflection/message.h"
 
 // -----------------------------------------------------------------------------
 // ExtensionDict
@@ -27,6 +38,7 @@ PyObject* PyUpb_ExtensionDict_New(PyObject* msg) {
   PyUpb_ModuleState* state = PyUpb_ModuleState_Get();
   PyUpb_ExtensionDict* ext_dict =
       (void*)PyType_GenericAlloc(state->extension_dict_type, 0);
+  if (!ext_dict) return NULL;
   ext_dict->msg = msg;
   Py_INCREF(ext_dict->msg);
   return &ext_dict->ob_base;
@@ -45,7 +57,8 @@ static PyObject* PyUpb_ExtensionDict_FindExtensionByName(PyObject* _self,
   const upb_DefPool* symtab = upb_FileDef_Pool(file);
   const upb_FieldDef* ext = upb_DefPool_FindExtensionByName(symtab, name);
   if (ext) {
-    return PyUpb_FieldDescriptor_Get(ext);
+    PyObject* pool = PyUpb_Message_GetPool(self->msg);
+    return PyUpb_FieldDescriptor_Get(pool, ext);
   } else {
     Py_RETURN_NONE;
   }
@@ -59,20 +72,28 @@ static PyObject* PyUpb_ExtensionDict_FindExtensionByNumber(PyObject* _self,
   const upb_FileDef* file = upb_MessageDef_File(m);
   const upb_DefPool* symtab = upb_FileDef_Pool(file);
   const upb_ExtensionRegistry* reg = upb_DefPool_ExtensionRegistry(symtab);
-  int64_t number = PyLong_AsLong(arg);
+  // Not PyLong_AsLong(): long is only 32 bits on some platforms (e.g. Windows),
+  // and out-of-range numbers should return None rather than raise.
+  int overflow;
+  int64_t number = PyLong_AsLongLongAndOverflow(arg, &overflow);
   if (number == -1 && PyErr_Occurred()) return NULL;
+  // Extension numbers are positive and fit in an int, so anything else (which
+  // the cast below could otherwise wrap onto a valid number) has no extension.
+  if (overflow != 0 || number < 0 || number > INT32_MAX) Py_RETURN_NONE;
   const upb_MiniTableExtension* ext =
-      (upb_MiniTableExtension*)upb_ExtensionRegistry_Lookup(reg, l, number);
+      (upb_MiniTableExtension*)upb_ExtensionRegistry_Lookup(reg, l,
+                                                            (uint32_t)number);
   if (ext) {
     const upb_FieldDef* f = upb_DefPool_FindExtensionByMiniTable(symtab, ext);
-    return PyUpb_FieldDescriptor_Get(f);
+    PyObject* pool = PyUpb_Message_GetPool(self->msg);
+    return PyUpb_FieldDescriptor_Get(pool, f);
   } else {
     Py_RETURN_NONE;
   }
 }
 
 static void PyUpb_ExtensionDict_Dealloc(PyUpb_ExtensionDict* self) {
-  PyUpb_Message_ClearExtensionDict(self->msg);
+  PyUpb_Message_ClearExtensionDict(self->msg, (PyObject*)self);
   Py_DECREF(self->msg);
   PyUpb_Dealloc(self);
 }
@@ -208,11 +229,12 @@ PyObject* PyUpb_ExtensionIterator_IterNext(PyObject* _self) {
   if (!msg) return NULL;
   const upb_MessageDef* m = PyUpb_Message_GetMsgdef(self->msg);
   const upb_DefPool* symtab = upb_FileDef_Pool(upb_MessageDef_File(m));
+  PyObject* pool = PyUpb_Message_GetPool(self->msg);
   while (true) {
     const upb_FieldDef* f;
     upb_MessageValue val;
     if (!upb_Message_Next(msg, m, symtab, &f, &val, &self->iter)) return NULL;
-    if (upb_FieldDef_IsExtension(f)) return PyUpb_FieldDescriptor_Get(f);
+    if (upb_FieldDef_IsExtension(f)) return PyUpb_FieldDescriptor_Get(pool, f);
   }
 }
 

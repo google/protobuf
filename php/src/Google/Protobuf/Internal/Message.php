@@ -416,7 +416,7 @@ class Message
             case GPBType::MESSAGE:
                 if ($field->isMap()) {
                     $value = new MapEntry($field->getMessageType());
-                } else {
+                } elseif (is_null($value)) {
                     $klass = $field->getMessageType()->getClass();
                     $value = new $klass;
                 }
@@ -500,6 +500,12 @@ class Message
             $this->skipField($input, $tag);
             return;
         } elseif ($value_format === GPBWire::NORMAL_FORMAT) {
+            if ($field->getType() === GPBType::MESSAGE &&
+                !$field->isRepeated() &&
+                $this->existField($field)) {
+                $getter = $field->getGetter();
+                $value = $this->$getter();
+            }
             self::parseFieldFromStreamNoTag($input, $field, $value);
         } elseif ($value_format === GPBWire::PACKED_FORMAT) {
             $length = 0;
@@ -933,6 +939,13 @@ class Message
                 if ($value === "NaN") {
                     return NAN;
                 }
+                if (!is_numeric($value)) {
+                    trigger_error(
+                        "Invalid data type for float field. " .
+                        "This will fail in a future version of Protobuf.",
+                        E_USER_WARNING
+                    );
+                }
                 return $value;
             case GPBType::INT32:
             case GPBType::SINT32:
@@ -1285,6 +1298,14 @@ class Message
                 if (is_null($value)) {
                     continue;
                 }
+                if (!is_array($value)) {
+                    trigger_error(
+                        "Invalid data type for repeated field. " .
+                        "This will fail in a future version of Protobuf.",
+                        E_USER_WARNING
+                    );
+                    continue;
+                }
                 foreach ($value as $tmp) {
                     if (is_null($tmp)) {
                         throw new \Exception(
@@ -1511,10 +1532,8 @@ class Message
 
             $output->writeRaw("}", 1);
         } elseif (is_a($this, 'Google\Protobuf\FieldMask')) {
-            $field_mask = GPBUtil::formatFieldMask($this);
-            $output->writeRaw("\"", 1);
-            $output->writeRaw($field_mask, strlen($field_mask));
-            $output->writeRaw("\"", 1);
+            $field_mask_json = json_encode(GPBUtil::formatFieldMask($this));
+            $output->writeRaw($field_mask_json, strlen($field_mask_json));
         } elseif (is_a($this, 'Google\Protobuf\Duration')) {
             $duration = GPBUtil::formatDuration($this) . "s";
             $output->writeRaw("\"", 1);
@@ -2041,8 +2060,8 @@ class Message
                 }
             }
         } elseif (get_class($this) === 'Google\Protobuf\FieldMask') {
-            $field_mask = GPBUtil::formatFieldMask($this);
-            $size += strlen($field_mask) + 2;  // 2 for ""
+            $field_mask_json = json_encode(GPBUtil::formatFieldMask($this));
+            $size += strlen($field_mask_json);
         } elseif (get_class($this) === 'Google\Protobuf\Duration') {
             $duration = GPBUtil::formatDuration($this) . "s";
             $size += strlen($duration) + 2;  // 2 for ""

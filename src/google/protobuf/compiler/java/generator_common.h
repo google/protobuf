@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_COMPILER_JAVA_GENERATOR_COMMON_H__
 #define GOOGLE_PROTOBUF_COMPILER_JAVA_GENERATOR_COMMON_H__
 
@@ -30,11 +37,12 @@ class FieldGeneratorMap {
  public:
   explicit FieldGeneratorMap(const Descriptor* descriptor)
       : descriptor_(descriptor) {
-    field_generators_.reserve(static_cast<size_t>(descriptor->field_count()));
+    insert_order_.reserve(static_cast<size_t>(descriptor->field_count()));
+    index_order_.resize(static_cast<size_t>(descriptor->field_count()));
   }
 
   ~FieldGeneratorMap() {
-    for (const auto* g : field_generators_) {
+    for (const auto* g : insert_order_) {
       delete g;
     }
   }
@@ -45,21 +53,28 @@ class FieldGeneratorMap {
   FieldGeneratorMap(const FieldGeneratorMap&) = delete;
   FieldGeneratorMap& operator=(const FieldGeneratorMap&) = delete;
 
+  size_t size() const { return insert_order_.size(); }
+
   void Add(const FieldDescriptor* field,
            std::unique_ptr<FieldGeneratorType> field_generator) {
     ABSL_CHECK_EQ(field->containing_type(), descriptor_);
-    field_generators_.push_back(field_generator.release());
+    insert_order_.push_back(field_generator.release());
+    index_order_[static_cast<size_t>(field->index())] = insert_order_.back();
   }
 
   const FieldGeneratorType& get(const FieldDescriptor* field) const {
     ABSL_CHECK_EQ(field->containing_type(), descriptor_);
-    return *field_generators_[static_cast<size_t>(field->index())];
+    return *index_order_[static_cast<size_t>(field->index())];
+  }
+
+  const FieldGeneratorType& getInInsertOrder(int index) const {
+    return *insert_order_[static_cast<size_t>(index)];
   }
 
   std::vector<const FieldGenerator*> field_generators() const {
     std::vector<const FieldGenerator*> field_generators;
-    field_generators.reserve(field_generators_.size());
-    for (const auto* g : field_generators_) {
+    field_generators.reserve(index_order_.size());
+    for (const auto* g : index_order_) {
       field_generators.push_back(g);
     }
     return field_generators;
@@ -67,7 +82,8 @@ class FieldGeneratorMap {
 
  private:
   const Descriptor* descriptor_;
-  std::vector<const FieldGeneratorType*> field_generators_;
+  std::vector<const FieldGeneratorType*> insert_order_;
+  std::vector<const FieldGeneratorType*> index_order_;
 };
 
 inline void ReportUnexpectedPackedFieldsCall() {

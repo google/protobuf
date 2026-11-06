@@ -1,5 +1,5 @@
-# Copyright (c) 2025, Google LLC
-# All rights reserved.
+# Protocol Buffers - Google's data interchange format
+# Copyright 2025 Google LLC
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -12,6 +12,20 @@ load("//build_defs:cpp_opts.bzl", "COPTS")
 load(
     "//upb_generator:bootstrap_compiler.bzl",
     "bootstrap_cc_library",
+)
+
+cc_test(
+    name = "generator_test",
+    srcs = ["generator_test.cc"],
+    deps = [
+        ":rust",
+        "//:protobuf",
+        "//src/google/protobuf/compiler:command_line_interface_tester",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -203,6 +217,7 @@ bootstrap_cc_library(
         ":extension",
         ":message",
         "//upb/reflection:reflection_cc",
+        "//upb_generator:file_layout",
         "//upb_generator:plugin",
     ],
     copts = COPTS,

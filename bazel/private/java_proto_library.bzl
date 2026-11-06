@@ -1,5 +1,5 @@
-# Copyright (c) 2009-2024, Google LLC
-# All rights reserved.
+# Protocol Buffers - Google's data interchange format
+# Copyright 2009 Google LLC
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -74,7 +74,7 @@ java_proto_aspect = aspect(
     attrs = (
         toolchains.if_legacy_toolchain({
             "_aspect_java_proto_toolchain": attr.label(
-                default = "//bazel/flags/java:proto_toolchain_for_java",
+                default = Label("//bazel/flags/java:proto_toolchain_for_java"),
             ),
         })
     ),
@@ -161,7 +161,7 @@ rules to generate Java code for.
         "licenses": attr.license() if hasattr(attr, "license") else attr.string_list(),
     } | toolchains.if_legacy_toolchain({
         "_aspect_java_proto_toolchain": attr.label(
-            default = "//bazel/flags/java:proto_toolchain_for_java",
+            default = Label("//bazel/flags/java:proto_toolchain_for_java"),
         ),
     }),  # buildifier: disable=attr-licenses (attribute called licenses)
     provides = [JavaInfo],

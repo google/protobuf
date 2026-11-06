@@ -23,8 +23,6 @@ def bazel_proto_library_test_suite(name):
         _test_descriptor_sets_are_exposed_in_provider,
         _test_descriptor_set_output_strict_deps,
         _test_descriptor_set_output_strict_deps_multiple_srcs,
-        _test_descriptor_set_output_strict_deps_strict,
-        _test_descriptor_set_output_strict_deps_disabled,
         _test_strip_import_prefix_without_deps,
         _test_strict_public_imports_enabled,
         _test_strict_public_imports_disabled,
@@ -46,8 +44,6 @@ def bazel_proto_library_test_suite(name):
         _test_proto_library_without_sources,
         _test_proto_library_with_generated_sources,
         _test_proto_library_with_mixed_sources,
-        _test_strict_proto_deps_starlark_override_native,
-        _test_strict_proto_deps_starlark_off_native_on,
     ]
 
     # Flipping experimental flag in test requires Bazel 8
@@ -211,7 +207,6 @@ def _test_descriptor_set_output_strict_deps(name):
             name + "_depends_on_alias",
         ],
         impl = _test_descriptor_set_output_strict_deps_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "error"},
     )
 
 def _test_descriptor_set_output_strict_deps_impl(env, targets):
@@ -253,7 +248,6 @@ def _test_descriptor_set_output_strict_deps_multiple_srcs(name):
         name = name,
         target = name + "_foo",
         impl = _test_descriptor_set_output_strict_deps_multiple_srcs_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "error"},
     )
 
 def _test_descriptor_set_output_strict_deps_multiple_srcs_impl(env, target):
@@ -265,44 +259,6 @@ def _test_descriptor_set_output_strict_deps_multiple_srcs_impl(env, target):
         "{package}/foo.proto:{package}/bar.proto",
     ])
     action.argv().contains_predicate(matching.str_matches("--direct_dependencies_violation_msg=*"))
-
-def _test_descriptor_set_output_strict_deps_strict(name):
-    util.helper_target(proto_library, name = name + "_foo", srcs = ["foo.proto", "bar.proto"])
-
-    analysis_test(
-        name = name,
-        target = name + "_foo",
-        impl = _test_descriptor_set_output_strict_deps_strict_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "strict"},
-    )
-
-def _test_descriptor_set_output_strict_deps_strict_impl(env, target):
-    action = env.expect.that_target(target).action_generating(
-        "{package}/{name}-descriptor-set.proto.bin",
-    )
-    action.argv().contains_at_least([
-        "--direct_dependencies",
-        "{package}/foo.proto:{package}/bar.proto",
-    ])
-    action.argv().contains_predicate(matching.str_matches("--direct_dependencies_violation_msg=*"))
-
-def _test_descriptor_set_output_strict_deps_disabled(name):
-    util.helper_target(proto_library, name = name + "_foo", srcs = ["foo.proto"])
-
-    analysis_test(
-        name = name,
-        target = name + "_foo",
-        impl = _test_descriptor_set_output_strict_deps_disabled_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "off"},
-    )
-
-def _test_descriptor_set_output_strict_deps_disabled_impl(env, target):
-    action = env.expect.that_target(target).action_generating(
-        "{package}/{name}-descriptor-set.proto.bin",
-    )
-
-    action.argv().not_contains("--direct_dependencies")
-    action.argv().not_contains_predicate(matching.str_matches("--direct_dependencies_violation_msg=*"))
 
 def _test_strip_import_prefix_without_deps(name):
     util.helper_target(
@@ -336,7 +292,10 @@ def _test_strict_public_imports_enabled(name):
         name = name,
         target = name + "_foo",
         impl = _test_strict_public_imports_enabled_impl,
-        config_settings = {"//command_line_option:strict_public_imports": "ERROR"},
+        config_settings = {
+            "//command_line_option:strict_public_imports": "ERROR",
+            "@@//bazel/flags:strict_public_imports": "ERROR",
+        },
     )
 
 def _test_strict_public_imports_enabled_impl(env, target):
@@ -352,7 +311,10 @@ def _test_strict_public_imports_disabled(name):
         name = name,
         target = name + "_foo",
         impl = _test_strict_public_imports_disabled_impl,
-        config_settings = {"//command_line_option:strict_public_imports": "OFF"},
+        config_settings = {
+            "//command_line_option:strict_public_imports": "OFF",
+            "@@//bazel/flags:strict_public_imports": "OFF",
+        },
     )
 
 def _test_strict_public_imports_disabled_impl(env, target):
@@ -374,8 +336,7 @@ def _test_strict_public_imports_default_impl(env, target):
     action = env.expect.that_target(target).action_generating(
         "{package}/{name}-descriptor-set.proto.bin",
     )
-
-    action.argv().not_contains("--allowed_public_imports=")
+    action.argv().contains("--allowed_public_imports=")
 
 def _test_strict_public_imports_transitive_exports(name):
     util.helper_target(
@@ -397,7 +358,10 @@ def _test_strict_public_imports_transitive_exports(name):
         name = name,
         target = name + "_top",
         impl = _test_strict_public_imports_transitive_exports_impl,
-        config_settings = {"//command_line_option:strict_public_imports": "ERROR"},
+        config_settings = {
+            "//command_line_option:strict_public_imports": "ERROR",
+            "@@//bazel/flags:strict_public_imports": "ERROR",
+        },
     )
 
 def _test_strict_public_imports_transitive_exports_impl(env, target):
@@ -603,7 +567,6 @@ def _test_strip_import_prefix_with_strict_proto_deps(name):
         name = name,
         target = name + "_d",
         impl = _test_strip_import_prefix_with_strict_proto_deps_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "STRICT"},
     )
 
 def _test_strip_import_prefix_with_strict_proto_deps_impl(env, target):
@@ -630,7 +593,6 @@ def _test_dep_on_strip_import_prefix_with_strict_proto_deps(name):
         name = name,
         target = name + "_e",
         impl = _test_dep_on_strip_import_prefix_with_strict_proto_deps_impl,
-        config_settings = {"//command_line_option:strict_proto_deps": "STRICT"},
     )
 
 def _test_dep_on_strip_import_prefix_with_strict_proto_deps_impl(env, target):
@@ -669,7 +631,10 @@ def _test_experimental_proto_descriptor_sets_include_source_info(name):
         name = name,
         target = name + "_a_proto",
         impl = _test_experimental_proto_descriptor_sets_include_source_info_impl,
-        config_settings = {"@@//bazel/flags:experimental_proto_descriptor_sets_include_source_info": "true"},
+        config_settings = {
+            "//command_line_option:experimental_proto_descriptor_sets_include_source_info": "true",
+            "@@//bazel/flags:experimental_proto_descriptor_sets_include_source_info": "true",
+        },
     )
 
 def _test_experimental_proto_descriptor_sets_include_source_info_impl(env, target):
@@ -793,27 +758,3 @@ def _test_proto_library_with_mixed_sources_impl(env, target):
         target.label.package + "/a.proto",
         target.label.package + "/generated2.proto",
     ])
-
-def _test_strict_proto_deps_starlark_override_native(name):
-    util.helper_target(proto_library, name = name + "_foo", srcs = ["foo.proto", "bar.proto"])
-
-    analysis_test(
-        name = name,
-        target = name + "_foo",
-        impl = _test_descriptor_set_output_strict_deps_strict_impl,
-        config_settings = {
-            "@@//bazel/flags:strict_proto_deps": "error",
-        },
-    )
-
-def _test_strict_proto_deps_starlark_off_native_on(name):
-    util.helper_target(proto_library, name = name + "_foo", srcs = ["foo.proto"])
-
-    analysis_test(
-        name = name,
-        target = name + "_foo",
-        impl = _test_descriptor_set_output_strict_deps_disabled_impl,
-        config_settings = {
-            "@@//bazel/flags:strict_proto_deps": "off",
-        },
-    )

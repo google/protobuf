@@ -23,6 +23,7 @@
 #include "upb/message/array.h"
 #include "upb/message/map.h"
 #include "upb/message/message.h"
+#include "upb/mini_table/extension_registry.h"
 #include "upb/mini_table/message.h"
 #include "upb/port/vsnprintf_compat.h"
 #include "upb/reflection/def.h"
@@ -35,7 +36,7 @@
 typedef struct {
   char *buf, *ptr, *end;
   size_t overflow;
-  int indent_depth;
+  int depth;
   int options;
   const upb_DefPool* ext_pool;
   jmp_buf err;
@@ -67,6 +68,12 @@ UPB_NORETURN static void jsonenc_errf(jsonenc* e, const char* fmt, ...) {
   upb_Status_VSetErrorFormat(e->status, fmt, argp);
   va_end(argp);
   UPB_LONGJMP(e->err, 1);
+}
+
+static void jsonenc_checkdepth(jsonenc* e) {
+  if (--e->depth < 0) {
+    jsonenc_err(e, "Max depth exceeded");
+  }
 }
 
 static upb_Arena* jsonenc_arena(jsonenc* e) {
@@ -227,9 +234,14 @@ static void jsonenc_enum(int32_t val, const upb_FieldDef* f, jsonenc* e) {
 }
 
 static void jsonenc_bytes(jsonenc* e, upb_StringView str) {
-  /* This is the regular base64, not the "web-safe" version. */
-  static const char base64[] =
+  /* Regular base64 (RFC 4648 section 4) by default; the URL- and filename-safe
+   * alphabet (RFC 4648 section 5) when upb_JsonEncode_WebSafeBase64 is set. */
+  static const char kBase64[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  static const char kWebSafeBase64[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const char* base64 =
+      (e->options & upb_JsonEncode_WebSafeBase64) ? kWebSafeBase64 : kBase64;
   const unsigned char* ptr = (unsigned char*)str.data;
   const unsigned char* end = UPB_PTRADD(ptr, str.size);
   char buf[4];
@@ -265,43 +277,47 @@ static void jsonenc_bytes(jsonenc* e, upb_StringView str) {
   jsonenc_putstr(e, "\"");
 }
 
+static void jsonenc_put_escaped_char(jsonenc* e, char ch) {
+  switch (ch) {
+    case '\n':
+      jsonenc_putstr(e, "\\n");
+      break;
+    case '\r':
+      jsonenc_putstr(e, "\\r");
+      break;
+    case '\t':
+      jsonenc_putstr(e, "\\t");
+      break;
+    case '\"':
+      jsonenc_putstr(e, "\\\"");
+      break;
+    case '\f':
+      jsonenc_putstr(e, "\\f");
+      break;
+    case '\b':
+      jsonenc_putstr(e, "\\b");
+      break;
+    case '\\':
+      jsonenc_putstr(e, "\\\\");
+      break;
+    default:
+      if ((uint8_t)ch < 0x20) {
+        jsonenc_printf(e, "\\u%04x", (int)(uint8_t)ch);
+      } else {
+        /* This could be a non-ASCII byte.  We rely on the string being valid
+         * UTF-8. */
+        jsonenc_putbytes(e, &ch, 1);
+      }
+      break;
+  }
+}
+
 static void jsonenc_stringbody(jsonenc* e, upb_StringView str) {
   const char* ptr = str.data;
   const char* end = UPB_PTRADD(ptr, str.size);
 
   while (ptr < end) {
-    switch (*ptr) {
-      case '\n':
-        jsonenc_putstr(e, "\\n");
-        break;
-      case '\r':
-        jsonenc_putstr(e, "\\r");
-        break;
-      case '\t':
-        jsonenc_putstr(e, "\\t");
-        break;
-      case '\"':
-        jsonenc_putstr(e, "\\\"");
-        break;
-      case '\f':
-        jsonenc_putstr(e, "\\f");
-        break;
-      case '\b':
-        jsonenc_putstr(e, "\\b");
-        break;
-      case '\\':
-        jsonenc_putstr(e, "\\\\");
-        break;
-      default:
-        if ((uint8_t)*ptr < 0x20) {
-          jsonenc_printf(e, "\\u%04x", (int)(uint8_t)*ptr);
-        } else {
-          /* This could be a non-ASCII byte.  We rely on the string being valid
-           * UTF-8. */
-          jsonenc_putbytes(e, ptr, 1);
-        }
-        break;
-    }
+    jsonenc_put_escaped_char(e, *ptr);
     ptr++;
   }
 }
@@ -349,7 +365,7 @@ static void jsonenc_wrapper(jsonenc* e, const upb_Message* msg,
 static const upb_MessageDef* jsonenc_getanymsg(jsonenc* e,
                                                upb_StringView type_url) {
   /* Find last '/', if any. */
-  const char* end = type_url.data + type_url.size;
+  const char* end = UPB_PTRADD(type_url.data, type_url.size);
   const char* ptr = end;
   const upb_MessageDef* ret;
 
@@ -385,6 +401,8 @@ badurl:
 
 static void jsonenc_any(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
+
   const upb_FieldDef* type_url_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_FieldDef* value_f = upb_MessageDef_FindFieldByNumber(m, 2);
   upb_StringView type_url = upb_Message_GetFieldByDef(msg, type_url_f).str_val;
@@ -398,7 +416,9 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
     return;
   }
 
-  if (upb_Decode(value.data, value.size, any, any_layout, NULL, 0, arena) !=
+  const upb_ExtensionRegistry* extreg =
+      upb_DefPool_ExtensionRegistry(e->ext_pool);
+  if (upb_Decode(value.data, value.size, any, any_layout, extreg, 0, arena) !=
       kUpb_DecodeStatus_Ok) {
     jsonenc_err(e, "Error decoding message in Any");
   }
@@ -416,6 +436,7 @@ static void jsonenc_any(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
@@ -428,7 +449,7 @@ static void jsonenc_putsep(jsonenc* e, const char* str, bool* first) {
 
 static void jsonenc_fieldpath(jsonenc* e, upb_StringView path) {
   const char* ptr = path.data;
-  const char* end = ptr + path.size;
+  const char* end = UPB_PTRADD(ptr, path.size);
 
   while (ptr < end) {
     char ch = *ptr;
@@ -449,7 +470,7 @@ static void jsonenc_fieldpath(jsonenc* e, upb_StringView path) {
       ch = *++ptr - 32;
     }
 
-    jsonenc_putbytes(e, &ch, 1);
+    jsonenc_put_escaped_char(e, ch);
     ptr++;
   }
 }
@@ -475,6 +496,7 @@ static void jsonenc_fieldmask(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
                            const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
 
   const upb_FieldDef* fields_f = upb_MessageDef_FindFieldByNumber(m, 1);
@@ -497,10 +519,12 @@ static void jsonenc_struct(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
                               const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   const upb_FieldDef* values_f = upb_MessageDef_FindFieldByNumber(m, 1);
   const upb_MessageDef* values_m = upb_FieldDef_MessageSubDef(values_f);
   const upb_Array* values = upb_Message_GetFieldByDef(msg, values_f).array_val;
@@ -520,6 +544,7 @@ static void jsonenc_listvalue(jsonenc* e, const upb_Message* msg,
   }
 
   jsonenc_putstr(e, "]");
+  e->depth++;
 }
 
 static void jsonenc_value(jsonenc* e, const upb_Message* msg,
@@ -719,14 +744,17 @@ static void jsonenc_fieldval(jsonenc* e, const upb_FieldDef* f,
     // TODO: For MessageSet, I would have expected this to print the message
     // name here, but Python doesn't appear to do this. We should do more
     // research here about what various implementations do.
-    jsonenc_printf(e, "\"[%s]\":", upb_FieldDef_FullName(f));
+    jsonenc_putstr(e, "\"[");
+    jsonenc_stringbody(e, upb_StringView_FromString(upb_FieldDef_FullName(f)));
+    jsonenc_putstr(e, "]\":");
   } else {
     if (e->options & upb_JsonEncode_UseProtoNames) {
       name = upb_FieldDef_Name(f);
     } else {
       name = upb_FieldDef_JsonName(f);
     }
-    jsonenc_printf(e, "\"%s\":", name);
+    jsonenc_string(e, upb_StringView_FromString(name));
+    jsonenc_putstr(e, ":");
   }
 
   if (upb_FieldDef_IsMap(f)) {
@@ -764,9 +792,11 @@ static void jsonenc_msgfields(jsonenc* e, const upb_Message* msg,
 
 static void jsonenc_msg(jsonenc* e, const upb_Message* msg,
                         const upb_MessageDef* m) {
+  jsonenc_checkdepth(e);
   jsonenc_putstr(e, "{");
   jsonenc_msgfields(e, msg, m, true);
   jsonenc_putstr(e, "}");
+  e->depth++;
 }
 
 static size_t jsonenc_nullz(jsonenc* e, size_t size) {
@@ -784,7 +814,10 @@ static size_t upb_JsonEncoder_Encode(jsonenc* const e,
                                      const upb_Message* const msg,
                                      const upb_MessageDef* const m,
                                      const size_t size) {
-  if (UPB_SETJMP(e->err) != 0) return -1;
+  if (UPB_SETJMP(e->err) != 0) {
+    if (e->arena) upb_Arena_Free(e->arena);
+    return -1;
+  }
 
   jsonenc_msgfield(e, msg, m);
   if (e->arena) upb_Arena_Free(e->arena);
@@ -800,6 +833,7 @@ size_t upb_JsonEncode(const upb_Message* msg, const upb_MessageDef* m,
   e.ptr = buf;
   e.end = UPB_PTRADD(buf, size);
   e.overflow = 0;
+  e.depth = upb_JsonEncodeOptions_GetEffectiveMaxDepth(options);
   e.options = options;
   e.ext_pool = ext_pool;
   e.status = status;

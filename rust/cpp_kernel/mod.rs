@@ -12,6 +12,8 @@ pub mod interop;
 pub mod map;
 pub mod message;
 pub mod raw;
+#[cfg(not(lite_runtime))]
+pub mod reflection;
 pub mod repeated;
 pub mod string;
 
@@ -20,6 +22,8 @@ pub use interop::*;
 pub use map::*;
 pub use message::*;
 pub use raw::*;
+#[cfg(not(lite_runtime))]
+pub use reflection::*;
 pub use repeated::*;
 pub use string::*;
 
@@ -27,8 +31,8 @@ use crate::__internal::{Enum, MatcherEq, Private, SealedInternal};
 use crate::{
     AsMut, AsView, Clear, ClearAndParse, CopyFrom, IntoProxied, Map, MapIter, MapMut, MapValue,
     MapView, MergeFrom, Message, Mut, MutProxied, ParseError, ProtoBytes, ProtoStr, ProtoString,
-    Proxied, Repeated, RepeatedMut, RepeatedView, Serialize, SerializeError, Singular, TakeFrom,
-    View,
+    Proxied, Repeated, RepeatedMut, RepeatedView, Serialize, SerializeError, SerializeOptions,
+    Singular, TakeFrom, View,
 };
 use core::fmt::Debug;
 use paste::paste;

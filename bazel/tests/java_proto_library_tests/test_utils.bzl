@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 """Common test utils for java_proto_library tests. 
 This file is forked from tests/java_proto_library_tests.bzl"""
 
@@ -38,6 +45,10 @@ def _java_info_subject(info, *, meta):
             _filter_inpackage(self.actual.transitive_source_jars, meta.ctx.label),
             meta = self.meta.derive("transitive_source_jars_in_package()"),
         ),
+        source_jars = lambda *a, **k: subjects.depset_file(
+            self.actual.source_jars,
+            meta = self.meta.derive("source_jars()"),
+        ),
         transitive_runtime_jars = lambda *a, **k: subjects.depset_file(
             self.actual.transitive_runtime_jars,
             meta = self.meta.derive("transitive_runtime_jars()"),
@@ -49,6 +60,10 @@ def _java_info_subject(info, *, meta):
         transitive_compile_time_jars_in_package = lambda *a, **k: subjects.depset_file(
             _filter_inpackage(self.actual.transitive_compile_time_jars, meta.ctx.label),
             meta = self.meta.derive("transitive_compile_time_jars_in_package()"),
+        ),
+        compile_jars = lambda *a, **k: subjects.depset_file(
+            self.actual.compile_jars,
+            meta = self.meta.derive("compile_jars()"),
         ),
     )
     return public

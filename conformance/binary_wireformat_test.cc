@@ -1,4 +1,11 @@
-#include "binary_wireformat.h"
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+#include "conformance/binary_wireformat.h"
 
 #include <cstdint>
 #include <string>
@@ -95,38 +102,14 @@ class TagTest : public testing::TestWithParam<TagTestCase> {};
 INSTANTIATE_TEST_SUITE_P(
     TagTest, TagTest,
     testing::ValuesIn(std::vector<TagTestCase>{
-        {.name = "Varint",
-         .fieldnum = 1,
-         .wire_type = WireType::kVarint,
-         .expected = "\010"},
-        {.name = "Fixed32",
-         .fieldnum = 2,
-         .wire_type = WireType::kFixed32,
-         .expected = "\025"},
-        {.name = "Fixed64",
-         .fieldnum = 3,
-         .wire_type = WireType::kFixed64,
-         .expected = "\031"},
-        {.name = "LengthPrefixed",
-         .fieldnum = 4,
-         .wire_type = WireType::kLengthPrefixed,
-         .expected = "\042"},
-        {.name = "StartGroup",
-         .fieldnum = 5,
-         .wire_type = WireType::kStartGroup,
-         .expected = "\053"},
-        {.name = "EndGroup",
-         .fieldnum = 6,
-         .wire_type = WireType::kEndGroup,
-         .expected = "\064"},
-        {.name = "TwoByteTag",
-         .fieldnum = 256,
-         .wire_type = WireType::kStartGroup,
-         .expected = "\203\020"},
-        {.name = "ThreeByteTag",
-         .fieldnum = 0xFFFF,
-         .wire_type = WireType::kStartGroup,
-         .expected = "\373\377\037"}}),
+        {"Varint", 1, WireType::kVarint, "\010"},
+        {"Fixed32", 2, WireType::kFixed32, "\025"},
+        {"Fixed64", 3, WireType::kFixed64, "\031"},
+        {"LengthPrefixed", 4, WireType::kLengthPrefixed, "\042"},
+        {"StartGroup", 5, WireType::kStartGroup, "\053"},
+        {"EndGroup", 6, WireType::kEndGroup, "\064"},
+        {"TwoByteTag", 256, WireType::kStartGroup, "\203\020"},
+        {"ThreeByteTag", 0xFFFF, WireType::kStartGroup, "\373\377\037"}}),
     [](const testing::TestParamInfo<TagTest::ParamType>& info) {
       return info.param.name;
     });
@@ -172,7 +155,8 @@ class LongVarintTest : public testing::TestWithParam<LongVarintTestCase> {};
 INSTANTIATE_TEST_SUITE_P(
     LongVarintTest, LongVarintTest,
     testing::ValuesIn(std::vector<LongVarintTestCase>{
-        {0, 1, std::string("\000", 1)},
+        {0, 1, std::string("\200\000", 2)},
+        {0, 2, std::string("\200\200\000", 3)},
         {1, 1, std::string("\201\000", 2)},
         {1, 4, std::string("\201\200\200\200\000", 5)},
         {127, 1, std::string("\377\000", 2)},
@@ -371,7 +355,16 @@ TEST(PackedTest, Empty) {
 
 TEST(PackedTest, OneFixed32) {
   EXPECT_EQ(Packed(Fixed32<int>, {9}),
-            Wire(absl::string_view("\001\011\000\000\000", 5)));
+            Wire(absl::string_view("\004\011\000\000\000", 5)));
+}
+
+TEST(PackedTest, TwoFixed32s) {
+  EXPECT_EQ(Packed(Fixed32<int>, {9, 8}),
+            Wire(absl::string_view("\010\011\000\000\000\010\000\000\000", 9)));
+}
+
+TEST(PackedTest, MultiByteVarints) {
+  EXPECT_EQ(Packed(Varint<int>, {128, 1}), Wire("\003\200\001\001"));
 }
 
 TEST(PackedTest, Varints) {
