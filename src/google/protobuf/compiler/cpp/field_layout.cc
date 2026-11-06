@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #include "google/protobuf/compiler/cpp/field_layout.h"
 
 #include <algorithm>
@@ -93,15 +100,6 @@ absl::optional<int> FieldLayout::GetHasBitIndex(
     return absl::nullopt;
   }
   return has_bit_indices_[index];
-}
-
-absl::optional<int> FieldLayout::GetHasByteIndex(
-    const FieldDescriptor* absl_nonnull field) const {
-  absl::optional<int> hasbit = GetHasBitIndex(field);
-  if (!hasbit.has_value()) {
-    return absl::nullopt;
-  }
-  return hasbit.value() / 8;
 }
 
 absl::optional<int> FieldLayout::GetHasWordIndex(

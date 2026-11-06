@@ -298,8 +298,7 @@ void LeftoverBuffer::remove_prefix(uint32_t pos) {
 }
 
 // Returns true if "fragment" potentially prefixed with "leftover" is valid
-// UTF8. Copied from `CordIsValid()`:
-// http://google3/util/utf8/internal/unilib.cc;l=85;rcl=740640507
+// UTF8.
 bool IsViewValidUTF8WithLeftover(absl::string_view fragment,
                                  LeftoverBuffer& leftover) {
   if (size_t leftover_size = leftover.size; leftover_size > 0) {
@@ -795,13 +794,11 @@ const char* UnknownFieldParse(uint32_t tag, std::string* unknown,
   return FieldParser(tag, field_parser, ptr, ctx);
 }
 
-const char* EpsCopyInputStream::ReadMicroStringFallback(const char* ptr,
-                                                        int size,
-                                                        MicroString& str,
-                                                        size_t inline_capacity,
-                                                        Arena* arena) {
+const char* EpsCopyInputStream::ReadMicroStringFallback(
+    const char* ptr, int size, MicroString& str, size_t inline_capacity,
+    const MessageLite& parent) {
   str.SetInChunks(
-      size, arena,
+      size, parent,
       [&](auto append) {
         ptr = AppendSize(ptr, size, [&](const char* p, int s) {
           append(absl::string_view(p, s));
