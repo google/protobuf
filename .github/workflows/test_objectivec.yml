@@ -36,7 +36,7 @@ jobs:
           destination: "platform=macOS"
           xc_project: "ProtocolBuffers_OSX.xcodeproj"
         - platform: "iOS"
-          destination: "platform=iOS Simulator,name=iPhone 15,OS=latest"
+          destination: "platform=iOS Simulator,name=iPhone 16"
           xc_project: "ProtocolBuffers_iOS.xcodeproj"
         # We run presubmits on all "Debug" entries, but not on "Release" entries
         - xc_config: "Debug"
@@ -44,9 +44,9 @@ jobs:
           continuous-only: true
 
     name: ${{ matrix.continuous-only && inputs.continuous-prefix || '' }} Xcode ${{ matrix.platform}} ${{ matrix.xc_config }}
-    runs-on: macos-14
+    runs-on: macos-15
     env:
-      DEVELOPER_DIR: /Applications/Xcode_15.2.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - name: Checkout pending changes
         if: ${{ !matrix.continuous-only || inputs.continuous-run }}
@@ -72,6 +72,15 @@ jobs:
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-version: 8.0.1
           command: |
+            if [[ "${{ matrix.platform }}" == "iOS" ]]; then
+              # Only iOS tests run in a simulator (macOS tests run directly on the host).
+              # Xcode 16's xcodebuild only waits about a minute for CoreSimulatorService to
+              # start. On a freshly started runner that is sometimes not enough, and it fails
+              # with "Unable to find a device matching the provided destination specifier".
+              # `simctl` blocks until the service is up, so talk to it first.
+              # See https://github.com/actions/runner-images/issues/12777
+              xcrun simctl list devices available
+            fi
             xcodebuild \
                 -project "objectivec/${{ matrix.xc_project }}" \
                 -scheme ProtocolBuffers \
@@ -92,8 +101,8 @@ jobs:
         PLATFORM: ["ios", "macos", "tvos", "watchos"]
         CONFIGURATION: ["Debug", "Release"]
         include:
-          - OS: macos-14
-            XCODE: "15.2"
+          - OS: macos-15
+            XCODE: "16.4"
           # We run presubmits on all "Debug" entries, but not on "Release" entries
           - CONFIGURATION: "Debug"
           - CONFIGURATION: "Release"
@@ -150,7 +159,7 @@ jobs:
         - platform: "macOS"
           bazel_targets: //objectivec/...
     name: ${{ matrix.config.continuous-only && inputs.continuous-prefix || '' }} Bazel ${{ matrix.platform }} ${{ matrix.config.name }}
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout pending changes
         if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
