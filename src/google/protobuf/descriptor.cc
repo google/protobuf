@@ -1392,11 +1392,14 @@ class DescriptorPool::DeferredValidation {
       const FileDescriptor* file = it.first;
 
       for (const auto& info : it.second) {
-        const Descriptor* option_descriptor = nullptr;
-        option_descriptor = pool_->FindMessageTypeByName(
-            info.option_to_validate->GetTypeName());
-        auto results = FeatureResolver::ValidateFeatureLifetimes(
-            file->edition(), *info.option_to_validate, option_descriptor);
+        FeatureResolver::ValidationResults results;
+        {
+          internal::ScopedFallbackDatabaseErrorSuppressor suppressor;
+          const Descriptor* option_descriptor = pool_->FindMessageTypeByName(
+              info.option_to_validate->GetTypeName());
+          results = FeatureResolver::ValidateFeatureLifetimes(
+              file->edition(), *info.option_to_validate, option_descriptor);
+        }
         for (const auto& error : results.errors) {
           has_errors = true;
           if (error_collector_ == nullptr) {
