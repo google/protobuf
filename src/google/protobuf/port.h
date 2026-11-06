@@ -340,7 +340,8 @@ constexpr bool DebugHardenClearOneofMessageOnArena() {
 }
 
 constexpr bool HasAnySanitizer() {
-#if defined(ABSL_HAVE_ADDRESS_SANITIZER) || \
+#if defined(ABSL_HAVE_ADDRESS_SANITIZER) ||   \
+    defined(ABSL_HAVE_HWADDRESS_SANITIZER) || \
     defined(ABSL_HAVE_MEMORY_SANITIZER) || defined(ABSL_HAVE_THREAD_SANITIZER)
   return true;
 #else

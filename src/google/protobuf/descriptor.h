@@ -2853,21 +2853,12 @@ class PROTOBUF_EXPORT DescriptorPool {
                                   std::unique_ptr<MemoBase>>>();
 #endif  // SWIG
 
-  // If fallback_database_ is nullptr, this is nullptr.  Otherwise, this is a
-  // mutex which must be locked while accessing tables_.
-  absl::Mutex* mutex_;
+  // Mutex which must be locked while accessing tables_ if a fallback database
+  // is present.
+  absl::Mutex* mutex() const;
 
-  void AssertHeld() const {
-    if (mutex_ != nullptr) {
-      mutex_->AssertHeld();
-    }
-  }
-
-  void AssertReaderHeld() const {
-    if (mutex_ != nullptr) {
-      mutex_->AssertReaderHeld();
-    }
-  }
+  void AssertHeld() const;
+  void AssertReaderHeld() const;
 
   // See constructor.
   DescriptorDatabase* fallback_database_;

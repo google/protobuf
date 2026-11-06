@@ -136,9 +136,8 @@ bool UPB_PRIVATE(_upb_Message_CopyInternal)(struct upb_Message* dst,
   for (size_t i = 0; i < in->size; i++) {
     upb_TaggedAuxPtr tagged_ptr = in->aux_data[i];
     if (upb_TaggedAuxPtr_IsExtension(tagged_ptr)) {
-      const upb_Extension* msg_ext = upb_TaggedAuxPtr_Extension(tagged_ptr);
-      upb_Extension* dst_ext =
-          UPB_PRIVATE(_upb_Extension_Clone)(msg_ext, arena);
+      const upb_AuxField* msg_ext = upb_TaggedAuxPtr_Extension(tagged_ptr);
+      upb_AuxField* dst_ext = UPB_PRIVATE(_upb_Extension_Clone)(msg_ext, arena);
       if (!dst_ext) return false;
       dst_in->aux_data[dst_in->size++] = upb_TaggedAuxPtr_MakeExtension(
           dst_ext, upb_TaggedAuxPtr_Type(tagged_ptr));
