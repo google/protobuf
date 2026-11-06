@@ -16,12 +16,12 @@ load(
     "internal_csharp_proto_library",
     "internal_objc_proto_library",
     "internal_php_proto_library",
-    "internal_py_proto_library",
 )
 load("//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
 load("//bazel:java_proto_library.bzl", "java_proto_library")
 load("//bazel:proto_library.bzl", "proto_library")
+load("//bazel:py_proto_library.bzl", "py_proto_library")
 load("//build_defs:internal_shell.bzl", "inline_sh_binary")
 
 exports_files([
@@ -123,6 +123,7 @@ test_suite(
     tests = [
         "binary_test_util_test",
         "binary_wireformat_test",
+        "failure_list_test",
         "failure_list_trie_node_test",
         "matchers_test",
         "naming_test",
@@ -314,7 +315,40 @@ cc_library(
     deps = [
         "//src/google/protobuf:endian",
         "//src/google/protobuf:protobuf_lite",
+        "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "failure_list",
+    testonly = True,
+    srcs = ["failure_list.cc"],
+    hdrs = ["failure_list.h"],
+    deps = [
+        ":failure_list_trie_node",
+        ":testee",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:optional",
+    ],
+)
+
+cc_test(
+    name = "failure_list_test",
+    srcs = ["failure_list_test.cc"],
+    deps = [
+        ":failure_list",
+        ":testee",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_matchers",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -324,8 +358,7 @@ cc_library(
     srcs = ["result_ledger.cc"],
     hdrs = ["result_ledger.h"],
     deps = [
-        ":conformance_cc_proto",
-        ":failure_list_trie_node",
+        ":failure_list",
         ":testee",
         "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/container:btree",
@@ -412,6 +445,7 @@ cc_test(
     name = "result_ledger_test",
     srcs = ["result_ledger_test.cc"],
     deps = [
+        ":failure_list",
         ":result_ledger",
         ":testee",
         "//src/google/protobuf/testing",
@@ -784,13 +818,12 @@ internal_objc_proto_library(
     ],
 )
 
-internal_py_proto_library(
+py_proto_library(
     name = "conformance_py_proto",
-    srcs = ["conformance.proto"],
-    srcs_version = "PY2AND3",
     visibility = [
         "//python:__subpackages__",
     ],
+    deps = [":conformance_proto"],
 )
 
 internal_php_proto_library(

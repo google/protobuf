@@ -89,7 +89,9 @@ void EnumLiteGenerator::Generate(io::Printer* printer) {
   }
 
   if (!descriptor_->is_closed()) {
-    printer->Print("${$UNRECOGNIZED$}$(-1),\n", "{", "", "}", "");
+    printer->Print("${$UNRECOGNIZED$}$($unrecognized_value$),\n", "{", "", "}",
+                   "", "unrecognized_value",
+                   absl::StrCat(GetUnrecognizedValue(descriptor_)));
     printer->Annotate("{", "}", descriptor_);
   }
 

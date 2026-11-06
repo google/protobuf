@@ -49,11 +49,15 @@ namespace pb {
 namespace file {
 class CppFileOptions;
 struct CppFileOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const CppFileOptionsGlobalsTypeInternal CppFileOptions_globals_;
+PROTOBUF_EXPORT extern const CppFileOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) CppFileOptions_globals_;
 }  // namespace file
 }  // namespace pb
 namespace google {
 namespace protobuf {
+template <>
+internal::GeneratedMessageTraitsT<&::pb::file::CppFileOptions_globals_>
+    internal::MessageTraitsImpl::value<::pb::file::CppFileOptions>;
 }  // namespace protobuf
 }  // namespace google
 

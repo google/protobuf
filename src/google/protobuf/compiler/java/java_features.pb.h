@@ -54,10 +54,12 @@ enum JavaFeatures_Utf8Validation : int;
 PROTOC_EXPORT extern const uint32_t JavaFeatures_Utf8Validation_internal_data_[];
 class JavaFeatures;
 struct JavaFeaturesGlobalsTypeInternal;
-PROTOC_EXPORT extern const JavaFeaturesGlobalsTypeInternal JavaFeatures_globals_;
+PROTOC_EXPORT extern const JavaFeaturesGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) JavaFeatures_globals_;
 class JavaFeatures_NestInFileClassFeature;
 struct JavaFeatures_NestInFileClassFeatureGlobalsTypeInternal;
-PROTOC_EXPORT extern const JavaFeatures_NestInFileClassFeatureGlobalsTypeInternal JavaFeatures_NestInFileClassFeature_globals_;
+PROTOC_EXPORT extern const JavaFeatures_NestInFileClassFeatureGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) JavaFeatures_NestInFileClassFeature_globals_;
 }  // namespace pb
 namespace google {
 namespace protobuf {
@@ -67,6 +69,12 @@ internal::EnumTraitsT<::pb::JavaFeatures_NestInFileClassFeature_NestInFileClass_
 template <>
 internal::EnumTraitsT<::pb::JavaFeatures_Utf8Validation_internal_data_>
     internal::EnumTraitsImpl::value<::pb::JavaFeatures_Utf8Validation>;
+template <>
+internal::GeneratedMessageTraitsT<&::pb::JavaFeatures_globals_>
+    internal::MessageTraitsImpl::value<::pb::JavaFeatures>;
+template <>
+internal::GeneratedMessageTraitsT<&::pb::JavaFeatures_NestInFileClassFeature_globals_>
+    internal::MessageTraitsImpl::value<::pb::JavaFeatures_NestInFileClassFeature>;
 namespace internal {
 template <>
 inline ::absl::string_view GetFeatureSetDefaultsData<::pb::JavaFeatures>() {

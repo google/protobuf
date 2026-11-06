@@ -296,7 +296,7 @@ static upb_UnknownFields* upb_UnknownFields_Build(upb_UnknownField_Context* ctx,
       char* enc_buf = upb_BackAlloc_Init(&ctx->encoder.alloc, ctx->arena);
       ctx->encoder.status = kUpb_EncodeStatus_Ok;
       // Encode non-canonical extension to buffer.
-      const upb_Extension* ext = (const upb_Extension*)data.value.extension;
+      const upb_AuxField* ext = (const upb_AuxField*)data.value.extension;
       bool is_message_set = false;
       const upb_MiniTableExtension* ext_mt =
           upb_Extension_MiniTableExtension(ext);
