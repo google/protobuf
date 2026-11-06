@@ -1337,6 +1337,7 @@ class JsonFormatTest(JsonFormatBase):
         '-INF',
         ' NaN ',
         'Infinity ',
+        '1e999',
     ):
       with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')

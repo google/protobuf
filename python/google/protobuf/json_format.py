@@ -1176,24 +1176,22 @@ def _ConvertFloat(value, field):
       # pylint: disable=protected-access
       if value < type_checkers._FLOAT_MIN:
         raise ParseError('Float value too small')
-  # The proto3 JSON mapping only allows the exact spellings "NaN", "Infinity"
-  # and "-Infinity".  Python's float() accepts many other spellings ("NAN",
-  # "+nan", "inf", "INF", "+Infinity", " NaN ", ...), which no other
-  # implementation accepts.  Rejecting them outright is a breaking change, so
-  # for now they parse as before but warn that a future release will reject
-  # them; the warning is deduplicated per spelling by the warnings machinery.
-  if isinstance(value, str) and value.strip().lower() in (
-      'nan',
-      'inf',
-      'infinity',
-      '+nan',
-      '+inf',
-      '+infinity',
-      '-nan',
-      '-inf',
-      '-infinity',
-  ):
-    if value not in (_NAN, _INFINITY, _NEG_INFINITY):
+  # The proto3 JSON mapping allows exactly three spellings for non finite
+  # values; return them before touching float() so the canonical hot path is
+  # three comparisons.
+  if value == _NEG_INFINITY:
+    return float('-inf')
+  elif value == _INFINITY:
+    return float('inf')
+  elif value == _NAN:
+    return float('nan')
+  try:
+    val = float(value)
+    if not math.isfinite(val):
+      # A non finite value that was not a canonical spelling ("NAN", "inf",
+      # "1e999", ...).  Other implementations reject these; rejecting here is
+      # a breaking change, so they parse as before and warn that a future
+      # release will reject the input.
       warnings.warn(
           'Non finite float "%s" uses a non canonical spelling; only "NaN",'
           ' "Infinity" and "-Infinity" are part of the proto3 JSON mapping.'
@@ -1201,18 +1199,8 @@ def _ConvertFloat(value, field):
           category=FutureWarning,
           stacklevel=5,
       )
-  try:
-    # Assume Python compatible syntax.
-    return float(value)
+    return val
   except ValueError as e:
-    # Check alternative spellings.
-    if value == _NEG_INFINITY:
-      return float('-inf')
-    elif value == _INFINITY:
-      return float('inf')
-    elif value == _NAN:
-      return float('nan')
-    else:
       raise ParseError("Couldn't parse float: {0}".format(value)) from e
 
 
