@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_COMPILER_CPP_FIELD_LAYOUT_H__
 #define GOOGLE_PROTOBUF_COMPILER_CPP_FIELD_LAYOUT_H__
 
@@ -40,9 +47,6 @@ class FieldLayout {
   // Returns the index of the hasbit for the given field, or absl::nullopt if
   // the field does not have a hasbit.
   absl::optional<int> GetHasBitIndex(
-      const FieldDescriptor* absl_nonnull field) const;
-
-  absl::optional<int> GetHasByteIndex(
       const FieldDescriptor* absl_nonnull field) const;
 
   // Returns the index into the _has_bits_ field that this field's hasbit

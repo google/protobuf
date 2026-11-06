@@ -39,13 +39,14 @@
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/barrier.h"
 #include "absl/types/optional.h"
-#include "absl/utility/utility.h"
+#include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/arena_test_util.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/port.h"
@@ -442,6 +443,33 @@ TEST_F(ArenaTest, InitialBlockTooSmall) {
   }
 }
 
+TEST(TaggedAllocationPolicyPtr, PreservesTagsWhenPolicyChanges) {
+  alignas(8) unsigned char storage[2 * sizeof(internal::AllocationPolicy)];
+  auto* first = reinterpret_cast<internal::AllocationPolicy*>(storage);
+  auto* second = reinterpret_cast<internal::AllocationPolicy*>(
+      storage + sizeof(internal::AllocationPolicy));
+
+  internal::TaggedAllocationPolicyPtr tagged;
+  EXPECT_FALSE(tagged.has_policy());
+
+  tagged.set_policy(first);
+  tagged.set_is_user_owned_initial_block(true);
+  EXPECT_TRUE(tagged.has_policy());
+  EXPECT_EQ(tagged.get(), first);
+  EXPECT_TRUE(tagged.is_user_owned_initial_block());
+
+  const uintptr_t tags_before = tagged.get_tags();
+  tagged.set_policy(second);
+
+  EXPECT_EQ(tagged.get(), second);
+  EXPECT_EQ(tagged.get_tags(), tags_before);
+  EXPECT_TRUE(tagged.is_user_owned_initial_block());
+
+  tagged.set_is_user_owned_initial_block(false);
+  EXPECT_EQ(tagged.get(), second);
+  EXPECT_FALSE(tagged.is_user_owned_initial_block());
+}
+
 TEST_F(ArenaTest, CreateDestroy) {
   TestAllTypes original;
   TestUtil::SetAllFields(&original);
@@ -578,7 +606,7 @@ class DispatcherTestProto : public Message {
     return nullptr;
   }
 };
-DispatcherTestProto dispatcher_test_proto_instance(absl::in_place);
+DispatcherTestProto dispatcher_test_proto_instance(std::in_place);
 
 // We use a specialization to inject behavior for the test.
 // This test is very intrusive and will have to be fixed if we change the
@@ -1395,7 +1423,7 @@ TEST_F(ArenaTest, ArenaOneofReflection) {
   EXPECT_TRUE(refl->HasOneof(*message, oneof));
   submsg = refl->ReleaseMessage(message, msg_field);
   EXPECT_FALSE(refl->HasOneof(*message, oneof));
-  EXPECT_TRUE(submsg->GetArena() == nullptr);
+  EXPECT_FALSE(internal::HasArena(*submsg));
   delete submsg;
 }
 

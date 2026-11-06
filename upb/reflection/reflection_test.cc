@@ -1,3 +1,9 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #include <cstring>
 #include <string>
@@ -54,6 +60,14 @@ absl::StatusOr<upb::DefPool> LoadDescriptorProto(absl::string_view proto_text) {
   google::protobuf::FileDescriptorSet set;
   *set.add_file() = proto;
   return LoadDescriptorSetFromProto(set);
+}
+
+TEST(ReflectionTest, EmptyFileWithoutExtensionsLoads) {
+  absl::StatusOr<upb::DefPool> pool = LoadDescriptorProto(
+      R"pb(
+        syntax: "proto3" name: "empty.proto"
+      )pb");
+  ASSERT_TRUE(pool.ok()) << pool.status();
 }
 
 TEST(ReflectionTest, OpenEnumWithNonZeroDefault) {
@@ -152,6 +166,28 @@ TEST(ReflectionTest, ImplicitPresenceWithDefault) {
   EXPECT_EQ(std::string_view(status.message()),
             "fields with implicit presence cannot have explicit defaults "
             "(FooMessage.f1)");
+}
+
+TEST(ReflectionTest, RepeatedFieldWithDefault) {
+  absl::Status status =
+      LoadDescriptorProto(
+          R"pb(
+            syntax: "proto2"
+            name: "F"
+            message_type {
+              name: "FooMessage"
+              field {
+                name: "f1"
+                number: 1
+                label: LABEL_REPEATED
+                type: TYPE_STRING
+                default_value: "abc"
+              }
+            }
+          )pb")
+          .status();
+  EXPECT_EQ(std::string_view(status.message()),
+            "repeated fields cannot have explicit defaults (FooMessage.f1)");
 }
 
 TEST(ReflectionTest, ImplicitPresenceWithNonZeroDefaultEnum) {
@@ -395,6 +431,35 @@ TEST(ReflectionTest, NegativePublicDependencyIndex) {
   EXPECT_THAT(std::string(status.message()), HasSubstr("out of range"));
 }
 
+TEST(ReflectionTest, RepeatedRequiredField) {
+  // A repeated field marked LEGACY_REQUIRED is rejected rather than producing a
+  // field that is both required and repeated.  Such a field has no presence,
+  // which violates the invariant that every required field has presence and
+  // would cause an out-of-bounds read when upb_FieldPath_ToText() formats the
+  // missing-required-field path.  protoc and the C++ DescriptorPool reject this
+  // for the same reason.
+  absl::Status status =
+      LoadDescriptorProto(
+          R"pb(
+            name: "test.proto"
+            syntax: "editions"
+            edition: EDITION_2023
+            message_type {
+              name: "M"
+              field {
+                name: "r"
+                number: 1
+                label: LABEL_REPEATED
+                type: TYPE_INT32
+                options { features { field_presence: LEGACY_REQUIRED } }
+              }
+            }
+          )pb")
+          .status();
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()), HasSubstr("cannot be required"));
+}
+
 TEST(ReflectionTest, NegativeWeakDependencyIndex) {
   absl::Status status = LoadDescriptorProto(
                             R"pb(
@@ -496,6 +561,77 @@ TEST(ReflectionTest, EnumCustomJsonNameAliasedSameNumberSucceeds) {
                                    })
           .status();
   EXPECT_TRUE(status.ok()) << status.message();
+}
+
+TEST(ReflectionTest, LegacyJsonFieldConflictsKeepsCorrectNumberMapping) {
+  // With deprecated_legacy_json_field_conflicts, two fields may share a
+  // json_name. Each field number must still map to its own FieldDef.
+  upb::DefPool pool =
+      LoadDescriptorProto(
+          R"pb(
+            syntax: "proto2"
+            name: "F"
+            message_type { name: "Sub" }
+            message_type {
+              name: "M"
+              options { deprecated_legacy_json_field_conflicts: true }
+              field {
+                name: "a"
+                number: 1
+                label: LABEL_OPTIONAL
+                type: TYPE_MESSAGE
+                type_name: ".Sub"
+                json_name: "j"
+              }
+              field {
+                name: "b"
+                number: 2
+                label: LABEL_OPTIONAL
+                type: TYPE_FIXED64
+                json_name: "j"
+              }
+            }
+          )pb")
+          .value();
+  upb::MessageDefPtr m = pool.FindMessageByName("M");
+  ASSERT_TRUE(m);
+  upb::FieldDefPtr a = m.FindFieldByNumber(1);
+  upb::FieldDefPtr b = m.FindFieldByNumber(2);
+  ASSERT_TRUE(a);
+  ASSERT_TRUE(b);
+  EXPECT_STREQ(a.name(), "a");
+  EXPECT_EQ(a.number(), 1);
+  EXPECT_STREQ(b.name(), "b");
+  EXPECT_EQ(b.number(), 2);
+  EXPECT_EQ(b.type(), kUpb_FieldType_Fixed64);
+}
+
+TEST(ReflectionTest, JsonFieldConflictsRejectedWithoutLegacyOption) {
+  absl::Status status = LoadDescriptorProto(
+                            R"pb(
+                              syntax: "proto2"
+                              name: "F"
+                              message_type {
+                                name: "M"
+                                field {
+                                  name: "a"
+                                  number: 1
+                                  label: LABEL_OPTIONAL
+                                  type: TYPE_FIXED64
+                                  json_name: "j"
+                                }
+                                field {
+                                  name: "b"
+                                  number: 2
+                                  label: LABEL_OPTIONAL
+                                  type: TYPE_FIXED64
+                                  json_name: "j"
+                                }
+                              }
+                            )pb")
+                            .status();
+  EXPECT_THAT(std::string(status.message()),
+              HasSubstr("duplicate json_name (j)"));
 }
 
 TEST(ReflectionTest, DefPoolFindMethodsRespectSize) {

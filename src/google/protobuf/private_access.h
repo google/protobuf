@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_PRIVATE_ACCESS_H__
 #define GOOGLE_PROTOBUF_PRIVATE_ACCESS_H__
 
@@ -6,12 +13,14 @@
 namespace google {
 namespace protobuf {
 
+class Arena;
 class MessageLite;
 
 namespace internal {
 
 struct ClassData;
 class ExtensionSet;
+class ThreadSafeArena;
 
 // The struct PrivateAccess is used to provide access to private members of
 // message classes without making them public. This is useful for highly
@@ -40,6 +49,7 @@ struct PrivateAccess {
     return msg._impl_._extensions_;
   }
 
+  // Defined in extension_set.cc
   static ExtensionSet* GetExtensionSet(MessageLite& msg);
   static const ExtensionSet* GetExtensionSet(const MessageLite& msg);
 
@@ -63,6 +73,9 @@ struct PrivateAccess {
   static constexpr decltype(auto) FullMessageName() {
     return T::FullMessageName();
   }
+
+  // Defined in arena.h
+  static constexpr ThreadSafeArena& GetThreadSafeArena(Arena& arena);
 
   template <typename T>
   using ImplTForTesting = typename T::Impl_;

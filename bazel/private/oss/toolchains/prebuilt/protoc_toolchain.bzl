@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 "Repository rule that downloads a pre-compiled protoc from our official release for a single platform."
 
 load("//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
@@ -22,12 +29,10 @@ def _prebuilt_protoc_repo_impl(rctx):
         RELEASE_VERSION,
         rctx.attr.platform,
     )
+    artifact = RELEASED_BINARY_INTEGRITY[filename]
     rctx.download_and_extract(
-        url = "https://github.com/protocolbuffers/protobuf/releases/download/{}/{}".format(
-            RELEASE_VERSION,
-            filename,
-        ),
-        sha256 = RELEASED_BINARY_INTEGRITY[filename],
+        url = artifact["url"],
+        sha256 = artifact["sha256"],
     )
 
     rctx.file("BUILD.bazel", """\

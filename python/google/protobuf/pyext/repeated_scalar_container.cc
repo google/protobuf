@@ -1439,7 +1439,16 @@ static PyObject* ToStr(PyObject* pself) {
 }
 
 static PyObject* MergeFrom(PyObject* pself, PyObject* arg) {
-  return Extend(reinterpret_cast<RepeatedScalarContainer*>(pself), arg);
+  RepeatedScalarContainer* self =
+      reinterpret_cast<RepeatedScalarContainer*>(pself);
+  if (cmessage::AssureWritable(self->parent) == nullptr) return nullptr;
+  if (arg == pself) {
+    // Self-merge is not supported, as for messages and maps.
+    PyErr_SetString(PyExc_AssertionError,
+                    "Cannot merge a repeated field into itself.");
+    return nullptr;
+  }
+  return Extend(self, arg);
 }
 
 // The private constructor of RepeatedScalarContainer objects.
@@ -1455,6 +1464,7 @@ RepeatedScalarContainer* NewContainer(
     return nullptr;
   }
 
+  self->SetTree(parent->GetTree());
   Py_INCREF(parent);
   self->parent = parent;
   self->parent_field_descriptor = parent_field_descriptor;
