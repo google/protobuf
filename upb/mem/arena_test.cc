@@ -165,6 +165,58 @@ TEST(ArenaTest, TryExtend) {
   upb_Arena_Free(arena);
 }
 
+// Delegates to upb_alloc_global, but fails any request over 1 MiB. This lets
+// tests pass near-SIZE_MAX sizes to the arena without asking the system (or
+// sanitizer) allocator for an impossible allocation, while still letting a
+// size computation that wrapped around to a small value succeed.
+void* SmallOnlyAllocFunc(upb_alloc* alloc, void* ptr, size_t oldsize,
+                         size_t size, size_t* actual_size) {
+  if (size > (size_t{1} << 20)) return nullptr;
+  return upb_alloc_global.func(alloc, ptr, oldsize, size, actual_size);
+}
+
+upb_alloc small_only_alloc = {&SmallOnlyAllocFunc, nullptr};
+
+// Covers every size whose alignment, ASAN guard, or block header padding can
+// overflow size_t, with margin.
+constexpr size_t kNearSizeMaxRange = 256;
+
+TEST(ArenaTest, MallocNearSizeMaxFails) {
+  upb_Arena* arena = upb_Arena_Init(nullptr, 0, &small_only_alloc);
+  ASSERT_NE(arena, nullptr);
+  for (size_t i = 0; i <= kNearSizeMaxRange; ++i) {
+    EXPECT_EQ(upb_Arena_Malloc(arena, SIZE_MAX - i), nullptr) << i;
+  }
+  // The arena is still usable.
+  char* p = static_cast<char*>(upb_Arena_Malloc(arena, 64));
+  ASSERT_NE(p, nullptr);
+  memset(p, 0, 64);
+  upb_Arena_Free(arena);
+}
+
+TEST(ArenaTest, TryExtendNearSizeMaxFails) {
+  upb_Arena* arena = upb_Arena_Init(nullptr, 1024, &small_only_alloc);
+  ASSERT_NE(arena, nullptr);
+  for (size_t oldsize : {size_t{0}, size_t{8}}) {
+    void* p = upb_Arena_Malloc(arena, oldsize);
+    ASSERT_NE(p, nullptr);
+    for (size_t i = 0; i <= kNearSizeMaxRange; ++i) {
+      EXPECT_FALSE(upb_Arena_TryExtend(arena, p, oldsize, SIZE_MAX - i))
+          << oldsize << " " << i;
+      EXPECT_EQ(upb_Arena_Realloc(arena, p, oldsize, SIZE_MAX - i), nullptr)
+          << oldsize << " " << i;
+    }
+  }
+  upb_Arena_Free(arena);
+}
+
+TEST(ArenaTest, InitNearSizeMaxFails) {
+  for (size_t i = 0; i <= kNearSizeMaxRange; ++i) {
+    EXPECT_EQ(upb_Arena_Init(nullptr, SIZE_MAX - i, &small_only_alloc), nullptr)
+        << i;
+  }
+}
+
 TEST(ArenaTest, ReallocFastPath) {
   upb_Arena* arena = upb_Arena_Init(nullptr, 1024, &upb_alloc_global);
   void* initial = upb_Arena_Malloc(arena, 512);
