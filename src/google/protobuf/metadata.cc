@@ -12,29 +12,11 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
-template <>
-void InternalMetadata::DoClear<UnknownFieldSet>() {
-  mutable_unknown_fields<UnknownFieldSet>()->Clear();
-}
-
-template <>
-void InternalMetadata::DoMergeFrom<UnknownFieldSet>(
-    const UnknownFieldSet& other) {
-  mutable_unknown_fields<UnknownFieldSet>()->MergeFrom(other);
-}
-
-template <>
-void InternalMetadata::DoSwap<UnknownFieldSet>(UnknownFieldSet* other) {
-  mutable_unknown_fields<UnknownFieldSet>()->Swap(other);
-}
-
-template <>
-void InternalMetadata::DeleteOutOfLineHelper<UnknownFieldSet>() {
-  delete PtrValue<Container<UnknownFieldSet>>();
-  // TODO:  This store is load-bearing.  Since we are destructing
-  // the message at this point, see if we can eliminate it.
-  ptr_ = nullptr;
-}
+template void InternalMetadata::DoClear<UnknownFieldSet>();
+template void InternalMetadata::DoMergeFrom<UnknownFieldSet>(
+    const UnknownFieldSet& other);
+template void InternalMetadata::DoSwap<UnknownFieldSet>(UnknownFieldSet* other);
+template void InternalMetadata::DeleteOutOfLineHelper<UnknownFieldSet>();
 
 }  // namespace internal
 }  // namespace protobuf
