@@ -427,7 +427,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*enum_options=*/"option features.(pb.java).large_enum = true;",
             /*enum_values=*/"ZERO = 0;\nNEG_ONE = -1;\nNEG_TWO = -2;",
             /*expected_unrecognized=*/
-            "UNRECOGNIZED = new TestEnum(-3, 3, \"UNRECOGNIZED\");",
+            "UNRECOGNIZED = new TestEnum(-3, \"UNRECOGNIZED\");",
         }),
     [](const testing::TestParamInfo<OpenEnumUnrecognizedTestCase>& info) {
       return std::string(info.param.test_name);

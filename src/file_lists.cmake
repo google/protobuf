@@ -1268,6 +1268,7 @@ set(upb_test_files
   ${protobuf_SOURCE_DIR}/upb/message/test.cc
   ${protobuf_SOURCE_DIR}/upb/message/unknown_fields_test.cc
   ${protobuf_SOURCE_DIR}/upb/message/utf8_test.cc
+  ${protobuf_SOURCE_DIR}/upb/mini_descriptor/build_enum_test.cc
   ${protobuf_SOURCE_DIR}/upb/mini_descriptor/internal/encode_test.cc
   ${protobuf_SOURCE_DIR}/upb/mini_table/compat_test.cc
   ${protobuf_SOURCE_DIR}/upb/mini_table/generated_registry_empty_test.cc

@@ -783,25 +783,6 @@ class PROTOBUF_EXPORT ParseContext : public EpsCopyInputStream {
                                               uint32_t start_tag,
                                               const Func& func);
 
-  // Use a template to avoid the strong dep into TcParser. All callers will have
-  // the dep.
-  template <typename Parser = TcParser>
-  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD PROTOBUF_ALWAYS_INLINE const char*
-  ParseMessage(MessageLite* msg, const TcParseTableBase* tc_table,
-               const char* ptr) {
-    return ParseLengthDelimitedInlined(ptr, [&](const char* ptr) {
-      return Parser::ParseLoop(msg, ptr, this, tc_table);
-    });
-  }
-  template <typename Parser = TcParser>
-  PROTOBUF_FUTURE_ADD_EARLY_NODISCARD PROTOBUF_ALWAYS_INLINE const char*
-  ParseGroup(MessageLite* msg, const TcParseTableBase* tc_table,
-             const char* ptr, uint32_t start_tag) {
-    return ParseGroupInlined(ptr, start_tag, [&](const char* ptr) {
-      return Parser::ParseLoop(msg, ptr, this, tc_table);
-    });
-  }
-
   [[nodiscard]] PROTOBUF_NDEBUG_INLINE const char* ParseGroup(MessageLite* msg,
                                                               const char* ptr,
                                                               uint32_t tag) {

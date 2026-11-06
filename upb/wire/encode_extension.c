@@ -23,7 +23,7 @@
 #include "upb/port/def.inc"
 
 static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
-                                              const struct upb_Extension* ext,
+                                              const struct upb_AuxField* ext,
                                               bool is_message_set,
                                               upb_StringView* view,
                                               int encode_options) {
@@ -46,7 +46,7 @@ static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
   return encoder->status;
 }
 
-upb_EncodeStatus upb_EncodeExtension(const struct upb_Extension* ext,
+upb_EncodeStatus upb_EncodeExtension(const struct upb_AuxField* ext,
                                      struct upb_Arena* arena,
                                      upb_StringView* view, int encode_options) {
   const upb_MiniTable* extendee =
