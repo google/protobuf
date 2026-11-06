@@ -14,6 +14,7 @@
 
 #include "upb/base/internal/log2.h"
 #include "upb/mem/internal/alloc.h"
+#include "upb/port/overflow.h"
 #include "upb/port/sanitizers.h"
 
 // Must be last.
@@ -70,8 +71,24 @@ UPB_PRIVATE(_upb_ArenaHas)(const struct upb_Arena* a) {
   return (size_t)(a->UPB_ONLYBITS(end) - a->UPB_ONLYBITS(ptr));
 }
 
+UPB_STATIC_ASSERT(UPB_PRIVATE(kUpb_Asan_GuardSize) % UPB_MALLOC_ALIGN == 0,
+                  "ASAN guard size must be a multiple of malloc alignment");
+
+// Returns the number of bytes of arena memory consumed by an allocation of
+// `size` bytes, or SIZE_MAX if that would overflow. No arena block can have
+// SIZE_MAX bytes available, so an overflowing span always takes the slow path,
+// where block allocation rejects it.
 UPB_NODISCARD UPB_INLINE size_t UPB_PRIVATE(_upb_Arena_AllocSpan)(size_t size) {
-  return UPB_ALIGN_MALLOC(size) + UPB_PRIVATE(kUpb_Asan_GuardSize);
+  // Since kUpb_Asan_GuardSize is a multiple of UPB_MALLOC_ALIGN, this is
+  // UPB_ALIGN_MALLOC(size) + kUpb_Asan_GuardSize with a single overflow check.
+  size_t padded;
+  if (UPB_UNLIKELY(upb_AddOverflow(
+          size,
+          (size_t)(UPB_MALLOC_ALIGN - 1 + UPB_PRIVATE(kUpb_Asan_GuardSize)),
+          &padded))) {
+    return SIZE_MAX;
+  }
+  return UPB_ALIGN_DOWN(padded, UPB_MALLOC_ALIGN);
 }
 
 UPB_NODISCARD UPB_INLINE bool UPB_PRIVATE(
@@ -144,7 +161,11 @@ UPB_NODISCARD UPB_API_INLINE bool upb_Arena_TryExtend(struct upb_Arena* a,
   UPB_ASSERT(size > oldsize);
 
   UPB_PRIVATE(upb_Xsan_AccessReadWrite)(UPB_XSAN(a));
-  size_t extend = UPB_ALIGN_MALLOC(size) - UPB_ALIGN_MALLOC(oldsize);
+  size_t new_span = UPB_PRIVATE(_upb_Arena_AllocSpan)(size);
+  if (UPB_UNLIKELY(new_span == SIZE_MAX)) return false;
+  // `oldsize` is the size of an existing allocation, so its span can't
+  // overflow.
+  size_t extend = new_span - UPB_PRIVATE(_upb_Arena_AllocSpan)(oldsize);
 
   if (UPB_PRIVATE(_upb_Arena_WasLastAllocFromCurrentBlock)(a, ptr, oldsize) &&
       UPB_PRIVATE(_upb_ArenaHas)(a) >= extend) {
