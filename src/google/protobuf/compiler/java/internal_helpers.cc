@@ -170,8 +170,6 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
   // If the style guide is followed (underscores cannot be followed directly
   // by a number), then using an underscore separator cannot create conflicts.
   absl::string_view count_sep = has_conflict ? "_" : "";
-  const bool has_descriptor_methods =
-      HasDescriptorMethods(descriptor, context->EnforceLite());
 
   printer->Emit(
 
@@ -181,49 +179,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
        {"deprecation",
         descriptor->options().deprecated() ? "@java.lang.Deprecated" : ""},
        {"unrecognized_value", GetUnrecognizedValue(descriptor)},
-       {"unrecognized_constant",
-        [&] {
-          if (has_descriptor_methods) {
-            printer->Emit({{"unrecognized_index", descriptor->value_count()}},
-                          R"(
-              public static final $classname$ UNRECOGNIZED = new $classname$($unrecognized_value$, $unrecognized_index$, "UNRECOGNIZED");
-            )");
-          } else {
-            printer->Emit(R"(
-              public static final $classname$ UNRECOGNIZED = new $classname$($unrecognized_value$, "UNRECOGNIZED");
-            )");
-          }
-        }},
-       {"fields_and_constructor",
-        [&] {
-          if (has_descriptor_methods) {
-            printer->Emit(R"(
-              private final int value;
-              private final String name;
-              private final int index;
-
-              $classname$(int v, int i, String n) {
-                this.value = v;
-                this.index = i;
-                this.name = n;
-              }
-
-              public int index() {
-                return index;
-              }
-            )");
-          } else {
-            printer->Emit(R"(
-              private final int value;
-              private final String name;
-
-              $classname$(int v, String n) {
-                this.value = v;
-                this.name = n;
-              }
-            )");
-          }
-        }},
+       {"unrecognized_index", descriptor->value_count()},
        {"proto_enum_class", context->EnforceLite()
                                 ? "com.google.protobuf.Internal.EnumLite"
                                 : "com.google.protobuf.ProtocolMessageEnum"},
@@ -428,7 +384,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
           // -----------------------------------------------------------------
           // Reflection
 
-          if (has_descriptor_methods) {
+          if (HasDescriptorMethods(descriptor, context->EnforceLite())) {
             printer->Print(
                 "public final "
                 "com.google.protobuf.Descriptors.EnumValueDescriptor\n"
@@ -525,7 +481,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
             $gen_code_version_validator$
           }
 
-          $unrecognized_constant$
+          public static final $classname$ UNRECOGNIZED = new $classname$($unrecognized_value$, $unrecognized_index$, "UNRECOGNIZED");
 
           $deprecated_value_of_func$
 
@@ -556,7 +512,19 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
             $canonical_values_func$
           }
 
-          $fields_and_constructor$
+          private final int value;
+          private final String name;
+          private final int index;
+
+          $classname$(int v, int i, String n) {
+            this.value = v;
+            this.index = i;
+            this.name = n;
+          }
+
+          public int index() {
+            return index;
+          }
 
           public int value() {
             return value;
@@ -650,7 +618,7 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
                     public static final $classname$ $name$ = $classname$$count_sep$$canonical_interface_index$.$canonical_name$;
 
                   )");
-              } else if (has_descriptor_methods) {
+              } else {
                 printer->Emit(
                     {io::Printer::Sub("name", value->name()).AnnotatedAs(value),
                      {"number", value->number()},
@@ -659,16 +627,6 @@ void GenerateLarge(io::Printer* printer, const EnumDescriptor* descriptor,
                     R"(
                     $deprecation$
                     public static final $classname$ $name$ = new $classname$($number$, $index$, "$name$");
-
-                )");
-              } else {
-                printer->Emit(
-                    {io::Printer::Sub("name", value->name()).AnnotatedAs(value),
-                     {"number", value->number()},
-                     {"deprecation", deprecation}},
-                    R"(
-                    $deprecation$
-                    public static final $classname$ $name$ = new $classname$($number$, "$name$");
 
                 )");
               }
