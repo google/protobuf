@@ -391,8 +391,9 @@ absl::Status ParseField(JsonLexer& lex, const Desc<Traits>& desc,
                         absl::string_view name, Msg<Traits>& msg);
 
 template <typename Traits>
-absl::Status ParseSingular(JsonLexer& lex, Field<Traits> field,
-                           Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseSingular(JsonLexer& lex,
+                                             Field<Traits> field,
+                                             Msg<Traits>& msg) {
   auto field_type = Traits::FieldType(field);
   if (lex.Peek(JsonLexer::kNull)) {
     auto message_type = ClassifyMessage(Traits::FieldTypeName(field));
@@ -778,19 +779,14 @@ absl::Status ParseMap(JsonLexer& lex, Field<Traits> field, Msg<Traits>& msg) {
 }
 
 absl::optional<uint32_t> TakeTimeDigitsWithSuffixAndAdvance(
-    absl::string_view& data, int max_digits, absl::string_view end) {
-  ABSL_DCHECK_LE(max_digits, 9);
+    absl::string_view& data, int digits, absl::string_view end) {
+  ABSL_DCHECK_LE(digits, 9);
 
   uint32_t val = 0;
-  int limit = max_digits;
-  while (!data.empty()) {
-    if (limit-- < 0) {
-      return absl::nullopt;
-    }
+  for (int i = 0; i < digits; ++i) {
+    if (data.empty()) return absl::nullopt;
     uint32_t digit = data[0] - '0';
-    if (digit >= 10) {
-      break;
-    }
+    if (digit >= 10) return absl::nullopt;
 
     val *= 10;
     val += digit;
@@ -828,8 +824,9 @@ absl::optional<int32_t> TakeNanosAndAdvance(absl::string_view& data) {
 }
 
 template <typename Traits>
-absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
-                            Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseTimestamp(JsonLexer& lex,
+                                              const Desc<Traits>& desc,
+                                              Msg<Traits>& msg) {
   if (lex.Peek(JsonLexer::kNull)) {
     return lex.Expect("null");
   }
@@ -850,23 +847,33 @@ absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
       return str->loc.Invalid("bad year in timestamp");
     }
     auto mon = TakeTimeDigitsWithSuffixAndAdvance(data, 2, "-");
-    if (!mon.has_value() || *mon == 0) {
+    if (!mon.has_value() || *mon == 0 || *mon > 12) {
       return str->loc.Invalid("bad month in timestamp");
     }
     auto day = TakeTimeDigitsWithSuffixAndAdvance(data, 2, "T");
     if (!day.has_value() || *day == 0) {
       return str->loc.Invalid("bad day in timestamp");
     }
+    static constexpr uint32_t kDaysPerMonth[] = {0,  31, 28, 31, 30, 31, 30,
+                                                 31, 31, 30, 31, 30, 31};
+    uint32_t max_day = kDaysPerMonth[*mon];
+    if (*mon == 2 &&
+        (*year % 4 == 0 && (*year % 100 != 0 || *year % 400 == 0))) {
+      ++max_day;
+    }
+    if (*day > max_day) {
+      return str->loc.Invalid("bad day in timestamp");
+    }
     auto hour = TakeTimeDigitsWithSuffixAndAdvance(data, 2, ":");
-    if (!hour.has_value()) {
+    if (!hour.has_value() || *hour > 23) {
       return str->loc.Invalid("bad hours in timestamp");
     }
     auto min = TakeTimeDigitsWithSuffixAndAdvance(data, 2, ":");
-    if (!min.has_value()) {
+    if (!min.has_value() || *min > 59) {
       return str->loc.Invalid("bad minutes in timestamp");
     }
     auto sec = TakeTimeDigitsWithSuffixAndAdvance(data, 2, "");
-    if (!sec.has_value()) {
+    if (!sec.has_value() || *sec > 59) {
       return str->loc.Invalid("bad seconds in timestamp");
     }
 
@@ -908,7 +915,8 @@ absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
         data = data.substr(1);
         auto hour = TakeTimeDigitsWithSuffixAndAdvance(data, 2, ":");
         auto mins = TakeTimeDigitsWithSuffixAndAdvance(data, 2, "");
-        if (!hour.has_value() || !mins.has_value()) {
+        if (!hour.has_value() || *hour > 23 || !mins.has_value() ||
+            *mins > 59) {
           return str->loc.Invalid("timestamp offset has bad hours and minutes");
         }
 
@@ -927,6 +935,12 @@ absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
     }
   }
 
+  constexpr int64_t kMinTimestampSeconds = -62135596800;
+  constexpr int64_t kMaxTimestampSeconds = 253402300799;
+  if (secs < kMinTimestampSeconds || secs > kMaxTimestampSeconds) {
+    return str->loc.Invalid("timestamp out of range");
+  }
+
   Traits::SetInt64(Traits::MustHaveField(desc, 1), msg, secs);
   Traits::SetInt32(Traits::MustHaveField(desc, 2), msg, *nanos);
 
@@ -934,8 +948,9 @@ absl::Status ParseTimestamp(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseDuration(JsonLexer& lex, const Desc<Traits>& desc,
-                           Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseDuration(JsonLexer& lex,
+                                             const Desc<Traits>& desc,
+                                             Msg<Traits>& msg) {
   if (lex.Peek(JsonLexer::kNull)) {
     return lex.Expect("null");
   }
@@ -988,8 +1003,9 @@ absl::Status ParseDuration(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseFieldMask(JsonLexer& lex, const Desc<Traits>& desc,
-                            Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseFieldMask(JsonLexer& lex,
+                                              const Desc<Traits>& desc,
+                                              Msg<Traits>& msg) {
   absl::StatusOr<LocationWith<MaybeOwnedString>> str = lex.ParseUtf8();
   RETURN_IF_ERROR(str.status());
   auto paths = str->value.AsView();
@@ -1026,8 +1042,9 @@ absl::Status ParseFieldMask(JsonLexer& lex, const Desc<Traits>& desc,
 }
 
 template <typename Traits>
-absl::Status ParseAny(JsonLexer& lex, const Desc<Traits>& desc,
-                      Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseAny(JsonLexer& lex,
+                                        const Desc<Traits>& desc,
+                                        Msg<Traits>& msg) {
   // Buffer an entire object. Because @type can occur anywhere, we're forced
   // to do this.
   RETURN_IF_ERROR(lex.SkipToToken());
@@ -1089,15 +1106,18 @@ absl::Status ParseAny(JsonLexer& lex, const Desc<Traits>& desc,
 
 // These are mutually recursive with ParseValue.
 template <typename Traits>
-absl::Status ParseStructValue(JsonLexer& lex, const Desc<Traits>& desc,
-                              Msg<Traits>& msg);
+PROTOBUF_NOINLINE absl::Status ParseStructValue(JsonLexer& lex,
+                                                const Desc<Traits>& desc,
+                                                Msg<Traits>& msg);
 template <typename Traits>
-absl::Status ParseListValue(JsonLexer& lex, const Desc<Traits>& desc,
-                            Msg<Traits>& msg);
+PROTOBUF_NOINLINE absl::Status ParseListValue(JsonLexer& lex,
+                                              const Desc<Traits>& desc,
+                                              Msg<Traits>& msg);
 
 template <typename Traits>
-absl::Status ParseValue(JsonLexer& lex, const Desc<Traits>& desc,
-                        Msg<Traits>& msg) {
+PROTOBUF_NOINLINE absl::Status ParseValue(JsonLexer& lex,
+                                          const Desc<Traits>& desc,
+                                          Msg<Traits>& msg) {
   auto kind = lex.PeekKind();
   RETURN_IF_ERROR(kind.status());
   // NOTE: The field numbers 1 through 6 are the numbers of the oneof fields

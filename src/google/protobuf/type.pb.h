@@ -57,19 +57,24 @@ enum Syntax : int;
 PROTOBUF_EXPORT extern const uint32_t Syntax_internal_data_[];
 class Enum;
 struct EnumGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const EnumGlobalsTypeInternal Enum_globals_;
+PROTOBUF_EXPORT extern const EnumGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Enum_globals_;
 class EnumValue;
 struct EnumValueGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const EnumValueGlobalsTypeInternal EnumValue_globals_;
+PROTOBUF_EXPORT extern const EnumValueGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumValue_globals_;
 class Field;
 struct FieldGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const FieldGlobalsTypeInternal Field_globals_;
+PROTOBUF_EXPORT extern const FieldGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Field_globals_;
 class Option;
 struct OptionGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const OptionGlobalsTypeInternal Option_globals_;
+PROTOBUF_EXPORT extern const OptionGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Option_globals_;
 class Type;
 struct TypeGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const TypeGlobalsTypeInternal Type_globals_;
+PROTOBUF_EXPORT extern const TypeGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Type_globals_;
 template <>
 internal::EnumTraitsT<::google::protobuf::Field_Cardinality_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::Field_Cardinality>;
@@ -79,6 +84,21 @@ internal::EnumTraitsT<::google::protobuf::Field_Kind_internal_data_>
 template <>
 internal::EnumTraitsT<::google::protobuf::Syntax_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::Syntax>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Enum_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Enum>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumValue_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumValue>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Field_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Field>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Option_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Option>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Type_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Type>;
 }  // namespace protobuf
 }  // namespace google
 

@@ -2796,13 +2796,16 @@ class PROTOBUF_EXPORT DescriptorPool {
   // checks that can't be done inside the database lock.  This is generally
   // reflective operations that also require the lock to do safely.
   class DeferredValidation;
-  bool TryFindFileInFallbackDatabase(
-      absl::string_view name, DeferredValidation& deferred_validation) const;
-  bool TryFindSymbolInFallbackDatabase(
-      absl::string_view name, DeferredValidation& deferred_validation) const;
-  bool TryFindExtensionInFallbackDatabase(
-      const Descriptor* containing_type, int field_number,
-      DeferredValidation& deferred_validation) const;
+  bool TryFindFileInFallbackDatabase(absl::string_view name) const;
+  bool TryFindSymbolInFallbackDatabase(absl::string_view name) const;
+  bool TryFindExtensionInFallbackDatabase(const Descriptor* containing_type,
+                                          int field_number) const;
+
+  template <typename FindInTable, typename FindInUnderlay,
+            typename TryFindInFallbackDb>
+  auto LookupWithFallback(FindInTable find_in_table,
+                          FindInUnderlay find_in_underlay,
+                          TryFindInFallbackDb try_find_in_fallback_db) const;
 
   // This internal find extension method only check with its table and underlay
   // descriptor_pool's table. It does not check with fallback DB and no
@@ -2814,8 +2817,7 @@ class PROTOBUF_EXPORT DescriptorPool {
   // fallback_database_.  Declared const because it is called by (semantically)
   // const methods.
   const FileDescriptor* BuildFileFromDatabase(
-      const FileDescriptorProto& proto,
-      DeferredValidation& deferred_validation) const;
+      const FileDescriptorProto& proto) const;
 
   // Helper for when lazily_build_dependencies_ is set, can look up a symbol
   // after the file's descriptor is built, and can build the file where that
@@ -2851,9 +2853,12 @@ class PROTOBUF_EXPORT DescriptorPool {
                                   std::unique_ptr<MemoBase>>>();
 #endif  // SWIG
 
-  // If fallback_database_ is nullptr, this is nullptr.  Otherwise, this is a
-  // mutex which must be locked while accessing tables_.
-  absl::Mutex* mutex_;
+  // Mutex which must be locked while accessing tables_ if a fallback database
+  // is present.
+  absl::Mutex* mutex() const;
+
+  void AssertHeld() const;
+  void AssertReaderHeld() const;
 
   // See constructor.
   DescriptorDatabase* fallback_database_;

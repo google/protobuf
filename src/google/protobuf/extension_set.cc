@@ -688,7 +688,8 @@ MessageLite* ExtensionSet::AddMessage(const MessageLite& parent, int number,
 
   return reinterpret_cast<internal::RepeatedPtrFieldBase*>(
              extension->ptr.repeated_message_value)
-      ->AddFromClassData<GenericTypeHandler<MessageLite>>(arena, class_data);
+      ->AddFromClassData<GenericTypeHandler<MessageLite>>(GetSerialArena(arena),
+                                                          class_data);
 }
 
 // Defined in extension_set_heavy.cc.
@@ -1990,6 +1991,20 @@ LazyEagerVerifyFnType FindExtensionLazyEagerVerifyFn(
   return nullptr;
 }
 
+
+ExtensionSet* PrivateAccess::GetExtensionSet(MessageLite& msg) {
+  auto* tc_table = msg.GetTcParseTable();
+  if (tc_table->extension_offset == 0) return nullptr;
+  return reinterpret_cast<ExtensionSet*>(reinterpret_cast<char*>(&msg) +
+                                         tc_table->extension_offset);
+}
+
+const ExtensionSet* PrivateAccess::GetExtensionSet(const MessageLite& msg) {
+  auto* tc_table = msg.GetTcParseTable();
+  if (tc_table->extension_offset == 0) return nullptr;
+  return reinterpret_cast<const ExtensionSet*>(
+      reinterpret_cast<const char*>(&msg) + tc_table->extension_offset);
+}
 
 }  // namespace internal
 }  // namespace protobuf

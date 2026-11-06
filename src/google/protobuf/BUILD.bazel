@@ -457,6 +457,7 @@ cc_library(
         "@abseil-cpp//absl/base:dynamic_annotations",
         "@abseil-cpp//absl/base:prefetch",
         "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/numeric:bits",
         "@abseil-cpp//absl/numeric:int128",
@@ -537,16 +538,17 @@ cc_test(
 )
 
 cc_library(
-    name = "arena_align",
-    srcs = ["arena_align.cc"],
-    hdrs = ["arena_align.h"],
+    name = "memory_align",
+    hdrs = [
+        "arena_align.h",  # Deprecated
+        "memory_align.h",
+    ],
     strip_include_prefix = "/src",
     visibility = [
         "//:__subpackages__",
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":port",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
@@ -584,11 +586,19 @@ cc_library(
 )
 
 cc_library(
+    name = "private_access",
+    hdrs = ["private_access.h"],
+    strip_include_prefix = "/src",
+    visibility = ["//visibility:private"],
+    deps = [],
+)
+
+cc_library(
     name = "string_block",
     hdrs = ["string_block.h"],
     strip_include_prefix = "/src",
     deps = [
-        ":arena_align",
+        ":memory_align",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
     ],
@@ -634,11 +644,13 @@ cc_library(
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":arena_align",
         ":arena_allocation_policy",
         ":arena_cleanup",
+        ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":port",
+        ":private_access",
         ":string_block",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
@@ -665,7 +677,7 @@ cc_library(
     strip_include_prefix = "/src",
     deps = [
         ":arena",
-        ":arena_align",
+        ":memory_align",
         ":port",
         ":protobuf_lite",
         "@abseil-cpp//absl/base:config",
@@ -680,8 +692,8 @@ cc_test(
     srcs = ["micro_string_test.cc"],
     deps = [
         ":arena",
-        ":arena_align",
         ":cc_test_protos",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",
@@ -738,7 +750,6 @@ cc_library(
         "micro_string.cc",
         "offset_ptr.cc",
         "parse_context.cc",
-        "private_access.cc",
         "raw_ptr.cc",
         "repeated_field.cc",
         "repeated_ptr_field.cc",
@@ -799,12 +810,12 @@ cc_library(
     # In Bazel 6.0+, these will be `interface_deps`:
     deps = [
         ":arena",
-        ":arena_align",
         ":arena_allocation_policy",
         ":arena_cleanup",
         ":class_data",
         ":endian",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":port",
         ":string_block",
@@ -921,6 +932,7 @@ cc_library(
     deps = [
         ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",
@@ -1943,8 +1955,8 @@ cc_test(
 )
 
 cc_test(
-    name = "arena_align_test",
-    srcs = ["arena_align_test.cc"],
+    name = "memory_align_test",
+    srcs = ["memory_align_test.cc"],
     copts = COPTS + select({
         "//build_defs:config_msvc": [],
         "//conditions:default": [
@@ -1952,7 +1964,7 @@ cc_test(
         ],
     }),
     deps = [
-        ":arena_align",
+        ":memory_align",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -1973,6 +1985,7 @@ cc_test(
         ":arena_cleanup",
         ":cc_test_protos",
         ":lite_test_util",
+        ":memory_align",
         ":port",
         ":protobuf",
         ":protobuf_lite",
