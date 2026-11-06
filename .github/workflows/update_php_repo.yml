@@ -10,9 +10,9 @@ permissions:
   contents: read  #  to fetch code in 'Clone protobuf' (actions/checkout)
 
 jobs:
-  update-php-repo:
-    name: Update protobuf-php Repo
-    runs-on: ubuntu-latest
+  update-repo:
+    name: Update PHP Repo
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout protobuf-php
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1

@@ -1,3 +1,10 @@
+# Protocol Buffers - Google's data interchange format
+# Copyright 2026 Google LLC
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
+
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_python//python:proto.bzl", "py_proto_library")
@@ -315,7 +322,6 @@ proto_library(
     srcs = ["json_enumval_custom_string.proto"],
     strip_import_prefix = "/src",
     visibility = [
-        "//:__subpackages__",
         "//src/google/protobuf:__subpackages__",
         "//upb:__subpackages__",
     ],

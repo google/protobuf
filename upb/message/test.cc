@@ -23,6 +23,7 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/test_messages_proto3.upb.h"
+#include "upb/base/descriptor_constants.h"
 #include "upb/base/status.h"
 #include "upb/base/status.hpp"
 #include "upb/base/string_view.h"
@@ -35,6 +36,7 @@
 #include "upb/message/accessors.h"
 #include "upb/message/array.h"
 #include "upb/message/compare.h"
+#include "upb/message/compat.h"
 #include "upb/message/internal/accessors.h"
 #include "upb/message/internal/extension.h"
 #include "upb/message/internal/message.h"
@@ -245,6 +247,35 @@ TEST(MessageTest, ExtensionsEmpty) {
   }
 }
 
+TEST(MessageTest, DecodeErrorInRepeatedExtensionLeavesMessageValid) {
+  upb::Arena arena;
+  upb::DefPool defpool;
+  upb::MessageDefPtr m(upb_test_TestExtensions_getmsgdef(defpool.ptr()));
+  ASSERT_TRUE(m.ptr() != nullptr);
+
+  // Field 1001 (`repeated int32 repeated_int32_ext`) as a packed (LEN) field
+  // whose payload is an over-long, malformed varint. The decoder creates the
+  // extension's array before it hits the error.
+  const char data[] =
+      "\xca\x3e\x0b\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+  upb_test_TestExtensions* msg = upb_test_TestExtensions_new(arena.ptr());
+  upb_DecodeStatus status =
+      upb_Decode(data, sizeof(data) - 1, UPB_UPCAST(msg),
+                 &upb_0test__TestExtensions_msg_init,
+                 upb_DefPool_ExtensionRegistry(defpool.ptr()), 0, arena.ptr());
+  EXPECT_NE(status, kUpb_DecodeStatus_Ok);
+
+  // The partially-decoded message must still be safe to inspect.
+  const upb_MiniTableField* f;
+  upb_MessageValue v;
+  uintptr_t iter = kUpb_Message_ExtensionBegin;
+  while (upb_Message_NextExtensionField(UPB_UPCAST(msg), &f, &v, &iter)) {
+  }
+  size_t size;
+  EXPECT_NE(upb_test_TestExtensions_serialize(msg, arena.ptr(), &size),
+            nullptr);
+}
+
 void VerifyMessageSet(const upb_test_TestMessageSet* mset_msg) {
   ASSERT_TRUE(mset_msg != nullptr);
   bool has = upb_test_MessageSetMember_has_message_set_extension(mset_msg);
@@ -269,6 +300,53 @@ TEST(MessageTest, LargeMessageSetExtension) {
 
   EXPECT_EQ(upb_ExtensionRegistry_Add(reg, &ext),
             kUpb_ExtensionRegistryStatus_Ok);
+}
+
+TEST(MessageTest, NextExtensionField) {
+  upb::Arena arena;
+  upb_test_TestExtensions* ext_msg = upb_test_TestExtensions_new(arena.ptr());
+  upb_Message* msg = UPB_UPCAST(ext_msg);
+  upb_test_TestExtensions_set_optional_int32_ext(ext_msg, 123, arena.ptr());
+  protobuf_test_messages_proto3_TestAllTypesProto3* submsg =
+      protobuf_test_messages_proto3_TestAllTypesProto3_new(arena.ptr());
+  upb_test_set_optional_msg_ext(ext_msg, submsg, arena.ptr());
+
+  const upb_MiniTableField* int32_f = upb_MiniTableExtension_ToField(
+      upb_test_TestExtensions_optional_int32_ext_ext);
+  const upb_MiniTableField* msg_f =
+      upb_MiniTableExtension_ToField(upb_test_optional_msg_ext_ext);
+
+  // Wire order.
+  std::vector<const upb_MiniTableField*> fields;
+  const upb_MiniTableField* f;
+  upb_MessageValue val;
+  uintptr_t iter = kUpb_Message_ExtensionBegin;
+  while (upb_Message_NextExtensionField(msg, &f, &val, &iter)) {
+    fields.push_back(f);
+    if (f == int32_f) {
+      EXPECT_EQ(val.int32_val, 123);
+    } else {
+      EXPECT_EQ(val.msg_val, UPB_UPCAST(submsg));
+    }
+  }
+  EXPECT_THAT(fields, testing::ElementsAre(int32_f, msg_f));
+
+  // Reverse wire order.
+  fields.clear();
+  iter = kUpb_Message_ExtensionBegin;
+  while (upb_Message_NextExtensionFieldReverse(msg, &f, &iter)) {
+    fields.push_back(f);
+  }
+  EXPECT_THAT(fields, testing::ElementsAre(msg_f, int32_f));
+
+  // Find by number.
+  EXPECT_EQ(upb_Message_FindExtensionFieldByNumber(
+                msg, upb_MiniTableField_Number(int32_f)),
+            int32_f);
+  EXPECT_EQ(upb_Message_FindExtensionFieldByNumber(
+                msg, upb_MiniTableField_Number(msg_f)),
+            msg_f);
+  EXPECT_EQ(upb_Message_FindExtensionFieldByNumber(msg, 1), nullptr);
 }
 
 TEST(MessageTest, MessageSet) {
@@ -1033,7 +1111,7 @@ TEST(MessageTest, AppendNonCanonicalExtensionDuplicates) {
   upb_MessageUnknown unknown;
   while (upb_Message_NextUnknown2(msg, &unknown, &iter)) {
     if (unknown.type == kUpb_MessageUnknownType_NonCanonicalExtension) {
-      if (unknown.value.extension->ext ==
+      if (upb_Extension_MiniTableExtension(unknown.value.extension) ==
           upb_test_TestExtensions_optional_int32_ext_ext) {
         count++;
       }
@@ -1066,10 +1144,9 @@ TEST(MessageTest, CoexistCanonicalAndNonCanonicalExtension) {
     bool found = false;
     while (upb_Message_NextUnknown2(msg, &unknown, &iter)) {
       if (unknown.type == kUpb_MessageUnknownType_NonCanonicalExtension) {
-        if (unknown.value.extension->ext ==
+        if (upb_Extension_MiniTableExtension(unknown.value.extension) ==
             upb_test_TestExtensions_optional_int32_ext_ext) {
-          const int32_t* pval = (const int32_t*)&unknown.value.extension->data;
-          EXPECT_EQ(*pval, 42);
+          EXPECT_EQ(upb_Extension_GetInt32(unknown.value.extension), 42);
           found = true;
           break;
         }
@@ -1103,10 +1180,9 @@ TEST(MessageTest, CoexistCanonicalAndNonCanonicalExtensionReverse) {
     bool found = false;
     while (upb_Message_NextUnknown2(msg, &unknown, &iter)) {
       if (unknown.type == kUpb_MessageUnknownType_NonCanonicalExtension) {
-        if (unknown.value.extension->ext ==
+        if (upb_Extension_MiniTableExtension(unknown.value.extension) ==
             upb_test_TestExtensions_optional_int32_ext_ext) {
-          const int32_t* pval = (const int32_t*)&unknown.value.extension->data;
-          EXPECT_EQ(*pval, 42);
+          EXPECT_EQ(upb_Extension_GetInt32(unknown.value.extension), 42);
           found = true;
           break;
         }
@@ -1225,6 +1301,71 @@ TEST(MessageTest, ArenaSpaceAllocatedAfterDecode) {
   EXPECT_GT(space_allocated_after, space_allocated_before + 297u);
 }
 
+TEST(MessageTest, ExtensionAccessors) {
+  upb::Arena arena;
+  upb_test_TestExtensions* msg = upb_test_TestExtensions_new(arena.ptr());
+
+  // Scalar extension.
+  upb_AuxField* int32_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+      UPB_UPCAST(msg), upb_test_TestExtensions_optional_int32_ext_ext,
+      arena.ptr());
+  ASSERT_NE(int32_ext, nullptr);
+  EXPECT_EQ(upb_Extension_MiniTableExtension(int32_ext),
+            upb_test_TestExtensions_optional_int32_ext_ext);
+  EXPECT_EQ(upb_Extension_GetInt32(int32_ext), 0);
+
+  upb_Extension_SetInt32(int32_ext, 42);
+  EXPECT_EQ(upb_Extension_GetInt32(int32_ext), 42);
+  EXPECT_EQ(upb_Extension_GetValue(int32_ext).int32_val, 42);
+  EXPECT_EQ(upb_test_TestExtensions_optional_int32_ext(msg), 42);
+
+  int32_t int32_val = 7;
+  upb_Extension_SetField(int32_ext, &int32_val);
+  EXPECT_EQ(upb_Extension_GetInt32(int32_ext), 7);
+  EXPECT_EQ(upb_test_TestExtensions_optional_int32_ext(msg), 7);
+
+  upb_MessageValue val;
+  val.int32_val = 123;
+  upb_Extension_SetValue(int32_ext, val);
+  EXPECT_EQ(upb_Extension_GetInt32(int32_ext), 123);
+  EXPECT_EQ(upb_test_TestExtensions_optional_int32_ext(msg), 123);
+
+  int32_t got_val = 0;
+  upb_Extension_GetField(int32_ext, &got_val);
+  EXPECT_EQ(got_val, 123);
+
+  // Message extension.
+  upb_AuxField* msg_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+      UPB_UPCAST(msg), upb_test_optional_msg_ext_ext, arena.ptr());
+  ASSERT_NE(msg_ext, nullptr);
+  EXPECT_EQ(upb_Extension_GetMessage(msg_ext), nullptr);
+  protobuf_test_messages_proto3_TestAllTypesProto3* sub_msg =
+      protobuf_test_messages_proto3_TestAllTypesProto3_new(arena.ptr());
+  upb_Extension_SetMessage(msg_ext, UPB_UPCAST(sub_msg));
+  EXPECT_EQ(upb_Extension_GetMessage(msg_ext), UPB_UPCAST(sub_msg));
+  EXPECT_EQ(upb_Extension_GetMutableMessage(msg_ext), UPB_UPCAST(sub_msg));
+  EXPECT_EQ(upb_test_optional_msg_ext(msg), sub_msg);
+
+  // Repeated extension.
+  upb_AuxField* array_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
+      UPB_UPCAST(msg), upb_test_TestExtensions_Nested_repeated_int32_ext_ext,
+      arena.ptr());
+  ASSERT_NE(array_ext, nullptr);
+  EXPECT_EQ(upb_Extension_GetArray(array_ext), nullptr);
+  upb_Array* arr = upb_Array_New(arena.ptr(), kUpb_CType_Int32);
+  ASSERT_NE(arr, nullptr);
+  upb_MessageValue elem;
+  elem.int32_val = 5;
+  ASSERT_TRUE(upb_Array_Append(arr, elem, arena.ptr()));
+  upb_Extension_SetArray(array_ext, arr);
+  EXPECT_EQ(upb_Extension_GetArray(array_ext), arr);
+  EXPECT_EQ(upb_Extension_GetMutableArray(array_ext), arr);
+  EXPECT_EQ(upb_Message_GetExtensionArray(
+                UPB_UPCAST(msg),
+                upb_test_TestExtensions_Nested_repeated_int32_ext_ext),
+            arr);
+}
+
 TEST(MessageTest, NextUnknown2AndDeleteUnknown2) {
   upb::Arena arena;
   upb_test_TestExtensions* ext_msg = upb_test_TestExtensions_new(arena.ptr());
@@ -1278,10 +1419,10 @@ TEST(MessageTest, NextUnknown2AndDeleteUnknown2) {
                  kUpb_MessageUnknownType_NonCanonicalExtension) {
         EXPECT_FALSE(found_ext);
         found_ext = true;
-        const upb_Extension* ext =
-            (const upb_Extension*)unknown.value.extension;
-        EXPECT_EQ(ext->ext, upb_test_TestExtensions_optional_int32_ext_ext);
-        EXPECT_EQ(ext->data.int32_val, 42);
+        const upb_AuxField* ext = (const upb_AuxField*)unknown.value.extension;
+        EXPECT_EQ(upb_Extension_MiniTableExtension(ext),
+                  upb_test_TestExtensions_optional_int32_ext_ext);
+        EXPECT_EQ(upb_Extension_GetInt32(ext), 42);
       } else {
         FAIL() << "Unexpected unknown type: " << (int)unknown.type;
       }

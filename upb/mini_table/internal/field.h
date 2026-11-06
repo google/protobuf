@@ -111,6 +111,17 @@ UPB_API_INLINE bool upb_MiniTableField_IsExtension(
   return (f->UPB_ONLYBITS(mode) & kUpb_LabelFlags_IsExtension) != 0;
 }
 
+// Returns true if `f` describes a field stored in a message's auxiliary data
+// (currently, an extension or a non-canonical field) rather than at a fixed
+// offset in the message.
+//
+// In the current implementation, base fields never have offset 0, since the
+// message data starts after the upb_Message header.
+UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_IsAuxField)(
+    const struct upb_MiniTableField* f) {
+  return f->UPB_ONLYBITS(offset) == 0;
+}
+
 UPB_API_INLINE bool upb_MiniTableField_IsPacked(
     const struct upb_MiniTableField* f) {
   return (f->UPB_ONLYBITS(mode) & kUpb_LabelFlags_IsPacked) != 0;
@@ -165,6 +176,14 @@ UPB_API_INLINE bool upb_MiniTableField_IsSubMessage(
     const struct upb_MiniTableField* f) {
   return f->UPB_PRIVATE(descriptortype) == kUpb_FieldType_Message ||
          f->UPB_PRIVATE(descriptortype) == kUpb_FieldType_Group;
+}
+
+// Returns true if the field's type requires sub storage (ie. it is a
+// sub-message or closed enum), in which case `submsg_ofs` locates the sub.
+UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_HasSub)(
+    const struct upb_MiniTableField* f) {
+  return upb_MiniTableField_IsSubMessage(f) ||
+         upb_MiniTableField_IsClosedEnum(f);
 }
 
 UPB_API_INLINE bool upb_MiniTableField_HasPresence(
