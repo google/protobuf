@@ -305,18 +305,6 @@ Py_ssize_t MapReflectionFriend::Length(PyObject* _self) {
   return map.ok() ? map->size() : 0;
 }
 
-PyObject* Clear(PyObject* _self) {
-  MapContainer* self = GetMap(_self);
-  Message* message = self->GetMutableMessage();
-  if (message == nullptr) return nullptr;
-  const Reflection* reflection = message->GetReflection();
-
-  reflection->ClearField(message, self->parent_field_descriptor);
-  self->version++;
-
-  Py_RETURN_NONE;
-}
-
 PyObject* GetEntryClass(PyObject* _self) {
   MapContainer* self = GetMap(_self);
   CMessageClass* message_class = message_factory::GetMessageClass(
@@ -439,6 +427,16 @@ MapContainer* NewScalarMapContainer(
   self->version = 0;
 
   return self;
+}
+
+PyObject* ScalarMapClear(PyObject* _self) {
+  MapContainer* self = GetMap(_self);
+  Message* message = self->GetMutableMessage();
+  if (message == nullptr) return nullptr;
+  message->GetReflection()->ClearField(message, self->parent_field_descriptor);
+  self->version++;
+
+  Py_RETURN_NONE;
 }
 
 PyObject* MapReflectionFriend::ScalarMapGetItem(PyObject* _self,
@@ -609,7 +607,7 @@ static void ScalarMapDealloc(PyObject* _self) {
 }
 
 static PyMethodDef ScalarMapMethods[] = {
-    {"clear", (PyCFunction)Clear, METH_NOARGS,
+    {"clear", (PyCFunction)ScalarMapClear, METH_NOARGS,
      "Removes all elements from the map."},
     {"setdefault", (PyCFunction)ScalarMapSetdefault, METH_VARARGS,
      "If the key does not exist, insert the key, with the specified value"},
@@ -685,6 +683,28 @@ MessageMapContainer* NewMessageMapContainer(
   self->message_class = message_class;
 
   return self;
+}
+
+PyObject* MessageMapClear(PyObject* _self) {
+  MapContainer* self = GetMap(_self);
+  Message* message = self->GetMutableMessage();
+  if (message == nullptr) return nullptr;
+  const Reflection* reflection = message->GetReflection();
+
+  // ClearField() below frees the values, so detach their Python wrappers (if
+  // any) first: a detached wrapper keeps its own copy of the contents.
+  auto map = reflection->MutableMap(message, self->parent_field_descriptor);
+  if (!map.ok()) {
+    PyErr_SetString(PyExc_SystemError, map.status().ToString().c_str());
+    return nullptr;
+  }
+  for (auto entry : *map) {
+    self->parent->DetachSubMessage(entry.value().MutableMessageValue());
+  }
+  reflection->ClearField(message, self->parent_field_descriptor);
+  self->version++;
+
+  Py_RETURN_NONE;
 }
 
 int MapReflectionFriend::MessageMapSetItem(PyObject* _self, PyObject* key,
@@ -870,7 +890,7 @@ static void MessageMapDealloc(PyObject* _self) {
 }
 
 static PyMethodDef MessageMapMethods[] = {
-    {"clear", (PyCFunction)Clear, METH_NOARGS,
+    {"clear", (PyCFunction)MessageMapClear, METH_NOARGS,
      "Removes all elements from the map."},
     {"setdefault", (PyCFunction)MessageMapSetdefault, METH_VARARGS,
      "setdefault is disallowed in MessageMap."},
