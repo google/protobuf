@@ -3433,6 +3433,17 @@ class Proto3Test(unittest.TestCase):
     self.assertEqual(0, len(msg.map_int32_foreign_message))
     self.assertEqual(0, len(msg.map_int32_all_types))
 
+  def testMapClearLeavesHeldValuesIntact(self):
+    msg = map_unittest_pb2.TestMap()
+    msg.map_int32_foreign_message[1].c = 5
+    held = msg.map_int32_foreign_message[1]
+    msg.map_int32_foreign_message.clear()
+    self.assertEqual(0, len(msg.map_int32_foreign_message))
+    self.assertEqual(5, held.c)
+    # The held value is no longer part of the map.
+    held.c = 6
+    self.assertEqual(0, len(msg.map_int32_foreign_message))
+
   def testMapMergeFromLeavesSourceValuesIntact(self):
     src = map_unittest_pb2.TestMap()
     src.map_int32_foreign_message[1].c = 5
