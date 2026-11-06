@@ -125,7 +125,8 @@ void RepeatedPtrFieldBase::ReserveWithArena(Arena* arena, int capacity) {
 }
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-void RepeatedPtrFieldBase::DestroyMessageLites(const ClassData* class_data) {
+void RepeatedPtrFieldBase::DestroyMessageLites(
+    const ClassDataPrefix* class_data) {
   ABSL_DCHECK(NeedsDestroy());
   ABSL_DCHECK_EQ(GetArena(), nullptr);
 
@@ -145,7 +146,7 @@ void RepeatedPtrFieldBase::DestroyMessageLites(const ClassData* class_data) {
         << "Type mismatch in RepeatedPtrFieldBase::DestroyMessageLites: found "
            "element of type "
         << GetClassData(*ptr)->DebugName() << " at index " << i
-        << " in a repeated field of " << class_data->DebugName();
+        << " in a repeated field of " << class_data->type_name();
 
     destroy(*ptr);
     internal::SizedDelete(ptr, allocation_size);
@@ -160,7 +161,8 @@ void RepeatedPtrFieldBase::DestroyProtos() {
 #if defined(PROTOBUF_CUSTOM_VTABLE)
   if (allocated_size() > 0) {
     using H = GenericTypeHandler<MessageLite>;
-    const ClassData* class_data = cast<H>(elements()[0])->GetClassData();
+    const ClassDataPrefix* class_data =
+        cast<H>(elements()[0])->GetClassDataPrefix();
     PROTOBUF_ALWAYS_INLINE_CALL DestroyMessageLites(class_data);
   } else if (!using_sso()) {
     internal::SizedDelete(rep(), Capacity() * sizeof(void*) + kRepHeaderSize);
