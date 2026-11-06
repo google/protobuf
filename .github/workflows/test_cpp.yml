@@ -27,67 +27,77 @@ jobs:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
+        # Every config runs on both profiles of the composite Linux image
+        # (test/linux/composite in protocolbuffers/build-support, layered on
+        # gloop-linux): `latest` (Clang 23, Bazel 9.2.0 by default) and `floor`
+        # (Clang 14, Bazel 8.7.0 by default). A config that only makes sense on
+        # some profiles lists them in `profiles:`.
+        profile: [latest, floor]
         config:
           - { name: Optimized, flags: --config=opt }
           - { name: Debug, flags: --config=dbg, continuous-only: true }
           - { name: ASAN, flags: --config=asan, runner: ubuntu-22-4core }
-          - { name: MSAN, flags: --config=docker-msan, runner: ubuntu-22-4core, continuous-only: true }
-          - { name: TSAN, flags: --config=tsan, runner: ubuntu-22-4core, continuous-only: true }
-          - { name: UBSAN, flags: --config=ubsan, runner: ubuntu-22-4core, continuous-only: true,}
+          # MemorySanitizer needs an MSAN runtime that knows glibc 2.38's
+          # __isoc23_* symbols and propagates shadow through
+          # __builtin_memcpy_inline (used by every upb accessor). The floor
+          # Clang (14) has neither, so MSAN and TSAN run on `latest` only, as in
+          # gloop and Abseil; the floor image rejects --config=msan outright.
+          - { name: MSAN, flags: --config=docker-msan, runner: ubuntu-22-4core, continuous-only: true, profiles: latest }
+          - { name: TSAN, flags: --config=tsan, runner: ubuntu-22-4core, continuous-only: true, profiles: latest }
+          - { name: UBSAN, flags: --config=ubsan, runner: ubuntu-22-4core, continuous-only: true }
           - { name: No-RTTI, flags: --cxxopt=-fno-rtti, continuous-only: true }
+          - { name: TCMalloc, flags: --config=tcmalloc, targets: "//src/... //third_party/utf8_range/..." }
         include:
-          # Set defaults
-          - image: us-docker.pkg.dev/protobuf-build/containers/test/linux/sanitize:8.7.0-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7
+          # Image and Bazel version per profile (explicit USE_BAZEL_VERSION
+          # overrides the repo-root `.bazeliskrc`), pinned by digest.
+          - profile: latest
+            bazel: "9.2.0"
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:3b4ba7714b69dfc78cb6cd1ec9c71c1a830e78248abe40a1f5c11314f6667248
+          - profile: floor
+            bazel: "8.7.0"
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/composite@sha256:e22a3b313e1ab90785c18cfd9c948d547bad1501b72a2dd68c14777cce3d30c8
+          # Default targets; a config can narrow them with `targets:`.
           - targets: //pkg/... //src/... //third_party/utf8_range/... //conformance:conformance_framework_tests
-          # Override cases with custom images
-          - config: { name: "Bazel8", flags: --cxxopt="-Wno-self-assign-overloaded" }
-            cache_key: Bazel8
-            image: "us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:8.7.0-4d8e80ef93b0219fb907af9dd4596b92946995d8"
-            targets: "//src/... //third_party/utf8_range/..."
-          - config: { name: "Bazel9", flags: "--cxxopt=-Wno-self-assign-overloaded" }
-            cache_key: Bazel9
-            image: "us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8"
-            targets: "//src/... //third_party/utf8_range/..."
-          - config: { name: "TCMalloc" }
-            cache_key: TcMalloc
-            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/tcmalloc:8.7.0-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7 "
-            targets: "//src/... //third_party/utf8_range/..."
+          # Override cases with custom images (run once, outside the profile matrix).
           - config: { name: "aarch64", flags: "--platforms=//build_defs:linux-aarch_64" }
             cache_key: aarch64-bazel8
             targets: "//src/... //src/google/protobuf/compiler:protoc_aarch64_test //third_party/utf8_range/..."
-            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:8.7.0-aarch64-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7 "
-    name: ${{ matrix.config.continuous-only && inputs.continuous-prefix || '' }} Linux ${{ matrix.config.name }}
+            image: "us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation@sha256:fd886d351d82ea6a1422d5c33cfc9b7fb74087ccb218bc24f4d1c33f6209d71a"
+    name: ${{ matrix.config.continuous-only && inputs.continuous-prefix || '' }} Linux ${{ matrix.config.name }}${{ matrix.profile == 'floor' && ' (floor)' || '' }}
     runs-on: ${{ matrix.config.runner || 'ubuntu-24.04' }}
     steps:
       - name: Checkout pending changes
-        if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
+        if: ${{ contains(matrix.config.profiles || 'latest floor', matrix.profile || 'latest') && (!matrix.config.continuous-only || inputs.continuous-run) }}
         uses: protocolbuffers/protobuf-ci/checkout@v7
         with:
           ref: ${{ inputs.safe-checkout }}
       - name: Prime the cache
-        if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
+        if: ${{ contains(matrix.config.profiles || 'latest floor', matrix.profile || 'latest') && (!matrix.config.continuous-only || inputs.continuous-run) }}
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         with:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/${{ matrix.cache_key }}
-          bazel: fetch ${{ matrix.targets }} ${{ matrix.config.flags }}
-          exclude-targets: ${{ matrix.exclude-targets }}
+          bash: ${{ matrix.bazel && format('USE_BAZEL_VERSION={0} ', matrix.bazel) || '' }}bazel fetch ${{ matrix.config.targets || matrix.targets }} ${{ matrix.config.flags }} $BAZEL_FLAGS
       - name: Run tests
-        if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
+        if: ${{ contains(matrix.config.profiles || 'latest floor', matrix.profile || 'latest') && (!matrix.config.continuous-only || inputs.continuous-run) }}
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         with:
           image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/${{ matrix.cache_key }}
-          bazel: test ${{ matrix.targets }} ${{ matrix.config.flags }}
-          exclude-targets: ${{ matrix.exclude-targets }}
+          bash: ${{ matrix.bazel && format('USE_BAZEL_VERSION={0} ', matrix.bazel) || '' }}bazel test ${{ matrix.config.targets || matrix.targets }} ${{ matrix.config.flags }} $BAZEL_FLAGS
 
   linux-gcc:
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
         version: ['10.5', '13.4']
+        include:
+          - version: '10.5'
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc@sha256:cb82192b6206448d3a3ea446e6466e8c0d0228f72ee9c3faaaf9694428f530bf
+          - version: '13.4'
+            image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc@sha256:4602eae8b9fc3ed1b80ac6767680b0dd184af9f38117704e50bf1b4e966ddf39
     name: ${{ matrix.config.continuous-only && inputs.continuous-prefix || '' }} Linux GCC ${{ matrix.version }}
     runs-on: ubuntu-24.04
     steps:
@@ -100,7 +110,7 @@ jobs:
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc:8.7.0-${{ matrix.version }}-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7
+          image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/gcc-${{ matrix.version }}
           bazel: fetch //pkg/... //src/... //third_party/utf8_range/... //conformance:conformance_framework_tests
@@ -108,7 +118,7 @@ jobs:
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         if: ${{ !matrix.config.continuous-only || inputs.continuous-run }}
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc:8.7.0-${{ matrix.version }}-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7
+          image: ${{ matrix.image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/gcc-${{ matrix.version }}
           bazel: test //pkg/... //src/... //third_party/utf8_range/... //conformance:conformance_framework_tests
@@ -119,8 +129,11 @@ jobs:
       matrix:
         arch: [x86_64, aarch64]
         include:
+          - arch: x86_64
+            emulation_image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation@sha256:3d70ae3cefcee7f4cd87db06e35ebef87ca656c9e1678eafd87763923e5411a9
           - arch: aarch64
             continuous-only: true
+            emulation_image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation@sha256:fd886d351d82ea6a1422d5c33cfc9b7fb74087ccb218bc24f4d1c33f6209d71a
     name: ${{ matrix.continuous-only && inputs.continuous-prefix || '' }} Linux Release ${{ matrix.arch }}
     runs-on: ubuntu-22-4core
     steps:
@@ -142,7 +155,7 @@ jobs:
         id: cross-compile
         uses: protocolbuffers/protobuf-ci/cross-compile-protoc@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:8.7.0-4d8e80ef93b0219fb907af9dd4596b92946995d8
+          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel@sha256:eff4af9b960c01b9bad89aedfcff6fabe59b3e0d24f65016ded3b380ca314a39
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           architecture: linux-${{ matrix.arch }}
       - name: Check disk space after cross compile
@@ -163,7 +176,7 @@ jobs:
         if: ${{ !matrix.continuous-only || inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/emulation:8.7.0-${{ matrix.arch }}-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7
+          image: ${{ matrix.emulation_image }}
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           entrypoint: bash
           command: >
@@ -220,7 +233,7 @@ jobs:
         if: ${{ !matrix.continuous-only || inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake:3.16.9-9626718698895971df3953d4aa2321d7425f3c5f
+          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake@sha256:4cd7212dede79251af0e41e30a8b5ee65312a17f66ead0ddd4b89901d7b537af
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           command: >-
             /test.sh ${{ matrix.flags}} ${{ env.SCCACHE_CMAKE_FLAGS }}
@@ -263,7 +276,7 @@ jobs:
         uses: protocolbuffers/protobuf-ci/docker@v7
         if: ${{ !matrix.continuous-only || inputs.continuous-run }}
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake:3.16.9-9626718698895971df3953d4aa2321d7425f3c5f
+          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake@sha256:4cd7212dede79251af0e41e30a8b5ee65312a17f66ead0ddd4b89901d7b537af
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           command: >-
             /install.sh -DCMAKE_CXX_STANDARD=17 ${{ env.SCCACHE_CMAKE_FLAGS }}
@@ -361,7 +374,7 @@ jobs:
         if: ${{ inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake:3.16.9-9626718698895971df3953d4aa2321d7425f3c5f
+          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/cmake@sha256:4cd7212dede79251af0e41e30a8b5ee65312a17f66ead0ddd4b89901d7b537af
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           command: >-
             /install.sh -DCMAKE_CXX_STANDARD=17 ${{ env.SCCACHE_CMAKE_FLAGS }}
@@ -403,7 +416,7 @@ jobs:
         if: ${{ !matrix.continuous-only || inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc:8.7.0-12.5-5bb1a8fdfc30f8c21c1b38cf053d2db9fca865a7
+          image: us-docker.pkg.dev/protobuf-build/containers/test/linux/gcc@sha256:882fdc26ca73436514039c7e27404e0a8380956d9d18738e40f3b7f2f274109b
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           entrypoint: bash
           command: >-
@@ -635,7 +648,7 @@ jobs:
         if: ${{ inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8
+          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel@sha256:3339a1ebe3eef58b4dbb936d259e24e7c652909599492e7f1af3d8ea92463eed
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/abseil_head
           bazel: test //src/... --override_module=abseil-cpp=abseil-cpp-head
@@ -654,7 +667,7 @@ jobs:
         if: ${{ inputs.continuous-run }}
         uses: protocolbuffers/protobuf-ci/bazel-docker@v7
         with:
-          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel:9.2.0-4d8e80ef93b0219fb907af9dd4596b92946995d8
+          image: us-docker.pkg.dev/protobuf-build/containers/common/linux/bazel@sha256:3339a1ebe3eef58b4dbb936d259e24e7c652909599492e7f1af3d8ea92463eed
           credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
           bazel-cache: cpp_linux/bazel_last_green
           bash: USE_BAZEL_VERSION=last_green bazelisk test //src/... //third_party/utf8_range/... --cxxopt=-Wno-self-assign-overloaded
