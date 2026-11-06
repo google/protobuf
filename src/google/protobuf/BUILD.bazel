@@ -646,6 +646,7 @@ cc_library(
     deps = [
         ":arena_allocation_policy",
         ":arena_cleanup",
+        ":class_data",
         ":internal_visibility",
         ":memory_align",
         ":port",
