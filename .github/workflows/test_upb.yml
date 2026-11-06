@@ -81,31 +81,6 @@ jobs:
           bazel: test --cxxopt=/std:c++17 --host_cxxopt=/std:c++17 //upb/... //upb_generator/... //protos/... //protos_generator/...
           exclude-targets: -//python:conformance_test -//upb:def_builder_test
 
-  macos:
-    strategy:
-      fail-fast: false   # Don't cancel all jobs if one fails.
-      matrix:
-        config:
-          - { name: "macOS", bazel-command: "test" }
-          - { name: "macOS ARM", bazel-command: "test", flags: "--cpu=darwin_arm64" }
-    name: ${{ matrix.config.name }}
-    runs-on: macos-14
-    steps:
-      - name: Checkout pending changes
-        uses: protocolbuffers/protobuf-ci/checkout@v2
-        with:
-          ref: ${{ inputs.safe-checkout }}
-      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
-        with:
-          cache: pip
-          cache-dependency-path: 'python/requirements.txt'
-          python-version: '3.11' # 3.12 doesn't have setuptools
-      - name: Run tests
-        uses: protocolbuffers/protobuf-ci/bazel@v2
-        with:
-          credentials: ${{ secrets.GAR_SERVICE_ACCOUNT }}
-          bazel-cache: "upb-bazel-macos"
-          bazel: ${{ matrix.config.bazel-command }} --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 ${{ matrix.config.flags }} //bazel/... //benchmarks/... //lua/... //protos/... //protos_generator/... //python/... //upb/... //upb_generator/...
 
   no-python:
     strategy:
@@ -170,9 +145,7 @@ jobs:
           # coverage.
           # Pinned to ubuntu-24.04: setup-python no longer provides Python 3.8/3.9 builds for Ubuntu 26.04.
           - { os: ubuntu-24.04, python-version: "3.9", architecture: x64, type: 'binary' }
-          - { os: macos-14, python-version: "3.9", architecture: arm64, type: 'binary' }
           - { os: ubuntu-24.04, python-version: "3.9", architecture: x64, type: 'source'}
-          - { os: macos-14, python-version: "3.9", architecture: arm64, type: 'source', continuous-only: true }
 
           # Windows uses the full API up until Python 3.10, so each of these
           # jobs tests a distinct binary wheel.

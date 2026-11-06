@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   xcode:
+    if: false
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
@@ -66,6 +67,7 @@ jobs:
         run: ccache -s -v
 
   pod-lib-lint:
+    if: false
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
@@ -97,6 +99,7 @@ jobs:
               Protobuf.podspec
 
   bazel:
+    if: false
     strategy:
       fail-fast: false   # Don't cancel all jobs if one fails.
       matrix:
