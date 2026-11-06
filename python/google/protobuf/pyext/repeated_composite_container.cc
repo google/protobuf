@@ -132,7 +132,23 @@ static PyObject* Insert(PyObject* pself, PyObject* args) {
 // extend()
 
 PyObject* Extend(RepeatedCompositeContainer* self, PyObject* value) {
-  if (cmessage::AssureWritable(self->parent) == nullptr) return nullptr;
+  Message* message = cmessage::AssureWritable(self->parent);
+  if (message == nullptr) return nullptr;
+  if (value == reinterpret_cast<PyObject*>(self)) {
+    // Append copies of the elements that were there to begin with, so that the
+    // new elements are not visited.
+    const Reflection* reflection = message->GetReflection();
+    const FieldDescriptor* field = self->parent_field_descriptor;
+    MessageFactory* factory =
+        cmessage::GetFactoryForMessage(self->parent)->message_factory;
+    const int size = reflection->FieldSize(*message, field);
+    for (int i = 0; i < size; ++i) {
+      const Message& element =
+          reflection->GetRepeatedMessage(*message, field, i);
+      reflection->AddMessage(message, field, factory)->CopyFrom(element);
+    }
+    Py_RETURN_NONE;
+  }
   ScopedPyObjectPtr iter(PyObject_GetIter(value));
   if (iter == nullptr) {
     PyErr_SetString(PyExc_TypeError, "Value must be iterable");
@@ -160,6 +176,13 @@ static PyObject* ExtendMethod(PyObject* self, PyObject* value) {
 }
 
 PyObject* MergeFrom(RepeatedCompositeContainer* self, PyObject* other) {
+  if (cmessage::AssureWritable(self->parent) == nullptr) return nullptr;
+  if (other == reinterpret_cast<PyObject*>(self)) {
+    // Self-merge is not supported, as for messages and maps.
+    PyErr_SetString(PyExc_AssertionError,
+                    "Cannot merge a repeated field into itself.");
+    return nullptr;
+  }
   return Extend(self, other);
 }
 
