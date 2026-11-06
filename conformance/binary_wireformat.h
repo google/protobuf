@@ -1,3 +1,10 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2026 Google LLC
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
 #ifndef GOOGLE_PROTOBUF_CONFORMANCE_BINARY_WIREFORMAT_H__
 #define GOOGLE_PROTOBUF_CONFORMANCE_BINARY_WIREFORMAT_H__
 
@@ -169,11 +176,11 @@ inline Wire LengthPrefixed(const Wire& data) {
 namespace internal {
 template <typename Func, typename Container>
 Wire PackedImpl(Func func, const Container& container) {
-  std::string buf = Varint(container.size()).str();
+  std::string elements;
   for (auto x : container) {
-    absl::StrAppend(&buf, func(x).str());
+    absl::StrAppend(&elements, func(x).str());
   }
-  return Wire(buf);
+  return LengthPrefixed(elements);
 }
 }  // namespace internal
 

@@ -10,18 +10,15 @@
 
 #include "google/protobuf/pyext/repeated_composite_container.h"
 
-#include <memory>
 #include <utility>
 
 #include "google/protobuf/descriptor.h"
-#include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/reflection.h"
-#include "google/protobuf/breaking_changes.h"
-#include "google/protobuf/pyext/descriptor.h"
 #include "google/protobuf/pyext/descriptor_pool.h"
 #include "google/protobuf/pyext/message.h"
 #include "google/protobuf/pyext/message_factory.h"
+#include "google/protobuf/pyext/message_tree.h"
 #include "google/protobuf/pyext/scoped_pyobject_ptr.h"
 
 // Must include last.
@@ -51,17 +48,11 @@ static Py_ssize_t Length(PyObject* pself) {
 
 static PyObject* AttachQuiescentMessage(RepeatedCompositeContainer* self,
                                         ScopedPyObjectPtr child) {
-  Message* parent_msg = cmessage::AssureWritable(self->parent);
-  if (parent_msg == nullptr) return nullptr;
-
   CMessage* cmsg = reinterpret_cast<CMessage*>(child.get());
-  parent_msg->GetReflection()->UnsafeArenaAddAllocatedMessage(
-      parent_msg, self->parent_field_descriptor, cmsg->GetQuiescent());
-  Py_INCREF(self->parent);
-  cmsg->parent = self->parent;
-  cmsg->parent_field_descriptor = self->parent_field_descriptor;
-  cmsg->has_mutable_map_ancestor = self->parent->has_mutable_map_ancestor;
-  cmessage::SetSubmessage(self->parent, cmsg);
+  if (!self->parent->AttachQuiescentChild(self->parent_field_descriptor,
+                                          cmsg)) {
+    return nullptr;
+  }
   return child.release();
 }
 
@@ -197,12 +188,10 @@ static PyObject* GetItem(RepeatedCompositeContainer* self, Py_ssize_t index,
   // 2. Any subsequent write on the child triggers AssureWritable, which
   //    promotes the entire parent hierarchy (e.g., marking LazyField ancestors
   //    dirty).
-  MessageMutabilityState state = self->parent->state == MESSAGE_FROZEN
-                                     ? MESSAGE_FROZEN
-                                     : MESSAGE_UNPROMOTED;
   return self->parent
       ->BuildSubMessageFromPointer(self->parent_field_descriptor, sub_message,
-                                   self->child_message_class, state)
+                                   self->child_message_class,
+                                   MESSAGE_UNPROMOTED)
       ->AsPyObject();
 }
 
@@ -524,6 +513,7 @@ RepeatedCompositeContainer* NewContainer(
     return nullptr;
   }
 
+  self->SetTree(parent->GetTree());
   Py_INCREF(parent);
   self->parent = parent;
   self->parent_field_descriptor = parent_field_descriptor;

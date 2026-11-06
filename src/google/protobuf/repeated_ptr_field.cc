@@ -71,9 +71,9 @@ void** RepeatedPtrFieldBase::InternalExtend(int extend_amount,
       new_capacity = static_cast<int>((alloc.n - kRepHeaderSize) / kPtrSize);
       new_rep = reinterpret_cast<Rep*>(alloc.p);
     } else {
-      if constexpr (internal::ArenaAlignDefault::Ceil(kPtrSize) != kPtrSize) {
+      if constexpr (internal::ArenaAlignDefault{}.Ceil(kPtrSize) != kPtrSize) {
         // We need to manually align the allocation.
-        bytes = internal::ArenaAlignDefault::Ceil(bytes);
+        bytes = internal::ArenaAlignDefault{}.Ceil(bytes);
         new_capacity = (bytes - kRepHeaderSize) / kPtrSize;
       }
 
@@ -191,6 +191,26 @@ void RepeatedPtrFieldBase::CloseGap(int start, int num) {
 
 void InternalOutOfLineDeleteMessageLite(MessageLite* message) {
   delete message;
+}
+
+void MemswapLarge(char* PROTOBUF_RESTRICT a, char* PROTOBUF_RESTRICT b,
+                  size_t n) {
+  ABSL_DCHECK_GE(n, size_t{16});
+  size_t i = 0;
+  for (; i + 16 < n; i += 8) {
+    MemswapWord(a + i, b + i);
+  }
+  // Swap the remaining (8, 16] bytes using two potentially overlapping 8-byte
+  // words. Load both words before storing so the overlap is not swapped twice.
+  uint64_t a0, a1, b0, b1;
+  std::memcpy(&a0, a + i, sizeof(a0));
+  std::memcpy(&a1, a + n - 8, sizeof(a1));
+  std::memcpy(&b0, b + i, sizeof(b0));
+  std::memcpy(&b1, b + n - 8, sizeof(b1));
+  std::memcpy(a + i, &b0, sizeof(b0));
+  std::memcpy(a + n - 8, &b1, sizeof(b1));
+  std::memcpy(b + i, &a0, sizeof(a0));
+  std::memcpy(b + n - 8, &a1, sizeof(a1));
 }
 
 template PROTOBUF_EXPORT_TEMPLATE_DEFINE void

@@ -38,11 +38,9 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/message_traits.h"
-#include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/parse_context.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/type_id.h"
-#include "google/protobuf/unknown_field_set.h"
 
 
 // Must be included last.
@@ -750,30 +748,6 @@ absl::Cord MessageLite::SerializePartialAsCord() const {
   if (!AppendPartialToString(&output)) output.Clear();
   return output;
 }
-
-namespace internal {
-
-// Non-inline variants of std::string specializations for
-// various InternalMetadata routines.
-template <>
-void InternalMetadata::DoClear<std::string>() {
-  mutable_unknown_fields<std::string>()->clear();
-}
-
-template <>
-void InternalMetadata::DoMergeFrom<std::string>(const std::string& other) {
-  mutable_unknown_fields<std::string>()->append(other);
-}
-
-template <>
-void InternalMetadata::DoSwap<std::string>(std::string* other) {
-  mutable_unknown_fields<std::string>()->swap(*other);
-}
-
-template UnknownFieldSet*
-InternalMetadata::mutable_unknown_fields_slow<UnknownFieldSet>();
-
-}  // namespace internal
 
 std::string ShortFormat(const MessageLite& message_lite) {
   return message_lite.DebugString();

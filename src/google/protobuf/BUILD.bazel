@@ -457,6 +457,7 @@ cc_library(
         "@abseil-cpp//absl/base:dynamic_annotations",
         "@abseil-cpp//absl/base:prefetch",
         "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/numeric:bits",
         "@abseil-cpp//absl/numeric:int128",
@@ -537,16 +538,17 @@ cc_test(
 )
 
 cc_library(
-    name = "arena_align",
-    srcs = ["arena_align.cc"],
-    hdrs = ["arena_align.h"],
+    name = "memory_align",
+    hdrs = [
+        "arena_align.h",  # Deprecated
+        "memory_align.h",
+    ],
     strip_include_prefix = "/src",
     visibility = [
         "//:__subpackages__",
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":port",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
@@ -584,11 +586,19 @@ cc_library(
 )
 
 cc_library(
+    name = "private_access",
+    hdrs = ["private_access.h"],
+    strip_include_prefix = "/src",
+    visibility = ["//visibility:private"],
+    deps = [],
+)
+
+cc_library(
     name = "string_block",
     hdrs = ["string_block.h"],
     strip_include_prefix = "/src",
     deps = [
-        ":arena_align",
+        ":memory_align",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/log:absl_check",
     ],
@@ -634,15 +644,18 @@ cc_library(
         "//src/google/protobuf:__subpackages__",
     ],
     deps = [
-        ":arena_align",
         ":arena_allocation_policy",
         ":arena_cleanup",
+        ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":port",
+        ":private_access",
         ":string_block",
         "//src/google/protobuf/stubs:lite",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/base:dynamic_annotations",
+        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/base:prefetch",
         "@abseil-cpp//absl/container:layout",
         "@abseil-cpp//absl/hash",
@@ -652,6 +665,7 @@ cc_library(
         "@abseil-cpp//absl/numeric:bits",
         "@abseil-cpp//absl/strings:str_format",
         "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )
@@ -663,7 +677,7 @@ cc_library(
     strip_include_prefix = "/src",
     deps = [
         ":arena",
-        ":arena_align",
+        ":memory_align",
         ":port",
         ":protobuf_lite",
         "@abseil-cpp//absl/base:config",
@@ -678,14 +692,16 @@ cc_test(
     srcs = ["micro_string_test.cc"],
     deps = [
         ":arena",
-        ":arena_align",
         ":cc_test_protos",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",
         ":protobuf_lite",
+        "//src/google/protobuf/testing:protobuf_test",
         "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
         "@abseil-cpp//absl/strings:str_format",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
@@ -730,10 +746,10 @@ cc_library(
         "inlined_string_field.cc",
         "map.cc",
         "message_lite.cc",
+        "metadata_lite.cc",
         "micro_string.cc",
         "offset_ptr.cc",
         "parse_context.cc",
-        "private_access.cc",
         "raw_ptr.cc",
         "repeated_field.cc",
         "repeated_ptr_field.cc",
@@ -794,12 +810,12 @@ cc_library(
     # In Bazel 6.0+, these will be `interface_deps`:
     deps = [
         ":arena",
-        ":arena_align",
         ":arena_allocation_policy",
         ":arena_cleanup",
         ":class_data",
         ":endian",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":port",
         ":string_block",
@@ -813,6 +829,7 @@ cc_library(
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/base:dynamic_annotations",
         "@abseil-cpp//absl/base:no_destructor",
+        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/base:prefetch",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/container:btree",
@@ -893,6 +910,7 @@ cc_library(
         "json_enumvalue_options.pb.cc",
         "map_field.cc",
         "message.cc",
+        "metadata.cc",
         "naming_style.cc",
         "option_interpreter.cc",
         "reflection_mode.cc",
@@ -914,6 +932,7 @@ cc_library(
     deps = [
         ":class_data",
         ":internal_visibility",
+        ":memory_align",
         ":message_traits",
         ":micro_string",
         ":port",
@@ -1892,7 +1911,11 @@ cc_library(
         "@abseil-cpp//absl/base:log_severity",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/functional:overload",
         "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/status:status_matchers",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
         "@abseil-cpp//absl/types:optional",
@@ -1932,8 +1955,8 @@ cc_test(
 )
 
 cc_test(
-    name = "arena_align_test",
-    srcs = ["arena_align_test.cc"],
+    name = "memory_align_test",
+    srcs = ["memory_align_test.cc"],
     copts = COPTS + select({
         "//build_defs:config_msvc": [],
         "//conditions:default": [
@@ -1941,7 +1964,7 @@ cc_test(
         ],
     }),
     deps = [
-        ":arena_align",
+        ":memory_align",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -1958,9 +1981,11 @@ cc_test(
     }),
     deps = [
         ":arena",
+        ":arena_allocation_policy",
         ":arena_cleanup",
         ":cc_test_protos",
         ":lite_test_util",
+        ":memory_align",
         ":port",
         ":protobuf",
         ":protobuf_lite",
@@ -2031,6 +2056,7 @@ cc_test(
         "//src/google/protobuf/testing",
         "//src/google/protobuf/testing:file",
         "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/strings",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -2384,6 +2410,8 @@ cc_test(
         "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/log:absl_log",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+        "@abseil-cpp//absl/strings:str_format",
         "@abseil-cpp//absl/types:optional",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
@@ -2524,6 +2552,8 @@ cc_test(
         "@abseil-cpp//absl/log:globals",
         "@abseil-cpp//absl/random",
         "@abseil-cpp//absl/random:distributions",
+        "@abseil-cpp//absl/status:status_matchers",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
         "@abseil-cpp//absl/time",

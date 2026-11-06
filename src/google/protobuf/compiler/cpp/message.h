@@ -92,6 +92,8 @@ class MessageGenerator {
 
   std::vector<const FieldDescriptor*> AllFields() const;
 
+  void GeneratePrivateHelpers(io::Printer* p);
+
   // Generate declarations and definitions of accessors for fields.
   void GenerateFieldAccessorDeclarations(io::Printer* p);
   void GenerateFieldAccessorPrivateHelpers(io::Printer* p);
@@ -135,7 +137,12 @@ class MessageGenerator {
   void GenerateMapEntryClassDefinition(io::Printer* p);
   void GenerateAnyMethodDefinition(io::Printer* p);
   void GenerateImplDefinition(io::Printer* p);
+  void GenerateSplitMembers(io::Printer* p);
+  void GenerateSplitMethods(io::Printer* p);
+  void GenerateSplitHelpers(io::Printer* p);
   void GenerateClassSpecificMergeImpl(io::Printer* p);
+  void GenerateMergeImplForField(io::Printer* p, const FieldDescriptor* field,
+                                 bool is_split, int cached_has_word_index);
   void GenerateCopyFrom(io::Printer* p);
   void GenerateSwap(io::Printer* p);
   void GenerateIsInitialized(io::Printer* p);
