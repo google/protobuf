@@ -76,6 +76,7 @@ constexpr Version::ParseTableT_ Version::_Internal::GenerateParseTable(const ::_
       4,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -107,9 +108,10 @@ constexpr Version::ParseTableT_ Version::_Internal::GenerateParseTable(const ::_
       {PROTOBUF_FIELD_OFFSET(Version, _impl_.patch_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional string suffix = 4;
       {PROTOBUF_FIELD_OFFSET(Version, _impl_.suffix_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
+    }}, {{
+      // no aux_entries
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -173,10 +175,13 @@ struct VersionGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(VersionGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(VersionGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOC_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const VersionGlobalsTypeInternal Version_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const VersionGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) Version_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class CodeGeneratorResponse_File::_Internal {
  public:
   using HasBits = decltype(::std::declval<CodeGeneratorResponse_File>()._impl_._has_bits_);
@@ -205,6 +210,7 @@ constexpr CodeGeneratorResponse_File::ParseTableT_ CodeGeneratorResponse_File::_
       4,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -236,11 +242,10 @@ constexpr CodeGeneratorResponse_File::ParseTableT_ CodeGeneratorResponse_File::_
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorResponse_File, _impl_.content_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
       // optional .google.protobuf.GeneratedCodeInfo generated_code_info = 16;
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorResponse_File, _impl_.generated_code_info_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvClassData)},
-    }},
-    {{
-        {::_pbi::FieldAuxClassData(), &::google::protobuf::GeneratedCodeInfo_globals_},
-    }},
-    {{
+    }}, {{
+      {::_pbi::FieldAuxClassData(), &::google::protobuf::GeneratedCodeInfo_globals_},
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -308,10 +313,13 @@ struct CodeGeneratorResponse_FileGlobalsTypeInternal : ::_pbi::MessageGlobalsBas
 };
 static_assert(PROTOBUF_FIELD_OFFSET(CodeGeneratorResponse_FileGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(CodeGeneratorResponse_FileGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOC_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorResponse_FileGlobalsTypeInternal CodeGeneratorResponse_File_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorResponse_FileGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) CodeGeneratorResponse_File_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class CodeGeneratorResponse::_Internal {
  public:
   using HasBits = decltype(::std::declval<CodeGeneratorResponse>()._impl_._has_bits_);
@@ -340,6 +348,7 @@ constexpr CodeGeneratorResponse::ParseTableT_ CodeGeneratorResponse::_Internal::
       5,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -380,11 +389,10 @@ constexpr CodeGeneratorResponse::ParseTableT_ CodeGeneratorResponse::_Internal::
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorResponse, _impl_.maximum_edition_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // repeated .google.protobuf.compiler.CodeGeneratorResponse.File file = 15;
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorResponse, _impl_.file_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvClassData)},
-    }},
-    {{
-        {::_pbi::FieldAuxClassData(), &::google::protobuf::compiler::CodeGeneratorResponse_File_globals_},
-    }},
-    {{
+    }}, {{
+      {::_pbi::FieldAuxClassData(), &::google::protobuf::compiler::CodeGeneratorResponse_File_globals_},
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -453,10 +461,13 @@ struct CodeGeneratorResponseGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(CodeGeneratorResponseGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(CodeGeneratorResponseGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOC_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorResponseGlobalsTypeInternal CodeGeneratorResponse_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorResponseGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) CodeGeneratorResponse_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 class CodeGeneratorRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<CodeGeneratorRequest>()._impl_._has_bits_);
@@ -485,6 +496,7 @@ constexpr CodeGeneratorRequest::ParseTableT_ CodeGeneratorRequest::_Internal::Ge
       5,  // num_field_entries
       3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
+      sizeof(ParseTableT_),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::MpUnknownFields,  // fallback
@@ -522,13 +534,12 @@ constexpr CodeGeneratorRequest::ParseTableT_ CodeGeneratorRequest::_Internal::Ge
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorRequest, _impl_.proto_file_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvClassData)},
       // repeated .google.protobuf.FileDescriptorProto source_file_descriptors = 17;
       {PROTOBUF_FIELD_OFFSET(CodeGeneratorRequest, _impl_.source_file_descriptors_), _Internal::kHasBitsOffset + 4, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvClassData)},
-    }},
-    {{
-        {::_pbi::FieldAuxClassData(), &::google::protobuf::compiler::Version_globals_},
-        {::_pbi::FieldAuxClassData(), &::google::protobuf::FileDescriptorProto_globals_},
-        {::_pbi::FieldAuxClassData(), &::google::protobuf::FileDescriptorProto_globals_},
-    }},
-    {{
+    }}, {{
+      {::_pbi::FieldAuxClassData(), &::google::protobuf::compiler::Version_globals_},
+      {::_pbi::FieldAuxClassData(), &::google::protobuf::FileDescriptorProto_globals_},
+      {::_pbi::FieldAuxClassData(), &::google::protobuf::FileDescriptorProto_globals_},
+    }}, {{
+      // no field_names
     }},
   };
 }
@@ -605,10 +616,13 @@ struct CodeGeneratorRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
 };
 static_assert(PROTOBUF_FIELD_OFFSET(CodeGeneratorRequestGlobalsTypeInternal, _default) ==
               ::_pbi::MessageGlobalsBase::OffsetToDefault());
+static_assert(alignof(CodeGeneratorRequestGlobalsTypeInternal) ==
+              ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOC_EXPORT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorRequestGlobalsTypeInternal CodeGeneratorRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CodeGeneratorRequestGlobalsTypeInternal
+        PROTOBUF_ALIGNAS(
+            ::_pbi::kClassDataAlignment) CodeGeneratorRequest_globals_ PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
@@ -1364,7 +1378,7 @@ void CodeGeneratorRequest::InternalSwap(CodeGeneratorRequest* PROTOBUF_RESTRICT 
 
 void CodeGeneratorResponse_File::clear_generated_code_info() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.generated_code_info_ != nullptr) _impl_.generated_code_info_->Clear();
+  if (auto* sub = _impl_.generated_code_info_) sub->Clear();
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 CodeGeneratorResponse_File::CodeGeneratorResponse_File(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)

@@ -55,6 +55,10 @@ typedef struct {
   PyObject* message_meta;            // We own a ref.
 } PyUpb_DescriptorBase;
 
+static PyObject* PyUpb_DescriptorBase_AsPyObj(PyUpb_DescriptorBase* base) {
+  return &base->ob_base;
+}
+
 PyObject* PyUpb_AnyDescriptor_GetPool(PyObject* desc) {
   PyUpb_DescriptorBase* base = (void*)desc;
   return base->pool;
@@ -282,7 +286,8 @@ static void PyUpb_DescriptorBase_Dealloc(PyUpb_DescriptorBase* base) {
   // methods) at any time. This also means we *must* stop GC from tracking
   // instances of them before we start destructing the object. In Python
   // 3.11, failing to do so would raise a runtime warning.
-  if (PyType_HasFeature(Py_TYPE(base), Py_TPFLAGS_HAVE_GC)) {
+  if (PyType_HasFeature(Py_TYPE(PyUpb_DescriptorBase_AsPyObj(base)),
+                        Py_TPFLAGS_HAVE_GC)) {
     PyObject_GC_UnTrack(base);
   }
   PyUpb_DescriptorPool_CacheEraseIfEqual(base->pool, base->def,
@@ -587,17 +592,8 @@ static PyObject* PyUpb_Descriptor_GetNestedTypesByName(PyObject* _self,
 
 static PyObject* PyUpb_Descriptor_GetContainingType(PyObject* _self,
                                                     void* closure) {
-  // upb does not natively store the lexical parent of a message type, but we
-  // can derive it with some string manipulation and a lookup.
   PyUpb_DescriptorBase* self = (void*)_self;
-  const upb_MessageDef* m = self->def;
-  const upb_FileDef* file = upb_MessageDef_File(m);
-  const upb_DefPool* symtab = upb_FileDef_Pool(file);
-  const char* full_name = upb_MessageDef_FullName(m);
-  const char* last_dot = strrchr(full_name, '.');
-  if (!last_dot) Py_RETURN_NONE;
-  const upb_MessageDef* parent = upb_DefPool_FindMessageByNameWithSize(
-      symtab, full_name, last_dot - full_name);
+  const upb_MessageDef* parent = upb_MessageDef_ContainingType(self->def);
   if (!parent) Py_RETURN_NONE;
   return PyUpb_Descriptor_Get(self->pool, parent);
 }

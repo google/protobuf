@@ -50,13 +50,25 @@ namespace google {
 namespace protobuf {
 class Api;
 struct ApiGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const ApiGlobalsTypeInternal Api_globals_;
+PROTOBUF_EXPORT extern const ApiGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Api_globals_;
 class Method;
 struct MethodGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const MethodGlobalsTypeInternal Method_globals_;
+PROTOBUF_EXPORT extern const MethodGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Method_globals_;
 class Mixin;
 struct MixinGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const MixinGlobalsTypeInternal Mixin_globals_;
+PROTOBUF_EXPORT extern const MixinGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Mixin_globals_;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Api_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Api>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Method_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Method>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Mixin_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Mixin>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -904,9 +916,10 @@ inline ::std::string* PROTOBUF_NULLABLE Api::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -917,9 +930,10 @@ inline void Api::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Api.name)
 }
@@ -1073,9 +1087,10 @@ inline ::std::string* PROTOBUF_NULLABLE Api::release_version() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.version_.Release();
+  auto& f = _impl_.version_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.version_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1086,9 +1101,10 @@ inline void Api::set_allocated_version(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
-  _impl_.version_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.version_.IsDefault()) {
-    _impl_.version_.Set("", *this);
+  auto& f = _impl_.version_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Api.version)
 }
@@ -1111,10 +1127,12 @@ inline const ::google::protobuf::SourceContext& Api::source_context() const ABSL
 inline void Api::unsafe_arena_set_allocated_source_context(
     ::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  auto*& sub = _impl_.source_context_;
   if (!::google::protobuf::internal::HasArena(*this)) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   } else {
@@ -1126,8 +1144,7 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Api::release_source_
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-  ::google::protobuf::SourceContext* released = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
+  auto* released = ::std::exchange(_impl_.source_context_, nullptr);
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
     released = ::google::protobuf::internal::DuplicateIfNonNull(released);
@@ -1146,17 +1163,16 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Api::unsafe_arena_re
   // @@protoc_insertion_point(field_release:google.protobuf.Api.source_context)
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-  ::google::protobuf::SourceContext* temp = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
-  return temp;
+  return ::std::exchange(_impl_.source_context_, nullptr);
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Api::_internal_mutable_source_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.source_context_ == nullptr) {
+  auto*& sub = _impl_.source_context_;
+  if (sub == nullptr) {
     auto* p = Super_::DefaultConstruct<::google::protobuf::SourceContext>(GetArena());
-    _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(p);
+    sub = p;
   }
-  return _impl_.source_context_;
+  return sub;
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Api::mutable_source_context()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1168,8 +1184,9 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Api::mutable_source_c
 inline void Api::set_allocated_source_context(::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
+  auto*& sub = _impl_.source_context_;
   if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
 
   if (value != nullptr) {
@@ -1182,7 +1199,7 @@ inline void Api::set_allocated_source_context(::google::protobuf::SourceContext*
     ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   }
 
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Api.source_context)
 }
 
@@ -1309,9 +1326,10 @@ inline ::std::string* PROTOBUF_NULLABLE Api::release_edition() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  auto* released = _impl_.edition_.Release();
+  auto& f = _impl_.edition_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.edition_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1322,9 +1340,10 @@ inline void Api::set_allocated_edition(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
-  _impl_.edition_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.edition_.IsDefault()) {
-    _impl_.edition_.Set("", *this);
+  auto& f = _impl_.edition_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Api.edition)
 }
@@ -1377,9 +1396,10 @@ inline ::std::string* PROTOBUF_NULLABLE Method::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1390,9 +1410,10 @@ inline void Method::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Method.name)
 }
@@ -1441,9 +1462,10 @@ inline ::std::string* PROTOBUF_NULLABLE Method::release_request_type_url() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.request_type_url_.Release();
+  auto& f = _impl_.request_type_url_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.request_type_url_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1454,9 +1476,10 @@ inline void Method::set_allocated_request_type_url(::std::string* PROTOBUF_NULLA
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.request_type_url_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_type_url_.IsDefault()) {
-    _impl_.request_type_url_.Set("", *this);
+  auto& f = _impl_.request_type_url_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Method.request_type_url)
 }
@@ -1529,9 +1552,10 @@ inline ::std::string* PROTOBUF_NULLABLE Method::release_response_type_url() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.response_type_url_.Release();
+  auto& f = _impl_.response_type_url_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.response_type_url_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1542,9 +1566,10 @@ inline void Method::set_allocated_response_type_url(::std::string* PROTOBUF_NULL
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
-  _impl_.response_type_url_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.response_type_url_.IsDefault()) {
-    _impl_.response_type_url_.Set("", *this);
+  auto& f = _impl_.response_type_url_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Method.response_type_url)
 }
@@ -1691,9 +1716,10 @@ inline ::std::string* PROTOBUF_NULLABLE Method::release_edition() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.edition_.Release();
+  auto& f = _impl_.edition_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.edition_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1704,9 +1730,10 @@ inline void Method::set_allocated_edition(::std::string* PROTOBUF_NULLABLE value
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
-  _impl_.edition_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.edition_.IsDefault()) {
-    _impl_.edition_.Set("", *this);
+  auto& f = _impl_.edition_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Method.edition)
 }
@@ -1759,9 +1786,10 @@ inline ::std::string* PROTOBUF_NULLABLE Mixin::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1772,9 +1800,10 @@ inline void Mixin::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Mixin.name)
 }
@@ -1823,9 +1852,10 @@ inline ::std::string* PROTOBUF_NULLABLE Mixin::release_root() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.root_.Release();
+  auto& f = _impl_.root_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.root_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1836,9 +1866,10 @@ inline void Mixin::set_allocated_root(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.root_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.root_.IsDefault()) {
-    _impl_.root_.Set("", *this);
+  auto& f = _impl_.root_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Mixin.root)
 }

@@ -2690,9 +2690,10 @@ class MapEntryMessageComparator {
         return first < second;
       }
       case FieldDescriptor::CPPTYPE_STRING: {
-        std::string first = reflection->GetString(*a, field_);
-        std::string second = reflection->GetString(*b, field_);
-        return first < second;
+        Reflection::ScratchSpace scratch_a;
+        Reflection::ScratchSpace scratch_b;
+        return reflection->GetStringView(*a, field_, scratch_a) <
+               reflection->GetStringView(*b, field_, scratch_b);
       }
       default:
         ABSL_DLOG(FATAL) << "Invalid key for map field.";
@@ -2747,14 +2748,14 @@ MapEntries MapFieldPrinterHelper::SortMap(const Message& message,
     const Descriptor* map_entry_desc = field->message_type();
     const Message* prototype =
         reflection->GetMessageFactory()->GetPrototype(map_entry_desc);
-    all_entries.reserve(reflection->MapSize(message, field));
-    owned_entries.reserve(reflection->MapSize(message, field));
-    for (ConstMapIterator iter = reflection->ConstMapBegin(&message, field);
-         iter != reflection->ConstMapEnd(&message, field); ++iter) {
+    auto map = *reflection->GetMap(message, field);
+    all_entries.reserve(map.size());
+    owned_entries.reserve(map.size());
+    for (auto entry : map) {
       std::unique_ptr<Message> map_entry_message =
           absl::WrapUnique(prototype->New());
-      CopyKey(iter.GetKey(), map_entry_message.get(), map_entry_desc->field(0));
-      CopyValue(iter.GetValueRef(), map_entry_message.get(),
+      CopyKey(entry.key(), map_entry_message.get(), map_entry_desc->field(0));
+      CopyValue(entry.value(), map_entry_message.get(),
                 map_entry_desc->field(1));
       all_entries.push_back(map_entry_message.get());
       owned_entries.push_back(std::move(map_entry_message));

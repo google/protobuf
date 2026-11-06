@@ -1,4 +1,4 @@
-// Protocol Buffers - Google's data interrdchange format
+// Protocol Buffers - Google's data interchange format
 // Copyright 2023 Google LLC.  All rights reserved.
 //
 // Use of this source code is governed by a BSD-style
@@ -31,6 +31,7 @@
 #include "upb_generator/common.h"
 #include "upb_generator/common/names.h"
 #include "upb_generator/file_layout.h"
+#include "upb_generator/minitable/layout_comment.h"
 #include "upb_generator/minitable/names.h"
 #include "upb_generator/minitable/names_internal.h"
 
@@ -193,6 +194,11 @@ void WriteMessage(upb::MessageDefPtr message, const DefPoolPair& pools,
 
   std::string struct_name = MessageVarName(message) + "_Fields";
 
+  if (!options.bootstrap && !options.strip_nonfunctional_codegen &&
+      !message.mapentry()) {
+    output("$0\n", MessageLayoutComment(pools, message));
+  }
+
   if (field_count > 0) {
     // Create a custom struct for the fields/subs, with arrays that are
     // precisely the right size
@@ -224,8 +230,20 @@ void WriteMessage(upb::MessageDefPtr message, const DefPoolPair& pools,
     output("}};\n\n");
   }
 
+  // The fasttable is only used on 64-bit platforms, so it is built from the
+  // 64-bit MiniTable. That table is only linked when the generator runs on a
+  // 64-bit host, so map fields are identified from the defs instead.
+  std::vector<const upb_MiniTable*> map_entries(field_count, nullptr);
+  for (int i = 0; i < field_count; i++) {
+    upb::FieldDefPtr field = message.FindFieldByNumber(
+        upb_MiniTableField_Number(&mt_64->UPB_PRIVATE(fields)[i]));
+    if (field.IsMap()) {
+      map_entries[i] = pools.GetMiniTable64(field.message_type());
+    }
+  }
   upb_DecodeFast_TableEntry table_entries[32];
-  int table_size = upb_DecodeFast_BuildTable(mt_64, table_entries);
+  int table_size =
+      upb_DecodeFast_BuildTable(mt_64, map_entries.data(), table_entries);
   uint8_t table_mask = upb_DecodeFast_GetTableMask(table_size);
 
   std::string msgext = "kUpb_ExtMode_NonExtendable";

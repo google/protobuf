@@ -166,6 +166,63 @@ TEST_P(MiniTableTest, AllScalarTypesOneof) {
   EXPECT_EQ(0, table->UPB_PRIVATE(required_count));
 }
 
+// All fields share oneof storage so the field index boundary is independent
+// of the message size and presence bit limits.
+TEST_P(MiniTableTest, OneofFieldIndexLargestAccepted) {
+  upb::Arena arena;
+  upb::MtDataEncoder e;
+  ASSERT_TRUE(e.StartMessage(0));
+  constexpr uint32_t kFieldCount = UINT16_MAX - 3;
+  for (uint32_t i = 1; i <= kFieldCount; ++i) {
+    ASSERT_TRUE(e.PutField(kUpb_FieldType_Bool, i, 0));
+  }
+  ASSERT_TRUE(e.StartOneof());
+  for (uint32_t i = 1; i <= kFieldCount; ++i) {
+    ASSERT_TRUE(e.PutOneofField(i));
+  }
+  upb::Status status;
+  upb_MiniTable* table = _upb_MiniTable_Build(
+      e.data().data(), e.data().size(), GetParam(), arena.ptr(), status.ptr());
+  ASSERT_NE(nullptr, table) << status.error_message();
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(static_cast<int>(kFieldCount), upb_MiniTable_FieldCount(table));
+  const upb_MiniTableField* first = upb_MiniTable_GetFieldByIndex(table, 0);
+  const upb_MiniTableField* last =
+      upb_MiniTable_GetFieldByIndex(table, kFieldCount - 1);
+  EXPECT_TRUE(upb_MiniTableField_IsInOneof(first));
+  EXPECT_TRUE(upb_MiniTableField_IsInOneof(last));
+  EXPECT_EQ(first->UPB_PRIVATE(offset), last->UPB_PRIVATE(offset));
+  EXPECT_EQ(first->presence, last->presence);
+}
+
+TEST_P(MiniTableTest, OneofFieldIndexOutOfRange) {
+  // A field index plus kOneofBase must remain below the uint16_t sentinel.
+  for (uint32_t field_count = UINT16_MAX - 2; field_count <= UINT16_MAX;
+       ++field_count) {
+    upb::Arena arena;
+    upb::MtDataEncoder e;
+    ASSERT_TRUE(e.StartMessage(0));
+    for (uint32_t i = 1; i <= field_count; ++i) {
+      ASSERT_TRUE(e.PutField(kUpb_FieldType_Bool, i, 0));
+    }
+    ASSERT_TRUE(e.StartOneof());
+    // Put this case's final index first to exercise each rejected value.
+    ASSERT_TRUE(e.PutOneofField(field_count));
+    for (uint32_t i = 1; i < field_count; ++i) {
+      ASSERT_TRUE(e.PutOneofField(i));
+    }
+    upb::Status status;
+    upb_MiniTable* table =
+        _upb_MiniTable_Build(e.data().data(), e.data().size(), GetParam(),
+                             arena.ptr(), status.ptr());
+    EXPECT_EQ(nullptr, table);
+    EXPECT_FALSE(status.ok());
+    EXPECT_NE(std::string_view::npos,
+              std::string_view(status.error_message())
+                  .find("Too many fields for oneof layout"));
+  }
+}
+
 TEST_P(MiniTableTest, FieldCountOverflow) {
   upb::Arena arena;
   upb::MtDataEncoder e;
@@ -455,4 +512,24 @@ TEST(MiniTableTest, ExtensionSubOffsetIsPlatformSpecific) {
       ext->UPB_PRIVATE(field).UPB_PRIVATE(submsg_ofs) * kUpb_SubmsgOffsetBytes);
   EXPECT_EQ(actual, sizeof(upb_MiniTableExtension));
   EXPECT_EQ(upb_MiniTableExtension_GetSubMessage(ext), extendee);
+}
+
+// MiniDescriptors for an int32->int32 map entry, without and with the
+// extendable message modifier ('P'). The map encoder never emits a modifier,
+// but the map parser shares the message parser, which accepts one.
+constexpr std::string_view kMapEntry = "%((";
+constexpr std::string_view kExtendableMapEntry = "%P((";
+
+TEST(MiniTableTest, MapEntryCannotBeExtendable) {
+  upb::Arena arena;
+  upb::Status status;
+  EXPECT_NE(nullptr, upb_MiniTable_Build(kMapEntry.data(), kMapEntry.size(),
+                                         arena.ptr(), status.ptr()))
+      << status.error_message();
+
+  status.Clear();
+  EXPECT_EQ(nullptr, upb_MiniTable_Build(kExtendableMapEntry.data(),
+                                         kExtendableMapEntry.size(),
+                                         arena.ptr(), status.ptr()));
+  EXPECT_FALSE(status.ok());
 }

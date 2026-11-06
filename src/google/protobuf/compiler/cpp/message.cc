@@ -275,7 +275,7 @@ void EmitNonDefaultCheckForString(io::Printer* p, absl::string_view prefix,
       R"cc(
         if ($condition$) {
           $emit_body$;
-        } else if ($this_field$.IsDefault()) {
+        } else if (this_.$field_$.IsDefault()) {
           this_._internal_set_$name$("");
         }
       )cc");
@@ -435,92 +435,6 @@ bool HasNonSplitOptionalString(const Descriptor* desc, const Options& options) {
   return false;
 }
 
-// Calculates the expected number of branch checks executed for a chunk of
-// `size` fields, where `p_none` is the probability that none of the fields
-// are present.
-//
-// For a single field (`size <= 1`), 1 branch is evaluated for its individual
-// presence check. For `size > 1`, 1 branch is evaluated for the batch presence
-// check, plus `size` subsequent individual branch checks evaluated when the
-// batch check succeeds (with probability `p_any`).
-double ExpectedNumberOfBranchesTaken(size_t size, double p_none) {
-  if (size <= 1) return 1.0;
-
-  double p_any = 1.0 - p_none;
-  return 1.0 + size * p_any;
-}
-
-double GetAbsenceProbability(const FieldDescriptor* field,
-                             const Options& options) {
-  // The default value of 0.0 is chosen for two reasons:
-  // 1. We batch in other generated methods when the PdProto data isn't
-  // available and the value of 0.0f promotes batching.
-  // 2. It has shown the best performance in the protogen_micro benchmark when
-  // compared do 1.0f and 0.5f.
-  return 1.0 - GetPresenceProbability(field, options).value_or(0.0f);
-}
-
-FieldChunk ChunkWithFields(const FieldChunk& chunk,
-                           std::vector<const FieldDescriptor*> fields) {
-  FieldChunk res(chunk.has_hasbit);
-  res.fields = std::move(fields);
-  return res;
-}
-
-const FieldChunk* GetPartitionableChunk(const FieldChunk& chunk) {
-  return chunk.has_hasbit ? &chunk : nullptr;
-}
-
-// Greedily partitions the fields sharing a hasbit word into batches to
-// minimize the expected number of branch checks executed.
-template <typename Chunk>
-std::vector<Chunk> PartitionToMinimizeExpectedBranches(const Chunk& chunk,
-                                                       const Options& options) {
-  std::vector<Chunk> result;
-  if (chunk.fields.empty()) return result;
-
-  result.push_back(ChunkWithFields(chunk, {chunk.fields.front()}));
-  double p_none = GetAbsenceProbability(chunk.fields.front(), options);
-
-  for (size_t i = 1; i < chunk.fields.size(); ++i) {
-    const FieldDescriptor* field = chunk.fields[i];
-    double current_cost =
-        ExpectedNumberOfBranchesTaken(result.back().fields.size(), p_none);
-    double p_field_absent = GetAbsenceProbability(field, options);
-    double new_absent = p_none * p_field_absent;
-    double extended_cost = ExpectedNumberOfBranchesTaken(
-        result.back().fields.size() + 1, new_absent);
-
-    // If adding this field to the current batch has a higher expected branches
-    // cost than if the field were alone, start a new chunk.
-    if (extended_cost > current_cost + 1.0) {
-      result.push_back(ChunkWithFields(chunk, {field}));
-      p_none = p_field_absent;
-    } else {
-      result.back().fields.push_back(field);
-      p_none = new_absent;
-    }
-  }
-  return result;
-}
-
-template <typename Chunk>
-std::vector<Chunk> PartitionToMinimizeExpectedBranches(
-    std::vector<Chunk> chunks, const Options& options) {
-  std::vector<Chunk> result;
-
-  for (Chunk& chunk : chunks) {
-    const auto* partitionable = GetPartitionableChunk(chunk);
-    if (partitionable != nullptr && partitionable->fields.size() > 1) {
-      absl::c_move(PartitionToMinimizeExpectedBranches(*partitionable, options),
-                   std::back_inserter(result));
-    } else {
-      result.push_back(std::move(chunk));
-    }
-  }
-
-  return result;
-}
 
 using Sub = ::google::protobuf::io::Printer::Sub;
 std::vector<Sub> ClassVars(const Descriptor* desc, Options opts) {
@@ -737,7 +651,7 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 typename = typename _proto_TypeTraits::Singular>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+      [[nodiscard]] inline bool HasExtension(
           const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
                                            _field_type, _is_packed>& id) const {
         $WeakDescriptorSelfPin$;
@@ -758,7 +672,7 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 typename = typename _proto_TypeTraits::Repeated>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+      [[nodiscard]] inline int ExtensionSize(
           const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
                                            _field_type, _is_packed>& id) const {
         $WeakDescriptorSelfPin$;
@@ -769,11 +683,10 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline
-          typename _proto_TypeTraits::Singular::ConstType
-          GetExtension(const $pbi$::ExtensionIdentifier<
-                       $Msg$, _proto_TypeTraits, _field_type, _is_packed>& id)
-              const {
+      [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+      GetExtension(
+          const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
+                                           _field_type, _is_packed>& id) const {
         $WeakDescriptorSelfPin$;
         $annotate_extension_get$;
         return _proto_TypeTraits::Get(id.number(), $extensions$, id.default_value());
@@ -782,11 +695,10 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline
-          typename _proto_TypeTraits::Singular::ConstType
-          GetExtension(const $pbi$::ExtensionIdentifier<
-                       $Msg$, _proto_TypeTraits, _field_type, _is_packed>& id)
-              const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+      [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+      GetExtension(const $pbi$::ExtensionIdentifier<
+                   $Msg$, _proto_TypeTraits, _field_type, _is_packed>& id) const
+          ABSL_ATTRIBUTE_LIFETIME_BOUND {
         $WeakDescriptorSelfPin$;
         $annotate_extension_get$;
         return _proto_TypeTraits::Get(*this, id.number(), $extensions$,
@@ -863,12 +775,10 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline
-          typename _proto_TypeTraits::Repeated::ConstType
-          GetExtension(
-              const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
-                                               _field_type, _is_packed>& id,
-              int index) const {
+      [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+      GetExtension(const $pbi$::ExtensionIdentifier<
+                       $Msg$, _proto_TypeTraits, _field_type, _is_packed>& id,
+                   int index) const {
         $WeakDescriptorSelfPin$;
         $annotate_repeated_extension_get$;
         return _proto_TypeTraits::Get(id.number(), $extensions$, index);
@@ -877,12 +787,10 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed,
                 ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline
-          typename _proto_TypeTraits::Repeated::ConstType
-          GetExtension(
-              const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
-                                               _field_type, _is_packed>& id,
-              int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+      [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+      GetExtension(const $pbi$::ExtensionIdentifier<
+                       $Msg$, _proto_TypeTraits, _field_type, _is_packed>& id,
+                   int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
         $WeakDescriptorSelfPin$;
         $annotate_repeated_extension_get$;
         return _proto_TypeTraits::Get(id.number(), $extensions$, index);
@@ -938,8 +846,8 @@ void MessageGenerator::GenerateFieldAccessorDeclarations(io::Printer* p) {
 
       template <typename _proto_TypeTraits, $pbi$::FieldType _field_type,
                 bool _is_packed>
-      PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-          Repeated::RepeatedFieldType&
+      [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+          RepeatedFieldType&
           GetRepeatedExtension(
               const $pbi$::ExtensionIdentifier<$Msg$, _proto_TypeTraits,
                                                _field_type, _is_packed>& id)
@@ -1043,7 +951,7 @@ void MessageGenerator::GenerateSingularFieldHasBits(
         {Sub{"ASSUME",
              [&] {
                if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
-                   !IsLazy(field, options_)) {
+                   !ShouldSplit(field, options_) && !IsLazy(field, options_)) {
                  // We maintain the invariant that for a submessage x, has_x()
                  // returning true implies that x_ is not null. By giving this
                  // information to the compiler, we allow it to eliminate
@@ -1137,13 +1045,6 @@ void MessageGenerator::GenerateFieldClear(const FieldDescriptor* field,
                       }
                     )cc");
               } else {
-                // TODO: figure out if early return breaks tracking
-                if (ShouldSplit(field, options_)) {
-                  p->Emit(R"cc(
-                    if (ABSL_PREDICT_TRUE(IsSplitMessageDefault()))
-                      return;
-                  )cc");
-                }
                 field_generators_.get(field).GenerateClearingCode(p);
                 if (HasHasbit(field, options_)) {
                   auto v = p->WithVars(HasBitVars(field));
@@ -1427,6 +1328,27 @@ void MessageGenerator::GenerateMapEntryClassDefinition(io::Printer* p) {
       )cc");
 }
 
+void MessageGenerator::GenerateSplitMembers(io::Printer* p) {
+  if (!ShouldSplit(descriptor_, options_)) return;
+  p->Emit({{"split_field",
+            [&] {
+              for (auto field : field_layout_.optimized_order()) {
+                if (!ShouldSplit(field, options_)) continue;
+                field_generators_.get(field).GeneratePrivateMembers(p);
+              }
+            }}},
+          R"cc(
+            struct Split {
+              $split_field$;
+              using InternalArenaConstructable_ = void;
+              using DestructorSkippable_ = void;
+            };
+            static_assert(::std::is_trivially_copy_constructible<Split>::value);
+            static_assert(::std::is_trivially_destructible<Split>::value);
+            Split* $nonnull$ _split_;
+          )cc");
+}
+
 void MessageGenerator::GenerateImplDefinition(io::Printer* p) {
   if (HasSimpleBaseClass(descriptor_, options_)) return;
   // Prepare decls for _cached_size_ and _has_bits_.  Their position in the
@@ -1493,27 +1415,7 @@ void MessageGenerator::GenerateImplDefinition(io::Printer* p) {
             }
           }
         }},
-       {"decl_split",
-        [&] {
-          if (!ShouldSplit(descriptor_, options_)) return;
-          p->Emit({{"split_field",
-                    [&] {
-                      for (auto field : field_layout_.optimized_order()) {
-                        if (!ShouldSplit(field, options_)) continue;
-                        field_generators_.get(field).GeneratePrivateMembers(p);
-                      }
-                    }}},
-                  R"cc(
-                    struct Split {
-                      $split_field$;
-                      using InternalArenaConstructable_ = void;
-                      using DestructorSkippable_ = void;
-                    };
-                    static_assert(::std::is_trivially_copy_constructible<Split>::value);
-                    static_assert(::std::is_trivially_destructible<Split>::value);
-                    Split* $nonnull$ _split_;
-                  )cc");
-        }},
+       {"decl_split", [&] { GenerateSplitMembers(p); }},
        {"oneof_members",
         [&] {
           // For each oneof generate a union
@@ -1704,6 +1606,34 @@ void MessageGenerator::GenerateAnyMethodDefinition(io::Printer* p) {
       )cc");
 }
 
+void MessageGenerator::GenerateSplitMethods(io::Printer* p) {
+  if (!ShouldSplit(descriptor_, options_)) return;
+  p->Emit({{"split_default", SplitDefaultInstanceName(descriptor_, options_)}},
+          R"cc(
+            inline bool IsSplitMessageDefault() const {
+              return $split$ == reinterpret_cast<const Impl_::Split*>(&$split_default$);
+            }
+            PROTOBUF_NOINLINE void PrepareSplitMessageForWrite();
+
+            template <typename Address>
+            PROTOBUF_ALWAYS_INLINE decltype(auto) GetSplitField_(
+                Address address) const {
+              return Super_::GetSplitField(*this, address);
+            }
+
+            template <typename Address>
+            PROTOBUF_ALWAYS_INLINE auto* PROTOBUF_NULLABLE
+            TryMutableSplitField_(Address address) {
+              return Super_::TryMutableSplitField(*this, address);
+            }
+
+            template <typename Address>
+            PROTOBUF_ALWAYS_INLINE auto& MutableSplitField_(Address address) {
+              return Super_::MutableSplitField(*this, address);
+            }
+          )cc");
+}
+
 void MessageGenerator::GeneratePrivateHelpers(io::Printer* p) {
   p->Emit(
       {
@@ -1761,18 +1691,7 @@ void MessageGenerator::GeneratePrivateHelpers(io::Printer* p) {
                void InternalSwap($Msg$* $nonnull$ other);
              )cc");
            }},
-          {"decl_split_methods",
-           [&] {
-             if (!ShouldSplit(descriptor_, options_)) return;
-             p->Emit({{"split_default",
-                       SplitDefaultInstanceName(descriptor_, options_)}},
-                     R"cc(
-                       inline bool IsSplitMessageDefault() const {
-                         return $split$ == reinterpret_cast<const Impl_::Split*>(&$split_default$);
-                       }
-                       PROTOBUF_NOINLINE void PrepareSplitMessageForWrite();
-                     )cc");
-           }},
+          {"decl_split_methods", [&] { GenerateSplitMethods(p); }},
           {"decl_field_accessors_private_helpers",
            [&] {
              // Generate private helper methods for all fields.
@@ -3316,15 +3235,15 @@ void MessageGenerator::EmitClearChunks(io::Printer* p, bool is_split) {
   // TODO:  Let the CppFieldGenerator decide this somehow.
   const auto emit_memset = [&](const FieldDescriptor* start,
                                const FieldDescriptor* end) {
+    auto v = p->WithVars(FieldVars(start, options_));
     p->Emit(
         {
             {"Impl", is_split ? "Impl_::Split" : "Impl_"},
-            {"start", FieldMemberName(start, is_split)},
             {"start_field", FieldName(start)},
             {"end_field", FieldName(end)},
         },
         R"cc(
-          ::memset(&this_.$start$, 0,
+          ::memset(&$this_mutable_field$, 0,
                    PROTOBUF_FIELD_OFFSET($Impl$, $end_field$_) -
                        PROTOBUF_FIELD_OFFSET($Impl$, $start_field$_) +
                        sizeof($Impl$::$end_field$_));
@@ -3890,13 +3809,6 @@ void MessageGenerator::GenerateMergeImplForField(io::Printer* p,
                                                  const FieldDescriptor* field,
                                                  bool is_split,
                                                  int cached_has_word_index) {
-  const auto prepare_split = [&] {
-    if (is_split) {
-      p->Emit(R"cc(
-        this_.PrepareSplitMessageForWrite();
-      )cc");
-    }
-  };
   const auto& generator = field_generators_.get(field);
 
   auto field_vars = p->WithVars(FieldVars(field, options_));
@@ -3907,10 +3819,7 @@ void MessageGenerator::GenerateMergeImplForField(io::Printer* p,
     MayEmitMutableIfNonDefaultCheck(
         p, "from.", field, is_split, options_,
         /*emit_body=*/
-        [&]() {
-          prepare_split();
-          generator.GenerateMergingCode(p);
-        },
+        [&]() { generator.GenerateMergingCode(p); },
         /*with_enclosing_braces_always=*/true);
   } else {
     // Check hasbit, using cached bits.
@@ -3921,7 +3830,6 @@ void MessageGenerator::GenerateMergeImplForField(io::Printer* p,
                                has_bit_index, field, options_)},
              {"merge_field",
               [&] {
-                prepare_split();
                 if (GetFieldHasbitMode(field, options_) ==
                     HasbitMode::kHintHasbit) {
                   // Merge semantics without true field presence: primitive
@@ -5236,6 +5144,58 @@ void MessageGenerator::GenerateIsInitialized(io::Printer* p) {
 }
 
 
+void MessageGenerator::GenerateSplitHelpers(io::Printer* p) {
+  if (!ShouldSplit(descriptor_, options_)) return;
+
+  const auto get_arena_merge = [&] {
+    if (RequiresArena(GeneratorFunction::kMergeFrom,
+                      /* is_split= */ true)) {
+      p->Emit(R"cc(
+        $pb$::Arena* arena = this_.GetArena();
+      )cc");
+    }
+  };
+
+  p->Emit({{"destroy_fields",
+            [&] {
+              for (const auto* field : field_layout_.optimized_order()) {
+                if (!ShouldSplit(field, options_)) continue;
+                field_generators_.get(field).GenerateDestructorCode(p);
+              }
+            }},
+           {"get_arena_merge", get_arena_merge},
+           {"merge_fields", [&] { EmitMergeChunks(p, /* is_split= */ true); }},
+           {"clear_fields", [&] { EmitClearChunks(p, /* is_split= */ true); }},
+           {"byte_size_fields",
+            [&] { EmitByteSizeChunks(p, /* is_split= */ true); }}},
+          R"cc(
+            PROTOBUF_NOINLINE static void DestroySplit($Msg$& this_) {
+              auto* const $cached_split_ptr$ = this_._impl_._split_;
+              $destroy_fields$;
+              delete $cached_split_ptr$;
+            }
+            PROTOBUF_NOINLINE static void MergeSplit($Msg$& this_, const $Msg$& from) {
+              auto* const from_cached_split_ptr = from._impl_._split_;
+              $get_arena_merge$;
+              ::uint32_t cached_has_bits [[maybe_unused]] = 0;
+              $merge_fields$;
+            }
+            PROTOBUF_NOINLINE static void ClearSplit($Msg$& this_) {
+              auto* const $cached_split_ptr$ = this_._impl_._split_;
+              ::uint32_t cached_has_bits [[maybe_unused]] = 0;
+              $clear_fields$;
+            }
+
+            PROTOBUF_NOINLINE static ::size_t ByteSizeSplit(const $Msg$& this_) {
+              auto* const $cached_split_ptr$ [[maybe_unused]] = this_._impl_._split_;
+              ::size_t total_size = 0;
+              ::uint32_t cached_has_bits [[maybe_unused]] = 0;
+              $byte_size_fields$;
+              return total_size;
+            }
+          )cc");
+}
+
 void MessageGenerator::GenerateSourceDefaultInstance(io::Printer* p) {
   if (!ShouldGenerateClass(descriptor_, options_)) return;
 
@@ -5280,57 +5240,7 @@ void MessageGenerator::GenerateSourceDefaultInstance(io::Printer* p) {
                   }
                 )cc");
           }},
-         {"split",
-          [&] {
-            if (!ShouldSplit(descriptor_, options_)) return;
-
-            p->Emit(
-                {{"destroy_fields",
-                  [&] {
-                    for (const auto* field : field_layout_.optimized_order()) {
-                      if (!ShouldSplit(field, options_)) continue;
-                      field_generators_.get(field).GenerateDestructorCode(p);
-                    }
-                  }},
-                 {"get_arena_merge",
-                  [&] {
-                    if (RequiresArena(GeneratorFunction::kMergeFrom,
-                                      /* is_split= */ true)) {
-                      p->Emit(R"cc(
-                        $pb$::Arena* arena = this_.GetArena();
-                      )cc");
-                    }
-                  }},
-                 {"merge_fields",
-                  [&] { EmitMergeChunks(p, /* is_split= */ true); }},
-                 {"clear_fields",
-                  [&] { EmitClearChunks(p, /* is_split= */ true); }},
-                 {"byte_size_fields",
-                  [&] { EmitByteSizeChunks(p, /* is_split= */ true); }}},
-                R"cc(
-                  PROTOBUF_NOINLINE static void DestroySplit($Msg$& this_) {
-                    auto* const $cached_split_ptr$ = this_._impl_._split_;
-                    $destroy_fields$;
-                    delete $cached_split_ptr$;
-                  }
-                  PROTOBUF_NOINLINE static void MergeSplit($Msg$& this_, const $Msg$& from) {
-                    $get_arena_merge$;
-                    ::uint32_t cached_has_bits [[maybe_unused]] = 0;
-                    $merge_fields$;
-                  }
-                  PROTOBUF_NOINLINE static void ClearSplit($Msg$& this_) {
-                    ::uint32_t cached_has_bits [[maybe_unused]] = 0;
-                    $clear_fields$;
-                  }
-
-                  PROTOBUF_NOINLINE static ::size_t ByteSizeSplit(const $Msg$& this_) {
-                    ::size_t total_size = 0;
-                    ::uint32_t cached_has_bits [[maybe_unused]] = 0;
-                    $byte_size_fields$;
-                    return total_size;
-                  }
-                )cc");
-          }}},
+         {"split", [&] { GenerateSplitHelpers(p); }}},
         R"cc(
           class $Msg$::_Internal {
            public:
@@ -5455,8 +5365,8 @@ void MessageGenerator::GenerateSourceDefaultInstance(io::Printer* p) {
            [&] {
              if (!use_implicit_weak_descriptor) return;
              p->Emit({{"index", index_in_file_messages_}}, R"cc(
-               ::_pbi::WeakDescriptorDefaultTail tail = {
-                   file_message_globals + $index$, sizeof($globals_type$)};
+               ::_pbi::WeakDescriptorDefaultTail tail = {file_message_globals +
+                                                         $index$};
              )cc");
            }},
           Sub({"SECTION",
@@ -5508,10 +5418,13 @@ void MessageGenerator::GenerateSourceDefaultInstance(io::Printer* p) {
         };
         static_assert(PROTOBUF_FIELD_OFFSET($globals_type$, _default) ==
                       ::_pbi::MessageGlobalsBase::OffsetToDefault());
+        static_assert(alignof($globals_type$) ==
+                      ::_pbi::MessageGlobalsBase::kMessageGlobalsAlignment);
 
         PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT$ dllexport_decl$
-            PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 $const $$globals_type$ $globals$
-                $SECTION$;
+            PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 $const $$globals_type$
+                PROTOBUF_ALIGNAS(
+                    ::_pbi::kClassDataAlignment) $globals$ $SECTION$;
       )cc");
 
   if (options_.lite_implicit_weak_fields) {

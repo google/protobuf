@@ -57,19 +57,24 @@ enum Syntax : int;
 PROTOBUF_EXPORT extern const uint32_t Syntax_internal_data_[];
 class Enum;
 struct EnumGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const EnumGlobalsTypeInternal Enum_globals_;
+PROTOBUF_EXPORT extern const EnumGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Enum_globals_;
 class EnumValue;
 struct EnumValueGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const EnumValueGlobalsTypeInternal EnumValue_globals_;
+PROTOBUF_EXPORT extern const EnumValueGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumValue_globals_;
 class Field;
 struct FieldGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const FieldGlobalsTypeInternal Field_globals_;
+PROTOBUF_EXPORT extern const FieldGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Field_globals_;
 class Option;
 struct OptionGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const OptionGlobalsTypeInternal Option_globals_;
+PROTOBUF_EXPORT extern const OptionGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Option_globals_;
 class Type;
 struct TypeGlobalsTypeInternal;
-PROTOBUF_EXPORT extern const TypeGlobalsTypeInternal Type_globals_;
+PROTOBUF_EXPORT extern const TypeGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) Type_globals_;
 template <>
 internal::EnumTraitsT<::google::protobuf::Field_Cardinality_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::Field_Cardinality>;
@@ -79,6 +84,21 @@ internal::EnumTraitsT<::google::protobuf::Field_Kind_internal_data_>
 template <>
 internal::EnumTraitsT<::google::protobuf::Syntax_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::Syntax>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Enum_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Enum>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumValue_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumValue>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Field_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Field>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Option_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Option>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::Type_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::Type>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -1617,9 +1637,10 @@ inline ::std::string* PROTOBUF_NULLABLE Type::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1630,9 +1651,10 @@ inline void Type::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Type.name)
 }
@@ -1837,10 +1859,12 @@ inline const ::google::protobuf::SourceContext& Type::source_context() const ABS
 inline void Type::unsafe_arena_set_allocated_source_context(
     ::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  auto*& sub = _impl_.source_context_;
   if (!::google::protobuf::internal::HasArena(*this)) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
@@ -1852,8 +1876,7 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Type::release_source
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  ::google::protobuf::SourceContext* released = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
+  auto* released = ::std::exchange(_impl_.source_context_, nullptr);
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
     released = ::google::protobuf::internal::DuplicateIfNonNull(released);
@@ -1872,17 +1895,16 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Type::unsafe_arena_r
   // @@protoc_insertion_point(field_release:google.protobuf.Type.source_context)
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-  ::google::protobuf::SourceContext* temp = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
-  return temp;
+  return ::std::exchange(_impl_.source_context_, nullptr);
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Type::_internal_mutable_source_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.source_context_ == nullptr) {
+  auto*& sub = _impl_.source_context_;
+  if (sub == nullptr) {
     auto* p = Super_::DefaultConstruct<::google::protobuf::SourceContext>(GetArena());
-    _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(p);
+    sub = p;
   }
-  return _impl_.source_context_;
+  return sub;
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Type::mutable_source_context()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1894,8 +1916,9 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Type::mutable_source_
 inline void Type::set_allocated_source_context(::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
+  auto*& sub = _impl_.source_context_;
   if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
 
   if (value != nullptr) {
@@ -1908,7 +1931,7 @@ inline void Type::set_allocated_source_context(::google::protobuf::SourceContext
     ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
 
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Type.source_context)
 }
 
@@ -1980,9 +2003,10 @@ inline ::std::string* PROTOBUF_NULLABLE Type::release_edition() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.edition_.Release();
+  auto& f = _impl_.edition_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.edition_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -1993,9 +2017,10 @@ inline void Type::set_allocated_edition(::std::string* PROTOBUF_NULLABLE value) 
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
-  _impl_.edition_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.edition_.IsDefault()) {
-    _impl_.edition_.Set("", *this);
+  auto& f = _impl_.edition_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Type.edition)
 }
@@ -2120,9 +2145,10 @@ inline ::std::string* PROTOBUF_NULLABLE Field::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2133,9 +2159,10 @@ inline void Field::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Field.name)
 }
@@ -2184,9 +2211,10 @@ inline ::std::string* PROTOBUF_NULLABLE Field::release_type_url() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.type_url_.Release();
+  auto& f = _impl_.type_url_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.type_url_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2197,9 +2225,10 @@ inline void Field::set_allocated_type_url(::std::string* PROTOBUF_NULLABLE value
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.type_url_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.type_url_.IsDefault()) {
-    _impl_.type_url_.Set("", *this);
+  auto& f = _impl_.type_url_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Field.type_url)
 }
@@ -2351,9 +2380,10 @@ inline ::std::string* PROTOBUF_NULLABLE Field::release_json_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.json_name_.Release();
+  auto& f = _impl_.json_name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.json_name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2364,9 +2394,10 @@ inline void Field::set_allocated_json_name(::std::string* PROTOBUF_NULLABLE valu
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
-  _impl_.json_name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.json_name_.IsDefault()) {
-    _impl_.json_name_.Set("", *this);
+  auto& f = _impl_.json_name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Field.json_name)
 }
@@ -2415,9 +2446,10 @@ inline ::std::string* PROTOBUF_NULLABLE Field::release_default_value() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.default_value_.Release();
+  auto& f = _impl_.default_value_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.default_value_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2428,9 +2460,10 @@ inline void Field::set_allocated_default_value(::std::string* PROTOBUF_NULLABLE 
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
-  _impl_.default_value_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.default_value_.IsDefault()) {
-    _impl_.default_value_.Set("", *this);
+  auto& f = _impl_.default_value_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Field.default_value)
 }
@@ -2483,9 +2516,10 @@ inline ::std::string* PROTOBUF_NULLABLE Enum::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2496,9 +2530,10 @@ inline void Enum::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Enum.name)
 }
@@ -2631,10 +2666,12 @@ inline const ::google::protobuf::SourceContext& Enum::source_context() const ABS
 inline void Enum::unsafe_arena_set_allocated_source_context(
     ::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  auto*& sub = _impl_.source_context_;
   if (!::google::protobuf::internal::HasArena(*this)) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
@@ -2646,8 +2683,7 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Enum::release_source
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::google::protobuf::SourceContext* released = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
+  auto* released = ::std::exchange(_impl_.source_context_, nullptr);
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
     released = ::google::protobuf::internal::DuplicateIfNonNull(released);
@@ -2666,17 +2702,16 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NULLABLE Enum::unsafe_arena_r
   // @@protoc_insertion_point(field_release:google.protobuf.Enum.source_context)
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::google::protobuf::SourceContext* temp = _impl_.source_context_;
-  _impl_.source_context_ = nullptr;
-  return temp;
+  return ::std::exchange(_impl_.source_context_, nullptr);
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Enum::_internal_mutable_source_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.source_context_ == nullptr) {
+  auto*& sub = _impl_.source_context_;
+  if (sub == nullptr) {
     auto* p = Super_::DefaultConstruct<::google::protobuf::SourceContext>(GetArena());
-    _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(p);
+    sub = p;
   }
-  return _impl_.source_context_;
+  return sub;
 }
 inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Enum::mutable_source_context()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -2688,8 +2723,9 @@ inline ::google::protobuf::SourceContext* PROTOBUF_NONNULL Enum::mutable_source_
 inline void Enum::set_allocated_source_context(::google::protobuf::SourceContext* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
+  auto*& sub = _impl_.source_context_;
   if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.source_context_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
 
   if (value != nullptr) {
@@ -2702,7 +2738,7 @@ inline void Enum::set_allocated_source_context(::google::protobuf::SourceContext
     ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
 
-  _impl_.source_context_ = reinterpret_cast<::google::protobuf::SourceContext*>(value);
+  sub = value;
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Enum.source_context)
 }
 
@@ -2774,9 +2810,10 @@ inline ::std::string* PROTOBUF_NULLABLE Enum::release_edition() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.edition_.Release();
+  auto& f = _impl_.edition_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.edition_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2787,9 +2824,10 @@ inline void Enum::set_allocated_edition(::std::string* PROTOBUF_NULLABLE value) 
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
-  _impl_.edition_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.edition_.IsDefault()) {
-    _impl_.edition_.Set("", *this);
+  auto& f = _impl_.edition_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Enum.edition)
 }
@@ -2842,9 +2880,10 @@ inline ::std::string* PROTOBUF_NULLABLE EnumValue::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -2855,9 +2894,10 @@ inline void EnumValue::set_allocated_name(::std::string* PROTOBUF_NULLABLE value
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.EnumValue.name)
 }
@@ -2989,9 +3029,10 @@ inline ::std::string* PROTOBUF_NULLABLE Option::release_name() {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.name_.Release();
+  auto& f = _impl_.name_;
+  auto* released = f.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", *this);
+    f.Set("", *this);
   }
   return released;
 }
@@ -3002,9 +3043,10 @@ inline void Option::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
-  _impl_.name_.SetAllocated(value, *this);
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", *this);
+  auto& f = _impl_.name_;
+  f.SetAllocated(value, *this);
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && f.IsDefault()) {
+    f.Set("", *this);
   }
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Option.name)
 }
@@ -3027,10 +3069,12 @@ inline const ::google::protobuf::Any& Option::value() const ABSL_ATTRIBUTE_LIFET
 inline void Option::unsafe_arena_set_allocated_value(
     ::google::protobuf::Any* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  auto*& sub = _impl_.value_;
   if (!::google::protobuf::internal::HasArena(*this)) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.value_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
-  _impl_.value_ = reinterpret_cast<::google::protobuf::Any*>(value);
+  sub = value;
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
@@ -3042,8 +3086,7 @@ inline ::google::protobuf::Any* PROTOBUF_NULLABLE Option::release_value() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::google::protobuf::Any* released = _impl_.value_;
-  _impl_.value_ = nullptr;
+  auto* released = ::std::exchange(_impl_.value_, nullptr);
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
     released = ::google::protobuf::internal::DuplicateIfNonNull(released);
@@ -3062,17 +3105,16 @@ inline ::google::protobuf::Any* PROTOBUF_NULLABLE Option::unsafe_arena_release_v
   // @@protoc_insertion_point(field_release:google.protobuf.Option.value)
 
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::google::protobuf::Any* temp = _impl_.value_;
-  _impl_.value_ = nullptr;
-  return temp;
+  return ::std::exchange(_impl_.value_, nullptr);
 }
 inline ::google::protobuf::Any* PROTOBUF_NONNULL Option::_internal_mutable_value() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.value_ == nullptr) {
+  auto*& sub = _impl_.value_;
+  if (sub == nullptr) {
     auto* p = Super_::DefaultConstruct<::google::protobuf::Any>(GetArena());
-    _impl_.value_ = reinterpret_cast<::google::protobuf::Any*>(p);
+    sub = p;
   }
-  return _impl_.value_;
+  return sub;
 }
 inline ::google::protobuf::Any* PROTOBUF_NONNULL Option::mutable_value()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3084,8 +3126,9 @@ inline ::google::protobuf::Any* PROTOBUF_NONNULL Option::mutable_value()
 inline void Option::set_allocated_value(::google::protobuf::Any* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
+  auto*& sub = _impl_.value_;
   if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.value_);
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(sub);
   }
 
   if (value != nullptr) {
@@ -3098,7 +3141,7 @@ inline void Option::set_allocated_value(::google::protobuf::Any* PROTOBUF_NULLAB
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
-  _impl_.value_ = reinterpret_cast<::google::protobuf::Any*>(value);
+  sub = value;
   // @@protoc_insertion_point(field_set_allocated:google.protobuf.Option.value)
 }
 

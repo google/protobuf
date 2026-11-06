@@ -24,10 +24,10 @@
 #include "absl/log/absl_log.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
-#include "google/protobuf/arena_align.h"
 #include "google/protobuf/arena_allocation_policy.h"
 #include "google/protobuf/arena_cleanup.h"
 #include "google/protobuf/arenaz_sampler.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
 #include "google/protobuf/string_block.h"
@@ -64,7 +64,7 @@ MemoryAllocationFailure() noexcept {
   ABSL_LOG(FATAL) << "Failed to allocate memory.";
 }
 
-static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= ArenaAlignDefault::align,
+static_assert(__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= ArenaAlignDefault{}.align,
               "operator new does not guarantee the arena's block alignment");
 
 SizedPtr AllocateMemory(const AllocationPolicy& policy, size_t size) {
@@ -74,7 +74,7 @@ SizedPtr AllocateMemory(const AllocationPolicy& policy, size_t size) {
   if (ABSL_PREDICT_FALSE(result.p == nullptr)) {
     MemoryAllocationFailure();
   }
-  ABSL_DCHECK(ArenaAlignDefault::IsAligned(result.p));
+  ABSL_DCHECK(ArenaAlignDefault{}.IsAligned(result.p));
   return result;
 }
 
@@ -119,6 +119,11 @@ class GetDeallocator {
  private:
   void (*dealloc_)(void*, size_t);
 };
+
+size_t SerialArenaHeaderSize(const AllocationPolicy& policy) {
+  return ThreadSafeArena::kBlockHeaderSize +
+         (policy.IsDefault() ? 0 : ThreadSafeArena::kAllocPolicySize);
+}
 
 }  // namespace
 
@@ -219,17 +224,46 @@ SerialArena::SerialArena(ArenaBlock* b, ThreadSafeArena& parent)
   ABSL_DCHECK(!b->IsSentry());
 }
 
-// It is guaranteed that this is the first SerialArena. Use sentry block.
-SerialArena::SerialArena(ThreadSafeArena& parent)
-    : head_{SentryArenaBlock()}, parent_{parent} {}
-
-// It is guaranteed that this is the first SerialArena but `b` may be user
-// provided or newly allocated to store AllocationPolicy.
-SerialArena::SerialArena(FirstSerialArena, ArenaBlock* b,
+SerialArena::SerialArena(FirstSerialArena, SizedPtr mem,
+                         const AllocationPolicy& policy,
                          ThreadSafeArena& parent)
-    : head_{b}, space_allocated_{b->size}, parent_{parent} {
-  if (b->IsSentry()) return;
-  set_range(b->Pointer(kBlockHeaderSize), b->Limit());
+    : parent_(parent) {
+  ABSL_DCHECK(mem.p == nullptr || ArenaAlignDefault{}.IsAligned(mem.p));
+
+  // If the user-provided block is no larger than the header, it is not suitable
+  // for use as an arena block. Throw it away and allocate a block below.
+  if (mem.p != nullptr && mem.n <= SerialArenaHeaderSize(policy)) {
+    mem.p = nullptr;
+    mem.n = 0;
+  }
+
+  // If we won't be using a user-provided block and we don't have a custom
+  // allocation policy, we can delay allocation of the first block.
+  if (mem.p == nullptr && policy.IsDefault()) {
+    Init(SentryArenaBlock(), 0);
+    return;
+  }
+
+  if (mem.p == nullptr) {
+    mem = AllocateBlock(&policy, 0, ThreadSafeArena::kAllocPolicySize);
+  } else {
+    // Set the user-owned bit in the `ThreadSafeArena`'s allocation policy.
+    // Note that full initialization of the `ThreadSafeArena` has not yet run,
+    // but default initialization has. And `ThreadSafeArena::Init` takes care to
+    // preserve policy flags.
+    parent.alloc_policy_.set_is_user_owned_initial_block(true);
+
+    if constexpr (internal::PerformDebugChecks()) {
+      // Touch the user-owned block to verify that it is addressable.
+      static_cast<char*>(mem.p)[0] = 0;
+      static_cast<char*>(mem.p)[mem.n - 1] = 0;
+    }
+  }
+
+  ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(mem.p, mem.n);
+  ArenaBlock* head = new (mem.p) ArenaBlock{nullptr, mem.n};
+
+  Init(head, kBlockHeaderSize);
 }
 
 std::vector<void*> SerialArena::PeekCleanupListForTesting() {
@@ -571,63 +605,16 @@ PROTOBUF_CONSTINIT PROTOBUF_THREAD_LOCAL
     ThreadSafeArena::ThreadCache ThreadSafeArena::thread_cache_;
 #endif
 
-ThreadSafeArena::ThreadSafeArena() : first_arena_(*this) { Init(); }
+ThreadSafeArena::ThreadSafeArena()
+    : ThreadSafeArena(/*mem=*/nullptr, /*size=*/0, /*policy=*/{}) {}
 
 ThreadSafeArena::ThreadSafeArena(char* mem, size_t size)
-    : first_arena_(FirstSerialArena{}, FirstBlock(mem, size), *this) {
-  Init();
-}
+    : ThreadSafeArena(mem, size, /*policy=*/{}) {}
 
 ThreadSafeArena::ThreadSafeArena(void* mem, size_t size,
                                  const AllocationPolicy& policy)
-    : first_arena_(FirstSerialArena{}, FirstBlock(mem, size, policy), *this) {
+    : first_arena_(FirstSerialArena{}, SizedPtr{mem, size}, policy, *this) {
   InitializeWithPolicy(policy);
-}
-
-ArenaBlock* ThreadSafeArena::FirstBlock(void* buf, size_t size) {
-  ABSL_DCHECK_EQ(reinterpret_cast<uintptr_t>(buf) & 7, 0u);
-  if (buf == nullptr || size <= kBlockHeaderSize) {
-    return SentryArenaBlock();
-  }
-  // Record user-owned block.
-
-  if constexpr (internal::PerformDebugChecks()) {
-    // Touch block to verify it is addressable.
-    if (size > 0) {
-      static_cast<char*>(buf)[0] = 0;
-      static_cast<char*>(buf)[size - 1] = 0;
-    }
-  }
-
-  ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(buf, size);
-  alloc_policy_.set_is_user_owned_initial_block(true);
-  return new (buf) ArenaBlock{nullptr, size};
-}
-
-ArenaBlock* ThreadSafeArena::FirstBlock(void* buf, size_t size,
-                                        const AllocationPolicy& policy) {
-  if (policy.IsDefault()) return FirstBlock(buf, size);
-
-  ABSL_DCHECK_EQ(reinterpret_cast<uintptr_t>(buf) & 7, 0u);
-
-  SizedPtr mem;
-  if (buf == nullptr || size < kBlockHeaderSize + kAllocPolicySize) {
-    mem = AllocateBlock(&policy, 0, kAllocPolicySize);
-  } else {
-    mem = {buf, size};
-    // Record user-owned block.
-    if constexpr (internal::PerformDebugChecks()) {
-      // Touch block to verify it is addressable.
-      if (size > 0) {
-        static_cast<char*>(buf)[0] = 0;
-        static_cast<char*>(buf)[size - 1] = 0;
-      }
-    }
-    ABSL_ANNOTATE_MEMORY_IS_UNINITIALIZED(buf, size);
-    alloc_policy_.set_is_user_owned_initial_block(true);
-  }
-
-  return new (mem.p) ArenaBlock{nullptr, mem.n};
 }
 
 void ThreadSafeArena::InitializeWithPolicy(const AllocationPolicy& policy) {
@@ -652,8 +639,7 @@ void ThreadSafeArena::InitializeWithPolicy(const AllocationPolicy& policy) {
     return;
   }
   new (p) AllocationPolicy{policy};
-  ABSL_DCHECK_EQ(0u,
-                 reinterpret_cast<uintptr_t>(p) % alignof(AllocationPolicy));
+  ABSL_DCHECK(MemoryAlign{alignof(AllocationPolicy)}.IsAligned(p));
   alloc_policy_.set_policy(reinterpret_cast<AllocationPolicy*>(p));
   ABSL_DCHECK_POLICY_FLAGS_();
 
