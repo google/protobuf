@@ -46,10 +46,12 @@
 #include "google/protobuf/class_data.h"
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_traits.h"
 #include "google/protobuf/metadata_lite.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/raw_ptr.h"
+#include "google/protobuf/serial_arena.h"
 #include "google/protobuf/type_id.h"
 
 
@@ -258,12 +260,12 @@ struct MessageGlobalsBase {
   static constexpr size_t RoundUpTo(size_t n) {
     static_assert(absl::has_single_bit(R), "Must be power of two");
     if constexpr (KnownAlignment != 0) {
-      ABSL_DCHECK_EQ(n % KnownAlignment, 0u);
+      ABSL_DCHECK(MemoryAlign{KnownAlignment}.IsAligned(n));
     }
     if constexpr (KnownAlignment >= R) {
       return n;
     } else {
-      return (n + (R - 1)) & ~(R - 1);
+      return MemoryAlign{R}.Ceil(n);
     }
   }
 
@@ -1149,6 +1151,15 @@ PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(Arena* arena) const {
   return message_creator.PlacementNew(def, def, mem, arena);
 }
 
+PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::New(SerialArena* arena) const {
+  // Allocate the memory first, to reduce the number of spills.
+  // This way we only spill `this` and `parent_arena`.
+  Arena* parent_arena = ParentArena(arena);
+  void* mem = message_creator.AllocateMessage(arena);
+  const MessageLite* def = default_instance();
+  return message_creator.PlacementNew(def, def, mem, parent_arena);
+}
+
 PROTOBUF_ALWAYS_INLINE MessageLite* ClassData::PlacementNew(
     void* mem, Arena* arena) const {
   const MessageLite* def = default_instance();
@@ -1297,6 +1308,11 @@ inline bool HasArena(const MessageLite& message) {
 
 inline Arena* GetArena(const MessageLite& message) {
   return message.GetArena();
+}
+
+inline MessageLite* NewMessage(const MessageLite& prototype,
+                               internal::SerialArena* arena) {
+  return GetClassData(prototype)->New(arena);
 }
 
 // Takes either a `const char*` string literal as the `To` type name, or a
