@@ -70,6 +70,10 @@ struct JsonLocation {
   // Creates an absl::InvalidArgumentError with line/column information.
   absl::Status Invalid(absl::string_view message,
                        SourceLocation sl = SourceLocation::current()) const;
+  // Shortcut function to avoid a StrCat on the caller.
+  absl::Status UnsupportedType(
+      FieldDescriptor::Type type,
+      SourceLocation sl = SourceLocation::current()) const;
 };
 
 template <typename T>
@@ -110,6 +114,11 @@ class JsonLexer {
     return json_loc_.Invalid(message, sl);
   }
 
+  absl::Status UnsupportedType(FieldDescriptor::Type type,
+                               SourceLocation sl = SourceLocation::current()) {
+    return json_loc_.UnsupportedType(type, sl);
+  }
+
   // Expects the next bytes to be parsed (after consuming whitespace) to be
   // exactly `literal`. If they are, consumes them; otherwise returns an error.
   absl::Status Expect(absl::string_view literal,
@@ -146,10 +155,7 @@ class JsonLexer {
 
   // Like Peek(string), but returns true if and only if a token of the given
   // kind can be lexed next. Returns false on EOF, just like Peek(string).
-  bool Peek(Kind needle) {
-    auto kind = PeekKind();
-    return kind.ok() && *kind == needle;
-  }
+  bool Peek(Kind needle);
 
   // Consumes all whitespace and other ignored characters until the next
   // token.

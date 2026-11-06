@@ -29,6 +29,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "google/protobuf/descriptor.h"
 #include "google/protobuf/json/internal/zero_copy_buffered_stream.h"
 #include "utf8_validity.h"
 #include "google/protobuf/stubs/status_macros.h"
@@ -103,6 +104,11 @@ absl::Status JsonLocation::Invalid(absl::string_view message,
   return absl::InvalidArgumentError(std::move(status_message));
 }
 
+absl::Status JsonLocation::UnsupportedType(FieldDescriptor::Type type,
+                                           SourceLocation sl) const {
+  return Invalid(absl::StrCat("unsupported field type: ", type), sl);
+}
+
 absl::StatusOr<JsonLexer::Kind> JsonLexer::PeekKind() {
   RETURN_IF_ERROR(SkipToToken());
   char c = stream_.PeekChar();
@@ -135,6 +141,11 @@ absl::StatusOr<JsonLexer::Kind> JsonLexer::PeekKind() {
     default:
       return Invalid(absl::StrFormat("unexpected character: '%c'", c));
   }
+}
+
+bool JsonLexer::Peek(Kind needle) {
+  auto kind = PeekKind();
+  return kind.ok() && *kind == needle;
 }
 
 absl::Status JsonLexer::SkipValue() {
