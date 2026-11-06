@@ -34,12 +34,12 @@
 #include <utility>
 
 #include "absl/base/attributes.h"
-#include "absl/base/macros.h"
 #include "absl/base/no_destructor.h"
 #include "absl/base/optimization.h"
 #include "absl/base/prefetch.h"
 #include "absl/functional/function_ref.h"
 #include "absl/log/absl_check.h"
+#include "absl/meta/type_traits.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/class_data.h"
@@ -48,6 +48,7 @@
 #include "google/protobuf/internal_visibility.h"
 #include "google/protobuf/memory_align.h"
 #include "google/protobuf/message_lite.h"
+#include "google/protobuf/message_traits.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/serial_arena.h"
 
@@ -202,7 +203,8 @@ PROTOBUF_EXPORT inline void RuntimeAssertInBoundsGE(int64_t value,
 template <typename Type>
 class GenericTypeHandler;
 
-using ElementNewFn = void(Arena*, void*& ptr);
+template <typename ArenaT>
+using ElementNewFn = void(ArenaT*, void*& ptr);
 
 // This is the common base class for RepeatedPtrFields.  It deals only in void*
 // pointers.  Users should not use this interface directly.
@@ -299,6 +301,12 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   template <typename TypeHandler>
   Value<TypeHandler>* Add(Arena* arena) {
     return cast<TypeHandler>(AddInternal(arena, TypeHandler::GetNewFunc()));
+  }
+
+  template <typename TypeHandler>
+  Value<TypeHandler>* Add(SerialArena* arena) {
+    return cast<TypeHandler>(
+        AddInternal(arena, TypeHandler::GetSerialArenaNewFunc()));
   }
 
   template <typename TypeHandler>
@@ -436,7 +444,7 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   // Pre-condition: `class_data` must not be nullptr.
   template <typename TypeHandler>
   PROTOBUF_ALWAYS_INLINE Value<TypeHandler>* AddFromClassData(
-      Arena* arena, const ClassData* class_data) {
+      SerialArena* arena, const ClassData* class_data) {
     using H = CommonHandler<TypeHandler>;
     Value<TypeHandler>* result = cast<TypeHandler>(
         AddInternal(arena, H::GetNewFromClassDataFunc(class_data)));
@@ -939,7 +947,10 @@ class PROTOBUF_EXPORT RepeatedPtrFieldBase {
   // Common implementation used by various Add* methods. `factory` is an object
   // used to construct a new element unless there are spare cleared elements
   // ready for reuse. Returns pointer to the new element.
-  void* AddInternal(Arena* arena, absl::FunctionRef<ElementNewFn> factory);
+  template <typename ArenaT>
+  void* AddInternal(
+      ArenaT* arena,
+      absl::FunctionRef<ElementNewFn<absl::type_identity_t<ArenaT>>> factory);
 
   // A few notes on internal representation:
   //
@@ -975,9 +986,11 @@ PROTOBUF_EXPORT void RepeatedPtrFieldBase::MergeFrom<std::string>(
     const RepeatedPtrFieldBase& from, Arena* arena);
 
 
+template <typename ArenaT>
 inline void* RepeatedPtrFieldBase::AddInternal(
-    Arena* arena, absl::FunctionRef<ElementNewFn> factory) {
-  ABSL_DCHECK_EQ(arena, GetArena());
+    ArenaT* arena,
+    absl::FunctionRef<ElementNewFn<absl::type_identity_t<ArenaT>>> factory) {
+  ABSL_DCHECK_EQ(GetSerialArena(arena), GetSerialArena(GetArena()));
   if (tagged_rep_or_elem_ == nullptr) {
     ExchangeCurrentSize(1);
     factory(arena, tagged_rep_or_elem_);
@@ -1157,7 +1170,7 @@ class GenericTypeHandler {
   static constexpr auto GetNewFromClassDataFunc(
       const ClassData* class_data ABSL_ATTRIBUTE_LIFETIME_BOUND) {
     ABSL_DCHECK(class_data != nullptr);
-    return [class_data](Arena* arena, void*& ptr) {
+    return [class_data](SerialArena* arena, void*& ptr) {
       ptr = class_data->New(arena);
     };
   }
@@ -1205,6 +1218,13 @@ class GenericTypeHandler<std::string> {
 
   static constexpr auto GetNewFunc() {
     return [](Arena* arena, void*& ptr) { ptr = Arena::Create<Type>(arena); };
+  }
+  static constexpr auto GetSerialArenaNewFunc() {
+    return [](SerialArena* arena, void*& ptr) {
+      void* mem = arena == nullptr ? Allocate(sizeof(Type))
+                                   : arena->AllocateFromStringBlock();
+      ptr = new (mem) Type();
+    };
   }
   static constexpr auto GetNewWithMoveFunc(
       Type&& from ABSL_ATTRIBUTE_LIFETIME_BOUND) {
@@ -1646,6 +1666,9 @@ class ABSL_ATTRIBUTE_WARN_UNUSED RepeatedPtrField final
 
   pointer AddWithArena(Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND;
 
+  pointer AddWithArena(internal::SerialArena* arena)
+      ABSL_ATTRIBUTE_LIFETIME_BOUND;
+
   pointer AddWithArena(Arena* arena, Element&& value);
 
   // Private-only. Copies `value` into a newly allocated element.
@@ -1838,6 +1861,12 @@ PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::InternalAddWithArena(
 template <typename Element>
 PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::AddWithArena(
     Arena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  return RepeatedPtrFieldBase::Add<TypeHandler>(arena);
+}
+
+template <typename Element>
+PROTOBUF_NDEBUG_INLINE Element* RepeatedPtrField<Element>::AddWithArena(
+    internal::SerialArena* arena) ABSL_ATTRIBUTE_LIFETIME_BOUND {
   return RepeatedPtrFieldBase::Add<TypeHandler>(arena);
 }
 

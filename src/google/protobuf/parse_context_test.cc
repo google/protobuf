@@ -39,7 +39,7 @@ TEST(ParseContextTest, NoOverflowMaxDepth) {
       "\x81\x81\x81\x81\x08\x01\x00";  // Malformed varint size.
 
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, kPayload);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, kPayload);
   proto2_unittest::TestAllTypes proto;
   const char* result = ctx.ParseMessage(&proto, kPayload);
 
@@ -50,7 +50,7 @@ TEST(ParseContextTest, VerifyUTF8) {
   constexpr absl::string_view kPayload = "hello world, a valid UTF8 payload";
 
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, kPayload);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, kPayload);
 
   ptr = ctx.VerifyUTF8(ptr, static_cast<int>(kPayload.size()));
 
@@ -68,7 +68,7 @@ TEST(ParseContextTest, VerifyFragmentedUTF8) {
 
   const char* ptr;
   io::ArrayInputStream ais(kPayload.data(), kPayload.size(), /*block_size*/ 13);
-  ParseContext ctx(kMaxLimit, false, &ptr, &ais);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, &ais);
 
   ptr = ctx.VerifyUTF8(ptr, static_cast<int>(kPayload.size()));
 
@@ -80,7 +80,7 @@ TEST(ParseContextTest, FailsOnInvalidUTF8) {
   constexpr absl::string_view kInvalidUtf8 = "\xe2\x82\x28";
 
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, kInvalidUtf8);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, kInvalidUtf8);
 
   ptr = ctx.VerifyUTF8(ptr, static_cast<int>(kInvalidUtf8.size()));
 
@@ -98,7 +98,7 @@ TEST(ParseContextTest, FailsOnFragmentedInvalidUTF8) {
   const char* ptr;
   io::ArrayInputStream ais(kInvalidUtf8.data(), kInvalidUtf8.size(),
                            /*block_size*/ 13);
-  ParseContext ctx(kMaxLimit, false, &ptr, &ais);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, &ais);
 
   ptr = ctx.VerifyUTF8(ptr, static_cast<int>(kInvalidUtf8.size()));
 
@@ -108,7 +108,7 @@ TEST(ParseContextTest, FailsOnFragmentedInvalidUTF8) {
 
 TEST(ParseContextTest, SkipTooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
 
   ptr = ctx.Skip(ptr, kTooLargeSize);
 
@@ -117,7 +117,7 @@ TEST(ParseContextTest, SkipTooLarge) {
 
 TEST(ParseContextTest, ReadStringTooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
   std::string out;
 
   ptr = ctx.ReadString(ptr, kTooLargeSize, &out);
@@ -127,7 +127,7 @@ TEST(ParseContextTest, ReadStringTooLarge) {
 
 TEST(ParseContextTest, AppendStringTooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
   std::string out;
 
   ptr = ctx.AppendString(ptr, kTooLargeSize, &out);
@@ -137,7 +137,7 @@ TEST(ParseContextTest, AppendStringTooLarge) {
 
 TEST(ParseContextTest, ReadCordTooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
   absl::Cord out;
 
   ptr = ctx.ReadCord(ptr, kTooLargeSize, &out);
@@ -147,7 +147,7 @@ TEST(ParseContextTest, ReadCordTooLarge) {
 
 TEST(ParseContextTest, VerifyUTF8TooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
 
   ptr = ctx.VerifyUTF8(ptr, static_cast<uint32_t>(kTooLargeSize));
 
@@ -156,7 +156,7 @@ TEST(ParseContextTest, VerifyUTF8TooLarge) {
 
 TEST(ParseContextTest, ReadChunkAndCallbackTooLarge) {
   const char* ptr;
-  ParseContext ctx(kMaxLimit, false, &ptr, "hello world");
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, "hello world");
 
   ptr = ctx.ReadChunkAndCallback(ptr, kTooLargeSize,
                                  [&](const char* ptr, int s) {});
@@ -167,7 +167,7 @@ TEST(ParseContextTest, ReadChunkAndCallbackTooLarge) {
 TEST(ParseContextTest, ReadCordMustWorkAcrossFragments) {
   const char* ptr;
   io::internal::TestZeroCopyInputStream stream({"hello ", "world"});
-  ParseContext ctx(kMaxLimit, false, &ptr, &stream);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, &stream);
   absl::Cord out;
   ptr = ctx.ReadCord(ptr, 7, &out);
   EXPECT_EQ(out, "hello w");
@@ -176,7 +176,7 @@ TEST(ParseContextTest, ReadCordMustWorkAcrossFragments) {
 TEST(ParseContextTest, ReadCordFromMultipleFragments) {
   const char* ptr;
   io::internal::TestZeroCopyInputStream stream({"a", "bc", "def"});
-  ParseContext ctx(kMaxLimit, false, &ptr, &stream);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, &stream);
   absl::Cord out;
   ptr = ctx.ReadCord(ptr, 6, &out);
   EXPECT_EQ(out, "abcdef");
@@ -185,7 +185,7 @@ TEST(ParseContextTest, ReadCordFromMultipleFragments) {
 TEST(ParseContextTest, ReadCordFromMultipleFragmentsWithEmptyFragment) {
   const char* ptr;
   io::internal::TestZeroCopyInputStream stream({"a", "bc", "", "", "def"});
-  ParseContext ctx(kMaxLimit, false, &ptr, &stream);
+  ParseContext ctx(kMaxLimit, false, /*arena=*/nullptr, &ptr, &stream);
   absl::Cord out;
   ptr = ctx.ReadCord(ptr, 6, &out);
   EXPECT_EQ(out, "abcdef");
@@ -205,7 +205,7 @@ void TestAdvancePtrSinkingAndPeeking(
   io::internal::TestZeroCopyInputStream stream(input);
   const char* ptr;
   ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(), false,
-                   &ptr, &stream);
+                   /*arena=*/nullptr, &ptr, &stream);
   if (ctx.Done(&ptr)) return;
 
   WireFormatStringSink sink(ptr);
@@ -353,7 +353,7 @@ void VerifyUTF8AndCopy(const std::vector<std::string>& input) {
   io::internal::TestZeroCopyInputStream stream(input);
   const char* ptr;
   ParseContext ctx(io::CodedInputStream::GetDefaultRecursionLimit(), false,
-                   &ptr, &stream);
+                   /*arena=*/nullptr, &ptr, &stream);
 
   WireFormatStringSink sink(ptr);
   sink.data.reserve(flattened.size());
