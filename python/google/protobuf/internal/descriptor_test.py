@@ -302,6 +302,13 @@ class DescriptorTest(unittest.TestCase):
         self.my_service.GetOptions(), descriptor_pb2.ServiceOptions()
     )
 
+  def testReinitFrozenMessageRaises(self):
+    options = unittest_pb2.TestAllTypes.DESCRIPTOR.GetOptions()
+    before = options.SerializeToString()
+    with self.assertRaises(message.FrozenInstanceError):
+      options.__init__(deprecated=True)
+    self.assertEqual(before, options.SerializeToString())
+
   def testModifyFrozenMessage(self):
     immutability_error = message.FrozenInstanceError
     message_options = self.my_message.GetOptions()

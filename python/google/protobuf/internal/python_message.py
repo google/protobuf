@@ -598,6 +598,11 @@ def _AddInitMethod(message_descriptor, cls):
             )
         )
 
+    # Calling __init__() again on an existing message resets it, which a frozen
+    # message does not allow.
+    if getattr(self, '_frozen', False):
+      raise message_mod.FrozenInstanceError('Message is immutable')
+
     self._cached_byte_size = 0
     self._cached_byte_size_dirty = len(kwargs) > 0
     self._fields = {}
