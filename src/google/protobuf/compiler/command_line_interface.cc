@@ -3398,17 +3398,9 @@ bool CommandLineInterface::GeneratePluginOutput(
     const std::vector<const FileDescriptor*>& parsed_files,
     const std::string& plugin_name, const std::string& parameter,
     GeneratorContext* generator_context, std::string* error) {
-  // TODO Remove these special-cases and send json names to all
-  // plugins.
-  static const auto builtin_plugins = new absl::flat_hash_set<std::string>(
-      {"protoc-gen-cpp", "protoc-gen-java", "protoc-gen-mutable_java",
-       "protoc-gen-python"});
-
   bool bootstrap = GetBootstrapParam(parameter);
   CodeGeneratorRequest request = CreateCodeGeneratorRequest(
-      parsed_files, parameter,
-      // The built-in code generators didn't use the json names.
-      /*copy_json_name=*/!builtin_plugins->contains(plugin_name), bootstrap);
+      parsed_files, parameter, /*copy_json_name=*/true, bootstrap);
   CodeGeneratorResponse response;
 
   // Invoke the plugin.
