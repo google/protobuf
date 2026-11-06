@@ -728,12 +728,12 @@ Struct::~Struct() {
 PROTOBUF_NO_CUSTOM_VTABLE_INLINE void Struct::SharedDtor(
     MessageLite& self) {
   Struct& this_ = static_cast<Struct&>(self);
+  ABSL_DCHECK(!::_pbi::HasArena(this_));
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     this_.CheckHasBitConsistency();
   }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(!::_pbi::HasArena(this_));
   this_._impl_.~Impl_();
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
 }
 
 PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
@@ -986,15 +986,15 @@ Value::~Value() {
 PROTOBUF_NO_CUSTOM_VTABLE_INLINE void Value::SharedDtor(
     MessageLite& self) {
   Value& this_ = static_cast<Value&>(self);
+  ABSL_DCHECK(!::_pbi::HasArena(this_));
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     this_.CheckHasBitConsistency();
   }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(!::_pbi::HasArena(this_));
   if (this_.has_kind()) {
     this_.clear_kind();
   }
   this_._impl_.~Impl_();
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
 }
 
 void Value::clear_kind() {
@@ -1335,12 +1335,12 @@ ListValue::~ListValue() {
 PROTOBUF_NO_CUSTOM_VTABLE_INLINE void ListValue::SharedDtor(
     MessageLite& self) {
   ListValue& this_ = static_cast<ListValue&>(self);
+  ABSL_DCHECK(!::_pbi::HasArena(this_));
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     this_.CheckHasBitConsistency();
   }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(!::_pbi::HasArena(this_));
   this_._impl_.~Impl_();
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
 }
 
 PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
