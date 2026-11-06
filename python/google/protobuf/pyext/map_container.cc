@@ -305,18 +305,6 @@ Py_ssize_t MapReflectionFriend::Length(PyObject* _self) {
   return map.ok() ? map->size() : 0;
 }
 
-PyObject* Clear(PyObject* _self) {
-  MapContainer* self = GetMap(_self);
-  Message* message = self->GetMutableMessage();
-  if (message == nullptr) return nullptr;
-  const Reflection* reflection = message->GetReflection();
-
-  reflection->ClearField(message, self->parent_field_descriptor);
-  self->version++;
-
-  Py_RETURN_NONE;
-}
-
 PyObject* GetEntryClass(PyObject* _self) {
   MapContainer* self = GetMap(_self);
   CMessageClass* message_class = message_factory::GetMessageClass(
@@ -441,6 +429,16 @@ MapContainer* NewScalarMapContainer(
   return self;
 }
 
+PyObject* ScalarMapClear(PyObject* _self) {
+  MapContainer* self = GetMap(_self);
+  Message* message = self->GetMutableMessage();
+  if (message == nullptr) return nullptr;
+  message->GetReflection()->ClearField(message, self->parent_field_descriptor);
+  self->version++;
+
+  Py_RETURN_NONE;
+}
+
 PyObject* MapReflectionFriend::ScalarMapGetItem(PyObject* _self,
                                                 PyObject* key) {
   MapContainer* self = GetMap(_self);
@@ -460,12 +458,8 @@ PyObject* MapReflectionFriend::ScalarMapGetItem(PyObject* _self,
     }
   }
 
-  // 2. Frozen path: read-only lookup failed and message is frozen.
-  if (self->parent->state == MESSAGE_FROZEN) {
-    return SetMessageFrozenError();
-  }
-
-  // 3. Mutable path: insert default value for missing key.
+  // 2. Mutable path: insert default value for missing key (raises
+  // FrozenInstanceError via AssureWritable if the parent message is frozen).
   if (Message* mutable_message = self->GetMutableMessage();
       mutable_message != nullptr) {
     auto value = TryEmplace(mutable_message, self, map_key);
@@ -613,7 +607,7 @@ static void ScalarMapDealloc(PyObject* _self) {
 }
 
 static PyMethodDef ScalarMapMethods[] = {
-    {"clear", (PyCFunction)Clear, METH_NOARGS,
+    {"clear", (PyCFunction)ScalarMapClear, METH_NOARGS,
      "Removes all elements from the map."},
     {"setdefault", (PyCFunction)ScalarMapSetdefault, METH_VARARGS,
      "If the key does not exist, insert the key, with the specified value"},
@@ -691,6 +685,28 @@ MessageMapContainer* NewMessageMapContainer(
   return self;
 }
 
+PyObject* MessageMapClear(PyObject* _self) {
+  MapContainer* self = GetMap(_self);
+  Message* message = self->GetMutableMessage();
+  if (message == nullptr) return nullptr;
+  const Reflection* reflection = message->GetReflection();
+
+  // ClearField() below frees the values, so detach their Python wrappers (if
+  // any) first: a detached wrapper keeps its own copy of the contents.
+  auto map = reflection->MutableMap(message, self->parent_field_descriptor);
+  if (!map.ok()) {
+    PyErr_SetString(PyExc_SystemError, map.status().ToString().c_str());
+    return nullptr;
+  }
+  for (auto entry : *map) {
+    self->parent->DetachSubMessage(entry.value().MutableMessageValue());
+  }
+  reflection->ClearField(message, self->parent_field_descriptor);
+  self->version++;
+
+  Py_RETURN_NONE;
+}
+
 int MapReflectionFriend::MessageMapSetItem(PyObject* _self, PyObject* key,
                                            PyObject* v) {
   if (v) {
@@ -756,19 +772,13 @@ PyObject* MapReflectionFriend::MessageMapGetItem(PyObject* _self,
   auto map = reflection->GetMap(*message, self->parent_field_descriptor);
   if (map.ok()) {
     if (auto it = map->find(map_key); it != map->end()) {
-      MessageMutabilityState state = self->parent->state == MESSAGE_FROZEN
-                                         ? MESSAGE_FROZEN
-                                         : MESSAGE_UNPROMOTED;
-      return GetCMessage(self, &it->value().GetMessageValue(), state);
+      return GetCMessage(self, &it->value().GetMessageValue(),
+                         MESSAGE_UNPROMOTED);
     }
   }
 
-  // 2. Frozen path: read-only lookup failed and message is frozen.
-  if (self->parent->state == MESSAGE_FROZEN) {
-    return SetMessageFrozenError();
-  }
-
-  // 3. Mutable path: insert default submessage for missing key.
+  // 2. Mutable path: insert default submessage for missing key (raises
+  // FrozenInstanceError via AssureWritable if the parent message is frozen).
   if (Message* mutable_message = self->GetMutableMessage();
       mutable_message != nullptr) {
     auto value = TryEmplace(mutable_message, self, map_key);
@@ -793,9 +803,6 @@ PyObject* MapReflectionFriend::MessageMapToStr(PyObject* _self) {
   // Wrap const map messages as MESSAGE_UNPROMOTED so string formatting does not
   // mutate parent state, while ensuring any subsequent write will promote the
   // parent hierarchy (including lazy fields) via AssureWritable.
-  MessageMutabilityState state = self->parent->state == MESSAGE_FROZEN
-                                     ? MESSAGE_FROZEN
-                                     : MESSAGE_UNPROMOTED;
   auto map = reflection->GetMap(*message, self->parent_field_descriptor);
   if (map.ok()) {
     for (auto entry : *map) {
@@ -803,7 +810,8 @@ PyObject* MapReflectionFriend::MessageMapToStr(PyObject* _self) {
       if (key == nullptr) {
         return nullptr;
       }
-      value.reset(GetCMessage(self, &entry.value().GetMessageValue(), state));
+      value.reset(GetCMessage(self, &entry.value().GetMessageValue(),
+                              MESSAGE_UNPROMOTED));
       if (value == nullptr) {
         return nullptr;
       }
@@ -882,7 +890,7 @@ static void MessageMapDealloc(PyObject* _self) {
 }
 
 static PyMethodDef MessageMapMethods[] = {
-    {"clear", (PyCFunction)Clear, METH_NOARGS,
+    {"clear", (PyCFunction)MessageMapClear, METH_NOARGS,
      "Removes all elements from the map."},
     {"setdefault", (PyCFunction)MessageMapSetdefault, METH_VARARGS,
      "setdefault is disallowed in MessageMap."},

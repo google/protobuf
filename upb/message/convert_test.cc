@@ -1046,8 +1046,8 @@ TEST(ConvertTest, ConvertExtensionToNonExtendable) {
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(dst_msg, &unknown, &iter));
   EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
-  const upb_Extension* ext_found =
-      static_cast<const upb_Extension*>(unknown.value.extension);
+  const upb_AuxField* ext_found =
+      static_cast<const upb_AuxField*>(unknown.value.extension);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found), 123);
@@ -1083,8 +1083,8 @@ TEST(ConvertTest, ConvertExtensionToExtendableButUnknown) {
   upb_MessageUnknown unknown2;
   ASSERT_TRUE(upb_Message_NextUnknown2(dst_msg, &unknown2, &iter2));
   EXPECT_EQ(unknown2.type, kUpb_MessageUnknownType_NonCanonicalExtension);
-  const upb_Extension* ext_found2 =
-      static_cast<const upb_Extension*>(unknown2.value.extension);
+  const upb_AuxField* ext_found2 =
+      static_cast<const upb_AuxField*>(unknown2.value.extension);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found2)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found2), 123);
@@ -1121,8 +1121,8 @@ TEST(ConvertTest, NonCanonicalToNonCanonical) {
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(converted, &unknown, &iter));
   EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
-  const upb_Extension* ext_found =
-      static_cast<const upb_Extension*>(unknown.value.extension);
+  const upb_AuxField* ext_found =
+      static_cast<const upb_AuxField*>(unknown.value.extension);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found), 123);
@@ -1296,7 +1296,7 @@ TEST(ConvertTest, DeepCloneEmptyNonCanonicalExtension) {
   ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
   upb_StringView encoded;
   ASSERT_EQ(upb_EncodeExtension(
-                static_cast<const upb_Extension*>(unknown.value.extension),
+                static_cast<const upb_AuxField*>(unknown.value.extension),
                 src_arena.ptr(), &encoded, /*encode_options=*/0),
             kUpb_EncodeStatus_Ok);
   EXPECT_EQ(encoded.size, 0);
@@ -2418,8 +2418,8 @@ TEST(ConvertTest, NonCanonicalMessageToNonCanonical) {
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(converted, &unknown, &iter));
   EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
-  const upb_Extension* ext_found =
-      static_cast<const upb_Extension*>(unknown.value.extension);
+  const upb_AuxField* ext_found =
+      static_cast<const upb_AuxField*>(unknown.value.extension);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1002);
 

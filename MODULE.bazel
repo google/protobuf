@@ -128,16 +128,6 @@ SUPPORTED_PYTHON_VERSIONS = [
     "3.14",
 ]
 
-# TODO: Replace system_python with hermetic_python.
-# TODO: Remove dev_dependency once system_python is no longer used and we support
-# python/upb in Bazel.
-system_python = use_extension("//python/dist:system_python.bzl", "system_python_extension")
-system_python.find(
-    name = "system_python",
-    minimum = "3.9",
-)
-use_repo(system_python, "system_python")
-
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
 
 [
@@ -340,6 +330,7 @@ register_toolchains(
     "//toolchain:win32-toolchain",
     "//toolchain:win64-toolchain",
     "//toolchain:k8-toolchain",
+    dev_dependency = True,
 )
 
 # Python headers for release
@@ -406,11 +397,6 @@ flag_alias(
 )
 
 flag_alias(
-    name = "strict_proto_deps",
-    starlark_flag = "@//bazel/flags:strict_proto_deps",
-)
-
-flag_alias(
     name = "strict_public_imports",
     starlark_flag = "@//bazel/flags:strict_public_imports",
 )
@@ -418,9 +404,4 @@ flag_alias(
 flag_alias(
     name = "cc_proto_library_header_suffixes",
     starlark_flag = "@//bazel/flags/cc:cc_proto_library_header_suffixes",
-)
-
-flag_alias(
-    name = "cc_proto_library_source_suffixes",
-    starlark_flag = "@//bazel/flags/cc:cc_proto_library_source_suffixes",
 )

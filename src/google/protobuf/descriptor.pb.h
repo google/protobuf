@@ -92,109 +92,144 @@ enum SymbolVisibility : int;
 PROTOBUF_EXPORT extern const uint32_t SymbolVisibility_internal_data_[];
 class DescriptorProto;
 struct DescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern DescriptorProtoGlobalsTypeInternal DescriptorProto_globals_;
+PROTOBUF_EXPORT extern DescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) DescriptorProto_globals_;
 class DescriptorProto_ExtensionRange;
 struct DescriptorProto_ExtensionRangeGlobalsTypeInternal;
-PROTOBUF_EXPORT extern DescriptorProto_ExtensionRangeGlobalsTypeInternal DescriptorProto_ExtensionRange_globals_;
+PROTOBUF_EXPORT extern DescriptorProto_ExtensionRangeGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) DescriptorProto_ExtensionRange_globals_;
 class DescriptorProto_ReservedRange;
 struct DescriptorProto_ReservedRangeGlobalsTypeInternal;
-PROTOBUF_EXPORT extern DescriptorProto_ReservedRangeGlobalsTypeInternal DescriptorProto_ReservedRange_globals_;
+PROTOBUF_EXPORT extern DescriptorProto_ReservedRangeGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) DescriptorProto_ReservedRange_globals_;
 class EnumDescriptorProto;
 struct EnumDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern EnumDescriptorProtoGlobalsTypeInternal EnumDescriptorProto_globals_;
+PROTOBUF_EXPORT extern EnumDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumDescriptorProto_globals_;
 class EnumDescriptorProto_EnumReservedRange;
 struct EnumDescriptorProto_EnumReservedRangeGlobalsTypeInternal;
-PROTOBUF_EXPORT extern EnumDescriptorProto_EnumReservedRangeGlobalsTypeInternal EnumDescriptorProto_EnumReservedRange_globals_;
+PROTOBUF_EXPORT extern EnumDescriptorProto_EnumReservedRangeGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumDescriptorProto_EnumReservedRange_globals_;
 class EnumOptions;
 struct EnumOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern EnumOptionsGlobalsTypeInternal EnumOptions_globals_;
+PROTOBUF_EXPORT extern EnumOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumOptions_globals_;
 class EnumValueDescriptorProto;
 struct EnumValueDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern EnumValueDescriptorProtoGlobalsTypeInternal EnumValueDescriptorProto_globals_;
+PROTOBUF_EXPORT extern EnumValueDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumValueDescriptorProto_globals_;
 class EnumValueOptions;
 struct EnumValueOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern EnumValueOptionsGlobalsTypeInternal EnumValueOptions_globals_;
+PROTOBUF_EXPORT extern EnumValueOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) EnumValueOptions_globals_;
 class ExtensionRangeOptions;
 struct ExtensionRangeOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern ExtensionRangeOptionsGlobalsTypeInternal ExtensionRangeOptions_globals_;
+PROTOBUF_EXPORT extern ExtensionRangeOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) ExtensionRangeOptions_globals_;
 class ExtensionRangeOptions_Declaration;
 struct ExtensionRangeOptions_DeclarationGlobalsTypeInternal;
-PROTOBUF_EXPORT extern ExtensionRangeOptions_DeclarationGlobalsTypeInternal ExtensionRangeOptions_Declaration_globals_;
+PROTOBUF_EXPORT extern ExtensionRangeOptions_DeclarationGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) ExtensionRangeOptions_Declaration_globals_;
 class FeatureSet;
 struct FeatureSetGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FeatureSetGlobalsTypeInternal FeatureSet_globals_;
+PROTOBUF_EXPORT extern FeatureSetGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FeatureSet_globals_;
 class FeatureSetDefaults;
 struct FeatureSetDefaultsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FeatureSetDefaultsGlobalsTypeInternal FeatureSetDefaults_globals_;
+PROTOBUF_EXPORT extern FeatureSetDefaultsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FeatureSetDefaults_globals_;
 class FeatureSetDefaults_FeatureSetEditionDefault;
 struct FeatureSetDefaults_FeatureSetEditionDefaultGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FeatureSetDefaults_FeatureSetEditionDefaultGlobalsTypeInternal FeatureSetDefaults_FeatureSetEditionDefault_globals_;
+PROTOBUF_EXPORT extern FeatureSetDefaults_FeatureSetEditionDefaultGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FeatureSetDefaults_FeatureSetEditionDefault_globals_;
 class FeatureSet_ProtoLimitsFeature;
 struct FeatureSet_ProtoLimitsFeatureGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FeatureSet_ProtoLimitsFeatureGlobalsTypeInternal FeatureSet_ProtoLimitsFeature_globals_;
+PROTOBUF_EXPORT extern FeatureSet_ProtoLimitsFeatureGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FeatureSet_ProtoLimitsFeature_globals_;
 class FeatureSet_VisibilityFeature;
 struct FeatureSet_VisibilityFeatureGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FeatureSet_VisibilityFeatureGlobalsTypeInternal FeatureSet_VisibilityFeature_globals_;
+PROTOBUF_EXPORT extern FeatureSet_VisibilityFeatureGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FeatureSet_VisibilityFeature_globals_;
 class FieldDescriptorProto;
 struct FieldDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FieldDescriptorProtoGlobalsTypeInternal FieldDescriptorProto_globals_;
+PROTOBUF_EXPORT extern FieldDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FieldDescriptorProto_globals_;
 class FieldOptions;
 struct FieldOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FieldOptionsGlobalsTypeInternal FieldOptions_globals_;
+PROTOBUF_EXPORT extern FieldOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FieldOptions_globals_;
 class FieldOptions_EditionDefault;
 struct FieldOptions_EditionDefaultGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FieldOptions_EditionDefaultGlobalsTypeInternal FieldOptions_EditionDefault_globals_;
+PROTOBUF_EXPORT extern FieldOptions_EditionDefaultGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FieldOptions_EditionDefault_globals_;
 class FieldOptions_FeatureSupport;
 struct FieldOptions_FeatureSupportGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FieldOptions_FeatureSupportGlobalsTypeInternal FieldOptions_FeatureSupport_globals_;
+PROTOBUF_EXPORT extern FieldOptions_FeatureSupportGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FieldOptions_FeatureSupport_globals_;
 class FileDescriptorProto;
 struct FileDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FileDescriptorProtoGlobalsTypeInternal FileDescriptorProto_globals_;
+PROTOBUF_EXPORT extern FileDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FileDescriptorProto_globals_;
 class FileDescriptorSet;
 struct FileDescriptorSetGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FileDescriptorSetGlobalsTypeInternal FileDescriptorSet_globals_;
+PROTOBUF_EXPORT extern FileDescriptorSetGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FileDescriptorSet_globals_;
 class FileOptions;
 struct FileOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern FileOptionsGlobalsTypeInternal FileOptions_globals_;
+PROTOBUF_EXPORT extern FileOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) FileOptions_globals_;
 class GeneratedCodeInfo;
 struct GeneratedCodeInfoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern GeneratedCodeInfoGlobalsTypeInternal GeneratedCodeInfo_globals_;
+PROTOBUF_EXPORT extern GeneratedCodeInfoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) GeneratedCodeInfo_globals_;
 class GeneratedCodeInfo_Annotation;
 struct GeneratedCodeInfo_AnnotationGlobalsTypeInternal;
-PROTOBUF_EXPORT extern GeneratedCodeInfo_AnnotationGlobalsTypeInternal GeneratedCodeInfo_Annotation_globals_;
+PROTOBUF_EXPORT extern GeneratedCodeInfo_AnnotationGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) GeneratedCodeInfo_Annotation_globals_;
 class MessageOptions;
 struct MessageOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern MessageOptionsGlobalsTypeInternal MessageOptions_globals_;
+PROTOBUF_EXPORT extern MessageOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) MessageOptions_globals_;
 class MethodDescriptorProto;
 struct MethodDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern MethodDescriptorProtoGlobalsTypeInternal MethodDescriptorProto_globals_;
+PROTOBUF_EXPORT extern MethodDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) MethodDescriptorProto_globals_;
 class MethodOptions;
 struct MethodOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern MethodOptionsGlobalsTypeInternal MethodOptions_globals_;
+PROTOBUF_EXPORT extern MethodOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) MethodOptions_globals_;
 class OneofDescriptorProto;
 struct OneofDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern OneofDescriptorProtoGlobalsTypeInternal OneofDescriptorProto_globals_;
+PROTOBUF_EXPORT extern OneofDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) OneofDescriptorProto_globals_;
 class OneofOptions;
 struct OneofOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern OneofOptionsGlobalsTypeInternal OneofOptions_globals_;
+PROTOBUF_EXPORT extern OneofOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) OneofOptions_globals_;
 class ServiceDescriptorProto;
 struct ServiceDescriptorProtoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern ServiceDescriptorProtoGlobalsTypeInternal ServiceDescriptorProto_globals_;
+PROTOBUF_EXPORT extern ServiceDescriptorProtoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) ServiceDescriptorProto_globals_;
 class ServiceOptions;
 struct ServiceOptionsGlobalsTypeInternal;
-PROTOBUF_EXPORT extern ServiceOptionsGlobalsTypeInternal ServiceOptions_globals_;
+PROTOBUF_EXPORT extern ServiceOptionsGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) ServiceOptions_globals_;
 class SourceCodeInfo;
 struct SourceCodeInfoGlobalsTypeInternal;
-PROTOBUF_EXPORT extern SourceCodeInfoGlobalsTypeInternal SourceCodeInfo_globals_;
+PROTOBUF_EXPORT extern SourceCodeInfoGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) SourceCodeInfo_globals_;
 class SourceCodeInfo_Location;
 struct SourceCodeInfo_LocationGlobalsTypeInternal;
-PROTOBUF_EXPORT extern SourceCodeInfo_LocationGlobalsTypeInternal SourceCodeInfo_Location_globals_;
+PROTOBUF_EXPORT extern SourceCodeInfo_LocationGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) SourceCodeInfo_Location_globals_;
 class UninterpretedOption;
 struct UninterpretedOptionGlobalsTypeInternal;
-PROTOBUF_EXPORT extern UninterpretedOptionGlobalsTypeInternal UninterpretedOption_globals_;
+PROTOBUF_EXPORT extern UninterpretedOptionGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) UninterpretedOption_globals_;
 class UninterpretedOption_NamePart;
 struct UninterpretedOption_NamePartGlobalsTypeInternal;
-PROTOBUF_EXPORT extern UninterpretedOption_NamePartGlobalsTypeInternal UninterpretedOption_NamePart_globals_;
+PROTOBUF_EXPORT extern UninterpretedOption_NamePartGlobalsTypeInternal
+    PROTOBUF_ALIGNAS(::google::protobuf::internal::kClassDataAlignment) UninterpretedOption_NamePart_globals_;
 template <>
 internal::EnumTraitsT<::google::protobuf::Edition_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::Edition>;
@@ -258,6 +293,111 @@ internal::EnumTraitsT<::google::protobuf::MethodOptions_IdempotencyLevel_interna
 template <>
 internal::EnumTraitsT<::google::protobuf::SymbolVisibility_internal_data_>
     internal::EnumTraitsImpl::value<::google::protobuf::SymbolVisibility>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::DescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::DescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::DescriptorProto_ExtensionRange_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::DescriptorProto_ExtensionRange>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::DescriptorProto_ReservedRange_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::DescriptorProto_ReservedRange>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumDescriptorProto_EnumReservedRange_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumDescriptorProto_EnumReservedRange>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumValueDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumValueDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::EnumValueOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::EnumValueOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::ExtensionRangeOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::ExtensionRangeOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::ExtensionRangeOptions_Declaration_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::ExtensionRangeOptions_Declaration>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FeatureSet_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FeatureSet>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FeatureSetDefaults_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FeatureSetDefaults>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FeatureSetDefaults_FeatureSetEditionDefault_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FeatureSetDefaults_FeatureSetEditionDefault>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FeatureSet_ProtoLimitsFeature_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FeatureSet_ProtoLimitsFeature>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FeatureSet_VisibilityFeature_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FeatureSet_VisibilityFeature>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FieldDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FieldDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FieldOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FieldOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FieldOptions_EditionDefault_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FieldOptions_EditionDefault>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FieldOptions_FeatureSupport_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FieldOptions_FeatureSupport>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FileDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FileDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FileDescriptorSet_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FileDescriptorSet>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::FileOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::FileOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::GeneratedCodeInfo_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::GeneratedCodeInfo>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::GeneratedCodeInfo_Annotation_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::GeneratedCodeInfo_Annotation>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::MessageOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::MessageOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::MethodDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::MethodDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::MethodOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::MethodOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::OneofDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::OneofDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::OneofOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::OneofOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::ServiceDescriptorProto_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::ServiceDescriptorProto>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::ServiceOptions_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::ServiceOptions>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::SourceCodeInfo_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::SourceCodeInfo>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::SourceCodeInfo_Location_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::SourceCodeInfo_Location>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::UninterpretedOption_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::UninterpretedOption>;
+template <>
+internal::GeneratedMessageTraitsT<&::google::protobuf::UninterpretedOption_NamePart_globals_>
+    internal::MessageTraitsImpl::value<::google::protobuf::UninterpretedOption_NamePart>;
 namespace internal {
 #if !defined(PROTOBUF_CONSTINIT_DEFAULT_INSTANCES)
 PROTOBUF_EXPORT void InitializeFileDescriptorDefaultInstancesSlow();
@@ -2880,7 +3020,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FeatureSet final : 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -2897,7 +3037,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FeatureSet final : 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -2906,22 +3046,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FeatureSet final : 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FeatureSet, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FeatureSet, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               FeatureSet, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -2984,24 +3122,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FeatureSet final : 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FeatureSet, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FeatureSet, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -3047,8 +3181,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FeatureSet final : 
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<FeatureSet, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -4207,7 +4341,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SourceCodeInfo fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -4224,7 +4358,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SourceCodeInfo fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -4233,22 +4367,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SourceCodeInfo fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   SourceCodeInfo, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   SourceCodeInfo, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               SourceCodeInfo, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -4311,24 +4443,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SourceCodeInfo fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   SourceCodeInfo, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   SourceCodeInfo, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -4374,8 +4502,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SourceCodeInfo fina
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<SourceCodeInfo, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -5023,7 +5151,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ServiceOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -5040,7 +5168,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ServiceOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -5049,22 +5177,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ServiceOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   ServiceOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   ServiceOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               ServiceOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -5127,24 +5253,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ServiceOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   ServiceOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   ServiceOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -5190,8 +5312,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ServiceOptions fina
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<ServiceOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -5427,7 +5549,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OneofOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -5444,7 +5566,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OneofOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -5453,22 +5575,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OneofOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   OneofOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   OneofOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               OneofOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -5531,24 +5651,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OneofOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   OneofOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   OneofOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -5594,8 +5710,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED OneofOptions final 
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<OneofOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -5860,7 +5976,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MethodOptions final
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -5877,7 +5993,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MethodOptions final
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -5886,22 +6002,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MethodOptions final
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   MethodOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   MethodOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               MethodOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -5964,24 +6078,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MethodOptions final
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   MethodOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   MethodOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -6027,8 +6137,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MethodOptions final
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<MethodOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -6298,7 +6408,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MessageOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -6315,7 +6425,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MessageOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -6324,22 +6434,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MessageOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   MessageOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   MessageOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               MessageOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -6402,24 +6510,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MessageOptions fina
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   MessageOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   MessageOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -6465,8 +6569,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MessageOptions fina
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<MessageOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -6893,7 +6997,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -6910,7 +7014,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -6919,22 +7023,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FileOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FileOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               FileOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -6997,24 +7099,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FileOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FileOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -7060,8 +7158,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileOptions final :
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<FileOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -7557,7 +7655,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -7574,7 +7672,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -7583,22 +7681,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FieldOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FieldOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               FieldOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -7661,24 +7757,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldOptions final 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FieldOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FieldOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -7724,8 +7816,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FieldOptions final 
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<FieldOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -8262,7 +8354,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExtensionRangeOptio
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -8279,7 +8371,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExtensionRangeOptio
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -8288,22 +8380,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExtensionRangeOptio
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   ExtensionRangeOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   ExtensionRangeOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               ExtensionRangeOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -8366,24 +8456,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExtensionRangeOptio
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   ExtensionRangeOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   ExtensionRangeOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -8429,8 +8515,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ExtensionRangeOptio
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<ExtensionRangeOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -8693,7 +8779,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumValueOptions fi
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -8710,7 +8796,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumValueOptions fi
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -8719,22 +8805,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumValueOptions fi
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   EnumValueOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   EnumValueOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               EnumValueOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -8797,24 +8881,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumValueOptions fi
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   EnumValueOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   EnumValueOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -8860,8 +8940,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumValueOptions fi
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<EnumValueOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -9123,7 +9203,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -9140,7 +9220,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -9149,22 +9229,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   EnumOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   EnumOptions, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               EnumOptions, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -9227,24 +9305,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumOptions final :
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   EnumOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   EnumOptions, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -9290,8 +9364,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EnumOptions final :
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<EnumOptions, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
@@ -12057,7 +12131,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileDescriptorSet f
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Singular>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline bool HasExtension(
+  [[nodiscard]] inline bool HasExtension(
       const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.Has(id.number());
@@ -12074,7 +12148,7 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileDescriptorSet f
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             typename = typename _proto_TypeTraits::Repeated>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline int ExtensionSize(
+  [[nodiscard]] inline int ExtensionSize(
       const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
                                        _field_type, _is_packed>& id) const {
     return _impl_._extensions_.ExtensionSize(id.number());
@@ -12083,22 +12157,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileDescriptorSet f
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FileDescriptorSet, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(
+      const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
+                                       _field_type, _is_packed>& id) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, id.default_value());
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Singular::ConstType
-      GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
-                   FileDescriptorSet, _proto_TypeTraits, _field_type, _is_packed>& id)
-          const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Singular::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+               FileDescriptorSet, _proto_TypeTraits, _field_type, _is_packed>& id) const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(*this, id.number(), _impl_._extensions_,
                                   id.default_value());
   }
@@ -12161,24 +12233,20 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileDescriptorSet f
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<!_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FileDescriptorSet, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed,
             ::std::enable_if_t<_proto_TypeTraits::kLifetimeBound, int> = 0>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline
-      typename _proto_TypeTraits::Repeated::ConstType
-      GetExtension(
-          const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
-                                           _field_type, _is_packed>& id,
-          int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  [[nodiscard]] inline typename _proto_TypeTraits::Repeated::ConstType
+  GetExtension(const ::google::protobuf::internal::ExtensionIdentifier<
+                   FileDescriptorSet, _proto_TypeTraits, _field_type, _is_packed>& id,
+               int index) const ABSL_ATTRIBUTE_LIFETIME_BOUND {
     return _proto_TypeTraits::Get(id.number(), _impl_._extensions_, index);
   }
 
@@ -12224,8 +12292,8 @@ class PROTOBUF_EXPORT  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED FileDescriptorSet f
 
   template <typename _proto_TypeTraits, ::google::protobuf::internal::FieldType _field_type,
             bool _is_packed>
-  PROTOBUF_FUTURE_ADD_NODISCARD inline const typename _proto_TypeTraits::
-      Repeated::RepeatedFieldType&
+  [[nodiscard]] inline const typename _proto_TypeTraits::Repeated::
+      RepeatedFieldType&
       GetRepeatedExtension(
           const ::google::protobuf::internal::ExtensionIdentifier<FileDescriptorSet, _proto_TypeTraits,
                                            _field_type, _is_packed>& id)
