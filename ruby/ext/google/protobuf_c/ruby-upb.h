@@ -2480,10 +2480,10 @@ UPB_API_INLINE size_t upb_Array_Capacity(const struct upb_Array* arr) {
 #define UPB_OPAQUE(x) x##_opaque
 
 typedef enum {
-  kUpb_TaggedAuxType_Unknown = 0,                // tag 000
-  kUpb_TaggedAuxType_NonCanonicalExtension = 1,  // tag 001
-  kUpb_TaggedAuxType_CanonicalExtension = 3,     // tag 011
-  kUpb_TaggedAuxType_AliasedUnknown = 4          // tag 100
+  kUpb_TaggedAuxType_Unknown = 0,             // tag 000
+  kUpb_TaggedAuxType_UnknownAuxField = 1,     // tag 001
+  kUpb_TaggedAuxType_CanonicalExtension = 3,  // tag 011
+  kUpb_TaggedAuxType_AliasedUnknown = 4       // tag 100
 } upb_TaggedAuxType;
 
 struct upb_Message {
@@ -5167,7 +5167,8 @@ typedef struct upb_TaggedAuxPtr {
   // Three lowest bits form a tag:
   // 000 - non-aliased unknown data (upb_StringView*)
   // 100 - aliased unknown data (upb_StringView*)
-  // 001 - non-canonical extension (upb_AuxField*)
+  // 001 - unknown aux field, i.e. a non-canonical extension or field
+  //       (upb_AuxField*)
   // 011 - canonical extension (upb_AuxField*)
   //
   // Bit 0 (lowest bit): Represents the data format in memory (1 for parsed
@@ -5227,12 +5228,12 @@ UPB_INLINE bool upb_TaggedAuxPtr_IsCanonicalExtension(upb_TaggedAuxPtr ptr) {
   return !upb_TaggedAuxPtr_IsNull(ptr) && ((ptr.ptr & 3) == 3);
 }
 
-UPB_INLINE bool upb_TaggedAuxPtr_IsNonCanonicalExtension(upb_TaggedAuxPtr ptr) {
+UPB_INLINE bool upb_TaggedAuxPtr_IsUnknownAuxField(upb_TaggedAuxPtr ptr) {
   return !upb_TaggedAuxPtr_IsNull(ptr) && ((ptr.ptr & 3) == 1);
 }
 
-// Returns true if the entry is a canonical or non-canonical extension.
-UPB_INLINE bool upb_TaggedAuxPtr_IsExtension(upb_TaggedAuxPtr ptr) {
+// Returns true if the entry is a canonical extension or an unknown aux field.
+UPB_INLINE bool upb_TaggedAuxPtr_IsAuxField(upb_TaggedAuxPtr ptr) {
   return !upb_TaggedAuxPtr_IsNull(ptr) && ((ptr.ptr & 1) != 0);
 }
 
@@ -5251,23 +5252,22 @@ UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_CanonicalExtension(
   return (upb_AuxField*)(ptr.ptr & ~7ULL);
 }
 
-UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_NonCanonicalExtension(
+UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_UnknownAuxField(
     upb_TaggedAuxPtr ptr) {
-  UPB_ASSERT(upb_TaggedAuxPtr_IsNonCanonicalExtension(ptr));
+  UPB_ASSERT(upb_TaggedAuxPtr_IsUnknownAuxField(ptr));
   return (upb_AuxField*)(ptr.ptr & ~7ULL);
 }
 
-UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_Extension(upb_TaggedAuxPtr ptr) {
-  UPB_ASSERT(upb_TaggedAuxPtr_IsExtension(ptr));
+UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_AuxField(upb_TaggedAuxPtr ptr) {
+  UPB_ASSERT(upb_TaggedAuxPtr_IsAuxField(ptr));
   return (upb_AuxField*)(ptr.ptr & ~7ULL);
 }
 
-// Returns the extension pointer if the tagged pointer is a canonical or
-// non-canonical extension, otherwise returns NULL.
-UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_TryGetExtension(
-    upb_TaggedAuxPtr ptr) {
+// Returns the aux field pointer if the tagged pointer is a canonical extension
+// or an unknown aux field, otherwise returns NULL.
+UPB_INLINE upb_AuxField* upb_TaggedAuxPtr_TryGetAuxField(upb_TaggedAuxPtr ptr) {
   if (upb_TaggedAuxPtr_IsCanonicalExtension(ptr) ||
-      upb_TaggedAuxPtr_IsNonCanonicalExtension(ptr)) {
+      upb_TaggedAuxPtr_IsUnknownAuxField(ptr)) {
     return (upb_AuxField*)(ptr.ptr & ~7ULL);
   }
   return NULL;
@@ -5303,10 +5303,10 @@ UPB_INLINE upb_TaggedAuxPtr upb_TaggedAuxPtr_Null(void) {
 }
 
 UPB_INLINE upb_TaggedAuxPtr
-upb_TaggedAuxPtr_MakeExtension(const upb_AuxField* e, upb_TaggedAuxType type) {
+upb_TaggedAuxPtr_MakeAuxField(const upb_AuxField* e, upb_TaggedAuxType type) {
   UPB_ASSERT(((uintptr_t)e & 7) == 0);
   UPB_ASSERT(type == kUpb_TaggedAuxType_CanonicalExtension ||
-             type == kUpb_TaggedAuxType_NonCanonicalExtension);
+             type == kUpb_TaggedAuxType_UnknownAuxField);
   upb_TaggedAuxPtr ptr;
   ptr.ptr = (uintptr_t)e | type;
   return ptr;
@@ -17910,21 +17910,21 @@ extern "C" {
 
 typedef enum {
   kUpb_MessageUnknownType_StringView,
-  kUpb_MessageUnknownType_NonCanonicalExtension,
+  kUpb_MessageUnknownType_AuxField,
 } upb_MessageUnknownType;
 
 // Represents an unknown field in a message, whether it's in a serialized
-// (upb_StringView) or parsed non-canonical extension (upb_AuxField*) format.
+// (upb_StringView) or parsed non-canonical aux field (upb_AuxField*) format.
 typedef struct upb_MessageUnknown {
   uint8_t type;
   union {
     upb_StringView bytes;
-    const upb_AuxField* extension;
+    const upb_AuxField* aux_field;
   } value;
 } upb_MessageUnknown;
 
 // Support iteration over unknown (upb_MessageUnknown*), including unknown
-// upb_StringView and non-canonical extensions (upb_AuxField*).
+// upb_StringView and non-canonical aux fields (upb_AuxField*).
 UPB_INLINE bool upb_Message_NextUnknown2(const struct upb_Message* msg,
                                          struct upb_MessageUnknown* data,
                                          uintptr_t* iter) {
@@ -17938,10 +17938,9 @@ UPB_INLINE bool upb_Message_NextUnknown2(const struct upb_Message* msg,
         data->value.bytes = *upb_TaggedPtrAux_StringViewRepr(tagged_ptr);
         *iter = i;
         return true;
-      } else if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
-        data->type = kUpb_MessageUnknownType_NonCanonicalExtension;
-        data->value.extension =
-            upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
+      } else if (upb_TaggedAuxPtr_IsUnknownAuxField(tagged_ptr)) {
+        data->type = kUpb_MessageUnknownType_AuxField;
+        data->value.aux_field = upb_TaggedAuxPtr_UnknownAuxField(tagged_ptr);
         *iter = i;
         return true;
       }
@@ -17955,18 +17954,18 @@ UPB_INLINE bool upb_Message_NextUnknown2(const struct upb_Message* msg,
 }
 
 // Iterates over unknown fields in wire format (upb_StringView).
-// If an unknown field is a non-canonical extension, it is automatically
+// If an unknown field is a non-canonical aux field, it is automatically
 // encoded into wire format into `*arena` using default encode options (0).
 //
 // `arena` is a pointer to `upb_Arena*`. If `*arena` is NULL when a
-// non-canonical extension is encountered, an arena will be lazily created via
+// non-canonical aux field is encountered, an arena will be lazily created via
 // `upb_Arena_New()`. The caller is responsible for freeing `*arena` (if
 // non-NULL) using `upb_Arena_Free(*arena)` after iteration completes.
 //
-// NOTE: Automatically encoding non-canonical extensions into wire format may
-// incur a performance penalty if non-canonical extensions are present, as
+// NOTE: Automatically encoding non-canonical aux fields into wire format may
+// incur a performance penalty if non-canonical aux fields are present, as
 // encoding requires allocating temporary buffers in `*arena`. Use
-// `upb_Message_NextUnknown2` if you want to inspect non-canonical extensions
+// `upb_Message_NextUnknown2` if you want to inspect non-canonical aux fields
 // directly without encoding them.
 UPB_NODISCARD bool upb_Message_NextWireFormatUnknown(
     const struct upb_Message* msg, struct upb_Arena** arena,
@@ -17985,11 +17984,11 @@ typedef struct {
 } upb_FindUnknownRet2;
 
 // Finds first occurrence of unknown data (upb_MessageUnknown) by tag id in
-// message, including unknown upb_StringView and non-canonical extensions
+// message, including unknown upb_StringView and non-canonical aux fields
 // (upb_AuxField*).
 //
 // If multiple matching entries exist for the same field number (e.g. both a
-// raw unknown upb_StringView and a non-canonical extension), this function
+// raw unknown upb_StringView and a non-canonical aux field), this function
 // returns the one encountered first in internal iteration order (which follows
 // the order they were added or parsed).
 //
@@ -18032,7 +18031,7 @@ typedef enum {
 // returned region.
 // TODO: b/510055656 - Legacy API that works with messages that only have
 // unknown data in upb_StringView format. Use `upb_Message_DeleteUnknown2` for
-// messages that may have non-canonical extensions.
+// messages that may have non-canonical aux fields.
 UPB_NODISCARD upb_Message_DeleteUnknownStatus
 upb_Message_DeleteUnknown(struct upb_Message* msg, upb_StringView* data,
                           uintptr_t* iter, struct upb_Arena* arena);
@@ -18065,7 +18064,7 @@ upb_Message_DeleteUnknown(struct upb_Message* msg, upb_StringView* data,
 // returned region.
 //
 // Support deletion of unknown (upb_MessageUnknown*), including unknown
-// upb_StringView and non-canonical extensions (upb_AuxField*).
+// upb_StringView and non-canonical aux fields (upb_AuxField*).
 UPB_NODISCARD upb_Message_DeleteUnknownStatus upb_Message_DeleteUnknown2(
     struct upb_Message* msg, struct upb_MessageUnknown* data, uintptr_t* iter,
     struct upb_Arena* arena);
