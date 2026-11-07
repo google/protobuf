@@ -463,10 +463,15 @@ absl::Status UntypedMessage::DecodeDelimited(io::CodedInputStream& stream,
   if (!stream.IncrementRecursionDepth()) {
     return MakeTooDeepError();
   }
-  auto limit = stream.ReadLengthAndPushLimit();
-  if (limit == 0) {
+  int length;
+  if (!stream.ReadVarintSizeAsInt(&length)) {
     return MakeUnexpectedEofError();
   }
+  int bytes_until_limit = stream.BytesUntilLimit();
+  if (bytes_until_limit >= 0 && length > bytes_until_limit) {
+    return MakeMalformedLengthDelimError();
+  }
+  auto limit = stream.PushLimit(length);
 
   switch (field.proto().kind()) {
     case Field::TYPE_STRING:
@@ -525,6 +530,11 @@ absl::Status UntypedMessage::DecodeDelimited(io::CodedInputStream& stream,
       }
       break;
     }
+  }
+  // The field must be fully consumed; otherwise the underlying stream ended
+  // before the declared length (e.g. a truncated submessage).
+  if (stream.BytesUntilLimit() != 0) {
+    return MakeUnexpectedEofError();
   }
   // TODO: Remove this suppression.
   (void)stream.DecrementRecursionDepthAndPopLimit(limit);
