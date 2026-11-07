@@ -127,11 +127,7 @@ class PROTOBUF_EXPORT SerialArena {
       }
     }
 
-    void* ptr;
-    if (ABSL_PREDICT_TRUE(MaybeAllocateAligned(n, &ptr))) {
-      return ptr;
-    }
-    return AllocateAlignedFallback(n);
+    return AllocateAlignedImpl<AllocateAlignedMode::kDefault>(n);
   }
 
  private:
@@ -203,20 +199,71 @@ class PROTOBUF_EXPORT SerialArena {
     internal::PoisonMemoryRegion(p, size);
   }
 
+  enum class AllocateAlignedMode {
+    // Attempt to allocate in the current block. If there is not enough space,
+    // call the out-of-line fallback allocator to allocate a new block. Always
+    // succeeds.
+    kDefault,
+    // Attempt to allocate in the current block. If there is not enough space,
+    // return `nullptr`.
+    kNoFallback,
+    // Allocate in the current block assuming there is enough space. Callers are
+    // responsible for ensuring there is enough space.
+    kInfallible,
+  };
+
+  struct NoCleanup {
+    void AddCleanup(SerialArena& arena, void* elem) {}
+  };
+
+  struct WithCleanup {
+    void (*destructor)(void*);
+
+    void AddCleanup(SerialArena& arena, void* elem) {
+      arena.AddCleanup(elem, destructor);
+    }
+  };
+
   // Allocate space if the current region provides enough space.
-  bool MaybeAllocateAligned(size_t n, void** out) {
-    ABSL_DCHECK(internal::ArenaAlignDefault{}.IsAligned(n));
+  template <AllocateAlignedMode mode, typename Align = ArenaAlignDefault,
+            typename Cleanup = NoCleanup>
+  PROTOBUF_ALWAYS_INLINE void* AllocateAlignedImpl(size_t n, Align align = {},
+                                                   Cleanup cleanup = {}) {
+    static_assert(std::is_same_v<Align, ArenaAlignDefault> ||
+                  std::is_same_v<Align, MemoryAlign>);
+    static_assert(std::is_same_v<Cleanup, NoCleanup> ||
+                  std::is_same_v<Cleanup, WithCleanup>);
+
     ABSL_DCHECK_GE(limit_, ptr());
     char* ret = ptr();
-    if (ABSL_PREDICT_FALSE(static_cast<size_t>(limit_ - ret) < n)) {
-      return false;
+
+    ret = align.CeilDefaultAligned(ret);
+    n = align.CeilDefaultAligned(n);
+
+    switch (mode) {
+      case AllocateAlignedMode::kDefault:
+        if (ABSL_PREDICT_FALSE(ret + n > limit_)) {
+          PROTOBUF_MUSTTAIL return AllocateAlignedFallbackImpl(n, align,
+                                                               cleanup);
+        }
+        break;
+      case AllocateAlignedMode::kNoFallback:
+        if (ABSL_PREDICT_FALSE(ret + n > limit_)) {
+          return nullptr;
+        }
+        break;
+      case AllocateAlignedMode::kInfallible:
+        ABSL_DCHECK_LE(n, static_cast<size_t>(limit_ - ret));
+        break;
     }
+
     internal::UnpoisonMemoryRegion(ret, n);
-    *out = ret;
     char* next = ret + n;
     set_ptr(next);
+    cleanup.AddCleanup(*this, ret);
     MaybePrefetchData(next);
-    return true;
+    PROTOBUF_ASSUME(ret != nullptr);
+    return ret;
   }
 
   // If there is enough space in the current block, allocate space for one
@@ -225,27 +272,6 @@ class PROTOBUF_EXPORT SerialArena {
   PROTOBUF_ALWAYS_INLINE void* MaybeAllocateStringWithCleanup() {
     void* p;
     return MaybeAllocateString(p) ? p : nullptr;
-  }
-
-  PROTOBUF_ALWAYS_INLINE
-  void* AllocateAlignedWithCleanup(size_t n, size_t align,
-                                   void (*destructor)(void*)) {
-    auto align_as = align <= ArenaAlignDefault::align ? ArenaAlignDefault{}
-                                                      : ArenaAlignAs(align);
-    n = align_as.Ceil(n);
-    char* ret = align_as.CeilDefaultAligned(ptr());
-    // See the comment in MaybeAllocateAligned re uintptr_t.
-    if (ABSL_PREDICT_FALSE(reinterpret_cast<uintptr_t>(ret) + n >
-                           reinterpret_cast<uintptr_t>(limit_))) {
-      return AllocateAlignedWithCleanupFallback(n, align, destructor);
-    }
-    internal::UnpoisonMemoryRegion(ret, n);
-    char* next = ret + n;
-    set_ptr(next);
-    AddCleanup(ret, destructor);
-    ABSL_DCHECK_GE(limit_, ptr());
-    MaybePrefetchData(next);
-    return ret;
   }
 
   PROTOBUF_ALWAYS_INLINE
@@ -408,10 +434,8 @@ class PROTOBUF_EXPORT SerialArena {
     limit_ = limit;
   }
 
-  void* AllocateAlignedFallback(size_t n);
-  void* AllocateAlignedWithCleanupFallback(size_t n, size_t align,
-                                           void (*destructor)(void*));
-  void AddCleanupFallback(void* elem, void (*destructor)(void*));
+  template <typename Align, typename Cleanup>
+  void* AllocateAlignedFallbackImpl(size_t n, Align align, Cleanup cleanup);
   inline void AllocateNewBlock(size_t n);
   inline void Init(ArenaBlock* b, size_t offset);
 
@@ -495,6 +519,16 @@ inline Arena* ParentArena(SerialArena* arena) {
   if (arena == nullptr) return nullptr;
   return arena->parent();
 }
+
+extern template void* SerialArena::AllocateAlignedFallbackImpl(
+    size_t, ArenaAlignDefault, NoCleanup);
+extern template void* SerialArena::AllocateAlignedFallbackImpl<MemoryAlign>(
+    size_t, MemoryAlign, NoCleanup);
+extern template void* SerialArena::AllocateAlignedFallbackImpl<
+    ArenaAlignDefault, SerialArena::WithCleanup>(size_t, ArenaAlignDefault,
+                                                 WithCleanup);
+extern template void* SerialArena::AllocateAlignedFallbackImpl<
+    MemoryAlign, SerialArena::WithCleanup>(size_t, MemoryAlign, WithCleanup);
 
 }  // namespace internal
 }  // namespace protobuf
