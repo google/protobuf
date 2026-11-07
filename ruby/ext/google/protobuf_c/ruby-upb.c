@@ -10248,7 +10248,7 @@ static upb_UnknownFields* upb_UnknownFields_Build(upb_UnknownField_Context* ctx,
       const upb_AuxField* ext = (const upb_AuxField*)data.value.aux_field;
       bool is_message_set = false;
       const upb_MiniTableExtension* ext_mt =
-          upb_Extension_MiniTableExtension(ext);
+          UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext);
       const upb_MiniTable* extendee = upb_MiniTableExtension_Extendee(ext_mt);
       if (extendee) {
         is_message_set = upb_MiniTable_IsMessageSet(extendee);
@@ -10673,7 +10673,7 @@ upb_Message* _upb_Message_Copy(upb_Message* dst, const upb_Message* src,
           upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
       const upb_MiniTableField* field = upb_Extension_MiniTableField(msg_ext);
       upb_AuxField* dst_ext = UPB_PRIVATE(_upb_Message_GetOrCreateExtension)(
-          dst, upb_Extension_MiniTableExtension(msg_ext), arena);
+          dst, UPB_PRIVATE(_upb_Extension_MiniTableExtension)(msg_ext), arena);
       if (!dst_ext) goto err;
 
       if (upb_MiniTableField_IsScalar(field)) {
@@ -16320,7 +16320,7 @@ bool upb_Message_Next(const upb_Message* msg, const upb_MessageDef* m,
             upb_TaggedAuxPtr_CanonicalExtension(tagged_ptr);
         *out_val = upb_Extension_GetValue(ext);
         *out_f = upb_DefPool_FindExtensionByMiniTable(
-            ext_pool, upb_Extension_MiniTableExtension(ext));
+            ext_pool, UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext));
         *iter = i;
         return true;
       }
@@ -19748,7 +19748,7 @@ static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
     char* buf = ptr;
     size_t size = 0;
     UPB_PRIVATE(_upb_Encode_Extension)(
-        encoder, upb_Extension_MiniTableExtension(ext),
+        encoder, UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext),
         upb_Extension_GetValue(ext), is_message_set, &buf, &size,
         encode_options);
     view->data = buf;
@@ -19766,8 +19766,8 @@ static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
 upb_EncodeStatus upb_EncodeExtension(const struct upb_AuxField* ext,
                                      struct upb_Arena* arena,
                                      upb_StringView* view, int encode_options) {
-  const upb_MiniTable* extendee =
-      upb_MiniTableExtension_Extendee(upb_Extension_MiniTableExtension(ext));
+  const upb_MiniTable* extendee = upb_MiniTableExtension_Extendee(
+      UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext));
   bool is_message_set =
       extendee != NULL && upb_MiniTable_IsMessageSet(extendee);
   upb_encstate e;

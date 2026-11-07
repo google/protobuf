@@ -4755,14 +4755,25 @@ UPB_API_INLINE const upb_MiniTableField* upb_MiniTableExtension_ToField(
 // we can serialize it to binary format without needing to look it up in a
 // upb_ExtensionRegistry.
 //
+// It is described by a upb_MiniTableField, which is either part of a
+// upb_MiniTableExtension (as its first member, so the pointers are compatible)
+// or a freestanding upb_MiniTableField. upb_MiniTableField_IsExtension()
+// decides which (see _upb_Extension_MiniTableExtension()).
+//
 // The value is stored in the same allocation, at offset
 // kUpb_Extension_DataOffset from the start of the struct, and is sized
 // according to the field's representation (see _upb_Extension_Size).
 // It is only accessed through offset calculations, like the fields of a
 // upb_Message.
 typedef struct upb_AuxField {
-  const upb_MiniTableExtension* UPB_ONLYBITS(ext);
+  const upb_MiniTableField* UPB_ONLYBITS(field);
 } upb_AuxField;
+
+// _upb_Extension_MiniTableExtension() relies on the field being the first
+// member of upb_MiniTableExtension.
+UPB_STATIC_ASSERT(offsetof(struct upb_MiniTableExtension, UPB_PRIVATE(field)) ==
+                      0,
+                  "upb_MiniTableExtension must start with its field");
 
 // The offset of the value from the start of the upb_AuxField. Rounded up to 8
 // so that 8-byte values are naturally aligned on 32-bit platforms, where
@@ -4776,19 +4787,28 @@ enum {
 extern "C" {
 #endif
 
-// Returns the MiniTableExtension that describes this extension. Never NULL.
-UPB_API_INLINE const upb_MiniTableExtension* upb_Extension_MiniTableExtension(
-    const upb_AuxField* ext) {
-  UPB_ASSERT(ext->UPB_ONLYBITS(ext) != NULL);
-  return ext->UPB_ONLYBITS(ext);
-}
-
 // Returns the MiniTableField that describes this extension. Prefer this over
-// upb_Extension_MiniTableExtension() when only field properties (number, type,
+// _upb_Extension_MiniTableExtension() when only field properties (number, type,
 // sub-message, etc.) are needed. Never NULL.
 UPB_API_INLINE const upb_MiniTableField* upb_Extension_MiniTableField(
     const upb_AuxField* ext) {
-  return upb_MiniTableExtension_ToField(upb_Extension_MiniTableExtension(ext));
+  UPB_ASSERT(ext->UPB_ONLYBITS(field) != NULL);
+  return ext->UPB_ONLYBITS(field);
+}
+
+// Returns the upb_MiniTableExtension that the field of `ext` is part of. Never
+// NULL.
+//
+// The upb_MiniTableField that describes an entry is either part of a
+// upb_MiniTableExtension (it is the first member, so the pointers are
+// compatible) or a freestanding upb_MiniTableField. Which one is determined by
+// upb_MiniTableField_IsExtension(), so callers must only call this when that
+// is true. Only use this when the upb_MiniTableExtension itself is needed (e.g.
+// for its extendee); use upb_Extension_MiniTableField() otherwise.
+UPB_INLINE const upb_MiniTableExtension* UPB_PRIVATE(
+    _upb_Extension_MiniTableExtension)(const upb_AuxField* ext) {
+  UPB_ASSERT(upb_MiniTableField_IsExtension(upb_Extension_MiniTableField(ext)));
+  return (const upb_MiniTableExtension*)ext->UPB_ONLYBITS(field);
 }
 
 // Copies the value of `ext` into `val`, which must point to storage of the
@@ -5204,8 +5224,10 @@ typedef struct upb_TaggedAuxPtr {
   //
   // Invariants that hold for all extensions, canonical or non-canonical:
   //
-  //   - The extension is described by a upb_MiniTableExtension whose field is
-  //     flagged as an extension.
+  //   - The extension is described by a upb_MiniTableField. A canonical
+  //     extension's field is always part of a upb_MiniTableExtension; a
+  //     non-canonical extension's field is part of a upb_MiniTableExtension
+  //     iff upb_MiniTableField_IsExtension() is true.
   //   - The field is never a map, since protobuf does not allow map extensions.
   uintptr_t ptr;
 } upb_TaggedAuxPtr;
@@ -5419,7 +5441,7 @@ UPB_NODISCARD UPB_INLINE upb_AuxField* UPB_PRIVATE(_upb_Extension_New)(
   upb_AuxField* ext = (upb_AuxField*)upb_Arena_Malloc(a, size);
   if (UPB_UNLIKELY(!ext)) return NULL;
   _upb_Message_AlignedMemsetZero(ext, size);
-  ext->UPB_ONLYBITS(ext) = e;
+  ext->UPB_ONLYBITS(field) = upb_MiniTableExtension_ToField(e);
   return ext;
 }
 
@@ -5548,7 +5570,7 @@ UPB_INLINE bool upb_Message_NextExtension(const struct upb_Message* msg,
         // Empty repeated fields or maps semantically don't exist.
         if (UPB_PRIVATE(_upb_Extension_IsEmpty)(ext)) continue;
 
-        *out_e = upb_Extension_MiniTableExtension(ext);
+        *out_e = UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext);
         *out_v = upb_Extension_GetValue(ext);
         *iter = i;
         return true;
@@ -5578,7 +5600,7 @@ UPB_INLINE bool UPB_PRIVATE(_upb_Message_NextExtensionReverse)(
     // Empty repeated fields or maps semantically don't exist.
     if (UPB_PRIVATE(_upb_Extension_IsEmpty)(ext)) continue;
 
-    *out_e = upb_Extension_MiniTableExtension(ext);
+    *out_e = UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext);
     *out_v = upb_Extension_GetValue(ext);
     *iter = i;
     return true;
