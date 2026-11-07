@@ -1621,6 +1621,8 @@ TEST(GeneratedMessageReflectionTest, UnsafeShallowSwapFieldForeignFieldCheck) {
       GeneratedMessageReflectionTestHelper::UnsafeShallowSwapField(
           &message1, &message2, foreign_field),
       "Field does not match message type");
+}
+
 TEST(GeneratedMessageReflectionTest, OneofForeignDescriptorCheck) {
   unittest::TestAllTypes message1;
   const Reflection* reflection = message1.GetReflection();
