@@ -1045,9 +1045,9 @@ TEST(ConvertTest, ConvertExtensionToNonExtendable) {
   uintptr_t iter = kUpb_Message_UnknownBegin;
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(dst_msg, &unknown, &iter));
-  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   const upb_AuxField* ext_found =
-      static_cast<const upb_AuxField*>(unknown.value.extension);
+      static_cast<const upb_AuxField*>(unknown.value.aux_field);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found), 123);
@@ -1082,9 +1082,9 @@ TEST(ConvertTest, ConvertExtensionToExtendableButUnknown) {
   uintptr_t iter2 = kUpb_Message_UnknownBegin;
   upb_MessageUnknown unknown2;
   ASSERT_TRUE(upb_Message_NextUnknown2(dst_msg, &unknown2, &iter2));
-  EXPECT_EQ(unknown2.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+  EXPECT_EQ(unknown2.type, kUpb_MessageUnknownType_AuxField);
   const upb_AuxField* ext_found2 =
-      static_cast<const upb_AuxField*>(unknown2.value.extension);
+      static_cast<const upb_AuxField*>(unknown2.value.aux_field);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found2)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found2), 123);
@@ -1120,9 +1120,9 @@ TEST(ConvertTest, NonCanonicalToNonCanonical) {
   uintptr_t iter = kUpb_Message_UnknownBegin;
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(converted, &unknown, &iter));
-  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   const upb_AuxField* ext_found =
-      static_cast<const upb_AuxField*>(unknown.value.extension);
+      static_cast<const upb_AuxField*>(unknown.value.aux_field);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1000);
   EXPECT_EQ(upb_Extension_GetInt32(ext_found), 123);
@@ -1187,7 +1187,7 @@ TEST(ConvertTest, DeepCloneNonCanonicalExtensionOutlivesSourceMiniTable) {
     uintptr_t iter = kUpb_Message_UnknownBegin;
     upb_MessageUnknown unknown;
     ASSERT_TRUE(upb_Message_NextUnknown2(msg2, &unknown, &iter));
-    ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+    ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   }
 
   // msg3: a deep clone of msg2. It should only depend on B.
@@ -1256,7 +1256,7 @@ TEST(ConvertTest, DeepCloneMessageNonCanonicalExtensionOutlivesSourceSchema) {
     uintptr_t iter = kUpb_Message_UnknownBegin;
     upb_MessageUnknown unknown;
     ASSERT_TRUE(upb_Message_NextUnknown2(msg2, &unknown, &iter));
-    ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+    ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   }
   upb_Message* msg3 = upb_Message_DeepClone(msg2, dst_mt, arena3);
   ASSERT_NE(msg3, nullptr);
@@ -1293,10 +1293,10 @@ TEST(ConvertTest, DeepCloneEmptyNonCanonicalExtension) {
   uintptr_t iter = kUpb_Message_UnknownBegin;
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(msg, &unknown, &iter));
-  ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+  ASSERT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   upb_StringView encoded;
   ASSERT_EQ(upb_EncodeExtension(
-                static_cast<const upb_AuxField*>(unknown.value.extension),
+                static_cast<const upb_AuxField*>(unknown.value.aux_field),
                 src_arena.ptr(), &encoded, /*encode_options=*/0),
             kUpb_EncodeStatus_Ok);
   EXPECT_EQ(encoded.size, 0);
@@ -2417,9 +2417,9 @@ TEST(ConvertTest, NonCanonicalMessageToNonCanonical) {
   uintptr_t iter = kUpb_Message_UnknownBegin;
   upb_MessageUnknown unknown;
   ASSERT_TRUE(upb_Message_NextUnknown2(converted, &unknown, &iter));
-  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_NonCanonicalExtension);
+  EXPECT_EQ(unknown.type, kUpb_MessageUnknownType_AuxField);
   const upb_AuxField* ext_found =
-      static_cast<const upb_AuxField*>(unknown.value.extension);
+      static_cast<const upb_AuxField*>(unknown.value.aux_field);
   EXPECT_EQ(upb_MiniTableField_Number(upb_Extension_MiniTableField(ext_found)),
             1002);
 

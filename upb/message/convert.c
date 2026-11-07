@@ -852,8 +852,8 @@ static void upb_Message_ConvertInternal(upb_Converter* c, upb_Message* dst,
       _upb_Decoder_DecodeMessage(d, ptr, dst, dst_mt);
       UPB_ASSERT(d->end_group == DECODE_NOGROUP);
     } else {
-      UPB_ASSERT(unknown.type == kUpb_MessageUnknownType_NonCanonicalExtension);
-      const upb_AuxField* ext = unknown.value.extension;
+      UPB_ASSERT(unknown.type == kUpb_MessageUnknownType_AuxField);
+      const upb_AuxField* ext = unknown.value.aux_field;
       upb_Message_ConvertExtension(c, dst, dst_mt,
                                    upb_Extension_MiniTableExtension(ext),
                                    upb_Extension_GetValue(ext), extreg, depth);

@@ -762,9 +762,8 @@ char* encode_message(char* ptr, upb_encstate* e, const upb_Message* msg,
         const upb_StringView* unknown =
             upb_TaggedPtrAux_StringViewRepr(tagged_ptr);
         ptr = encode_bytes(ptr, e, unknown->data, unknown->size);
-      } else if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
-        const upb_AuxField* ext =
-            upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
+      } else if (upb_TaggedAuxPtr_IsUnknownAuxField(tagged_ptr)) {
+        const upb_AuxField* ext = upb_TaggedAuxPtr_UnknownAuxField(tagged_ptr);
         ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                          upb_Extension_GetValue(ext),
                          UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) ==

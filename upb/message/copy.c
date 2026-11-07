@@ -305,7 +305,7 @@ upb_Message* _upb_Message_Copy(upb_Message* dst, const upb_Message* src,
 
   for (size_t i = 0; i < in->size; i++) {
     upb_TaggedAuxPtr tagged_ptr = in->aux_data[i];
-    if (upb_TaggedAuxPtr_IsNonCanonicalExtension(tagged_ptr)) {
+    if (upb_TaggedAuxPtr_IsUnknownAuxField(tagged_ptr)) {
       // A non-canonical extension references a `upb_MiniTableExtension` (and
       // possibly its extendee and sub-message/enum tables) that belongs to a
       // foreign schema, e.g. the source schema of a `upb_Message_Convert()`.
@@ -313,7 +313,7 @@ upb_Message* _upb_Message_Copy(upb_Message* dst, const upb_Message* src,
       // copy the pointer. Instead, serialize the extension into the
       // destination arena and store it as unknown bytes, preserving order.
       const upb_AuxField* msg_ext =
-          upb_TaggedAuxPtr_NonCanonicalExtension(tagged_ptr);
+          upb_TaggedAuxPtr_UnknownAuxField(tagged_ptr);
       upb_StringView encoded;
       if (upb_EncodeExtension(msg_ext, arena, &encoded, /*encode_options=*/0) !=
           kUpb_EncodeStatus_Ok) {
