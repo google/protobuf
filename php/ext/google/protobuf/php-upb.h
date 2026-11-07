@@ -5282,20 +5282,6 @@ UPB_INLINE upb_StringView* upb_TaggedPtrAux_StringViewRepr(
 
 // LINT.ThenChange(//depot/google3/third_party/upb/bits/golang/message.go:tagged_aux_type)
 
-typedef union {
-  upb_AuxField* extension;
-  const upb_StringView* unknown_data;
-} upb_TaggedAux;
-
-UPB_INLINE upb_TaggedAuxType upb_TaggedAux_Get(upb_TaggedAuxPtr ptr,
-                                               upb_TaggedAux* data) {
-  UPB_ASSERT(!upb_TaggedAuxPtr_IsNull(ptr));
-  uintptr_t untagged = ptr.ptr & ~7ULL;
-  UPB_ASSERT((untagged & 7) == 0);
-  memcpy(data, &untagged, sizeof(*data));
-  return upb_TaggedAuxPtr_Type(ptr);
-}
-
 UPB_INLINE upb_TaggedAuxPtr upb_TaggedAuxPtr_Null(void) {
   upb_TaggedAuxPtr ptr;
   ptr.ptr = 0;
@@ -5309,22 +5295,6 @@ upb_TaggedAuxPtr_MakeAuxField(const upb_AuxField* e, upb_TaggedAuxType type) {
              type == kUpb_TaggedAuxType_UnknownAuxField);
   upb_TaggedAuxPtr ptr;
   ptr.ptr = (uintptr_t)e | type;
-  return ptr;
-}
-
-UPB_INLINE upb_TaggedAuxPtr
-upb_TaggedAuxPtr_MakeCanonicalExtension(const upb_AuxField* e) {
-  UPB_ASSERT(((uintptr_t)e & 7) == 0);
-  upb_TaggedAuxPtr ptr;
-  ptr.ptr = (uintptr_t)e | 3;
-  return ptr;
-}
-
-UPB_INLINE upb_TaggedAuxPtr
-upb_TaggedAuxPtr_MakeNonCanonicalExtension(const upb_AuxField* e) {
-  UPB_ASSERT(((uintptr_t)e & 7) == 0);
-  upb_TaggedAuxPtr ptr;
-  ptr.ptr = (uintptr_t)e | 1;
   return ptr;
 }
 
