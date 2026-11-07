@@ -25,6 +25,7 @@
 #include "upb/message/internal/types.h"
 #include "upb/message/value.h"
 #include "upb/mini_table/extension.h"
+#include "upb/mini_table/field.h"
 #include "upb/mini_table/internal/message.h"
 #include "upb/mini_table/message.h"
 
@@ -296,12 +297,13 @@ UPB_NODISCARD UPB_INLINE struct upb_Message* _upb_Message_New(
 // use.
 UPB_NODISCARD UPB_INLINE upb_AuxField* UPB_PRIVATE(_upb_Extension_New)(
     const upb_MiniTableExtension* e, upb_Arena* a) {
-  const size_t size =
-      UPB_PRIVATE(_upb_Extension_Size)(upb_MiniTableExtension_ToField(e));
+  const upb_MiniTableField* f = upb_MiniTableExtension_ToField(e);
+  UPB_ASSERT(upb_MiniTableField_IsExtension(f));
+  const size_t size = UPB_PRIVATE(_upb_Extension_Size)(f);
   upb_AuxField* ext = (upb_AuxField*)upb_Arena_Malloc(a, size);
   if (UPB_UNLIKELY(!ext)) return NULL;
   _upb_Message_AlignedMemsetZero(ext, size);
-  ext->UPB_ONLYBITS(field) = upb_MiniTableExtension_ToField(e);
+  ext->UPB_ONLYBITS(field) = f;
   return ext;
 }
 

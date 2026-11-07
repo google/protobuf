@@ -26,6 +26,7 @@
 #include "upb/mini_table/internal/extension.h"
 #include "upb/mini_table/internal/field.h"
 #include "upb/mini_table/internal/message.h"
+#include "upb/mini_table/message.h"
 
 // Must be last.
 #include "upb/port/def.inc"
@@ -61,6 +62,8 @@ UPB_STATIC_ASSERT(offsetof(struct upb_MiniTableExtension, UPB_PRIVATE(field)) ==
 // The offset of the value from the start of the upb_AuxField. Rounded up to 8
 // so that 8-byte values are naturally aligned on 32-bit platforms, where
 // sizeof(upb_AuxField) is 4 (the allocation itself is always 8-byte aligned).
+//
+// TODO: b/569995025 - Rename to kUpb_AuxField_DataOffset.
 enum {
   UPB_ONLYBITS(kUpb_Extension_DataOffset) =
       UPB_ALIGN_UP(sizeof(upb_AuxField), 8),
@@ -73,6 +76,9 @@ extern "C" {
 // Returns the MiniTableField that describes this extension. Prefer this over
 // _upb_Extension_MiniTableExtension() when only field properties (number, type,
 // sub-message, etc.) are needed. Never NULL.
+//
+// TODO: b/569995025 - This works on any upb_AuxField, not only on extensions.
+// Rename it to upb_AuxField_MiniTableField().
 UPB_API_INLINE const upb_MiniTableField* upb_Extension_MiniTableField(
     const upb_AuxField* ext) {
   UPB_ASSERT(ext->UPB_ONLYBITS(field) != NULL);
@@ -94,11 +100,39 @@ UPB_INLINE const upb_MiniTableExtension* UPB_PRIVATE(
   return (const upb_MiniTableExtension*)ext->UPB_ONLYBITS(field);
 }
 
+// Returns true if `ext` must be encoded as a MessageSet item: only an extension
+// field whose extendee is a MessageSet is.
+//
+// A freestanding field is never a MessageSet item. It describes a regular field
+// of some other message, and a MessageSet has no regular fields (only
+// extensions), so that message is not a MessageSet. upb_Message_Convert() only
+// converts between messages that are both or neither MessageSets, so the
+// message holding the entry is not a MessageSet either. A MessageSet item also
+// requires a singular message value, which a regular field need not have. The
+// field is encoded as a regular field, as it would be in its original message.
+UPB_INLINE bool UPB_PRIVATE(_upb_Extension_IsMessageSetItem)(
+    const upb_AuxField* ext) {
+  if (!upb_MiniTableField_IsExtension(upb_Extension_MiniTableField(ext))) {
+    return false;
+  }
+  const upb_MiniTable* extendee = upb_MiniTableExtension_Extendee(
+      UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext));
+  return extendee != NULL && upb_MiniTable_IsMessageSet(extendee);
+}
+
+// TODO: b/569995025 - The functions below, from upb_Extension_GetField() to
+// upb_Extension_GetMutableMap(), work on any upb_AuxField, not only on
+// extensions. Rename them to upb_AuxField_*() (and their `ext` parameters to
+// `aux_field`).
+
 // Copies the value of `ext` into `val`, which must point to storage of the
 // appropriate type for the extension's field representation.
+//
+// The field may be an extension field or a freestanding field (see
+// _upb_Extension_MiniTableExtension()); the value is laid out according to the
+// field's representation either way.
 UPB_API_INLINE void upb_Extension_GetField(const upb_AuxField* ext, void* val) {
   const upb_MiniTableField* f = upb_Extension_MiniTableField(ext);
-  UPB_ASSUME(upb_MiniTableField_IsExtension(f));
   const void* data =
       UPB_PTR_AT(ext, UPB_ONLYBITS(kUpb_Extension_DataOffset), const void);
   UPB_PRIVATE(_upb_MiniTableField_DataCopy)(f, val, data);
@@ -109,7 +143,6 @@ UPB_API_INLINE void upb_Extension_GetField(const upb_AuxField* ext, void* val) {
 // upb_Array**` for a repeated extension).
 UPB_API_INLINE void upb_Extension_SetField(upb_AuxField* ext, const void* val) {
   const upb_MiniTableField* f = upb_Extension_MiniTableField(ext);
-  UPB_ASSUME(upb_MiniTableField_IsExtension(f));
   void* data = UPB_PTR_AT(ext, UPB_ONLYBITS(kUpb_Extension_DataOffset), void);
   UPB_PRIVATE(_upb_MiniTableField_DataCopy)(f, data, val);
 }
@@ -374,6 +407,9 @@ const upb_AuxField* UPB_PRIVATE(_upb_Message_Getext)(
 const upb_AuxField* UPB_PRIVATE(_upb_Message_GetExtension)(
     const struct upb_Message* msg, const upb_MiniTableField* f);
 
+// TODO: b/569995025 - _upb_Extension_IsEmpty(), _upb_Extension_Size() and
+// _upb_Extension_Clone() work on any upb_AuxField, not only on extensions.
+// Rename them to _upb_AuxField_*().
 UPB_INLINE bool UPB_PRIVATE(_upb_Extension_IsEmpty)(const upb_AuxField* ext) {
   const upb_MiniTableField* f = upb_Extension_MiniTableField(ext);
   switch (UPB_PRIVATE(_upb_MiniTableField_Mode)(f)) {
@@ -390,9 +426,9 @@ UPB_INLINE bool UPB_PRIVATE(_upb_Extension_IsEmpty)(const upb_AuxField* ext) {
 // Returns the allocation size of an upb_AuxField described by `f`, including
 // the value. Rounded up to kUpb_Message_Align (which the arena would do anyway)
 // so that the extension can be zeroed with _upb_Message_AlignedMemsetZero().
+// `f` may be an extension field or a freestanding field.
 UPB_NODISCARD UPB_INLINE size_t
 UPB_PRIVATE(_upb_Extension_Size)(const upb_MiniTableField* f) {
-  UPB_ASSERT(upb_MiniTableField_IsExtension(f));
   static const uint8_t rep_sizes[] = {
       1,                       // kUpb_FieldRep_1Byte
       4,                       // kUpb_FieldRep_4Byte
