@@ -1516,6 +1516,17 @@ const char* EpsCopyInputStream::ReadPackedFixed(const MessageLite& parent,
   ABSL_DCHECK_EQ(parent.GetArena(), out->GetArena());
   GOOGLE_PROTOBUF_PARSER_ASSERT(ptr);
   int nbytes = BytesAvailable(ptr);
+  // If the field extends past the current buffer, reserve all of it now so that
+  // the loop below allocates once instead of growing the field chunk by chunk.
+  // `size` comes from the wire, so it is only reserved if it is within the
+  // current limit, and then only up to kSafeStringSize or the bytes available
+  // in the current buffer, whichever is larger.
+  if (size > nbytes && ABSL_PREDICT_TRUE(HasEnoughTillLimit(size, ptr))) {
+    int reserve_bytes = std::min(size, std::max(int{kSafeStringSize}, nbytes));
+    out->ReserveWithArena(
+        arena,
+        internal::CheckedAdd(out->size(), reserve_bytes / int{sizeof(T)}));
+  }
   while (size > nbytes) {
     int num = nbytes / sizeof(T);
     int old_entries = out->size();
