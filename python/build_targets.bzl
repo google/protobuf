@@ -527,6 +527,11 @@ def build_targets(name):
         srcs = ["python_version_test.py"],
     )
 
+    internal_py_test(
+        name = "sys_path_test",
+        srcs = ["sys_path_test.py"],
+    )
+
     conformance_test(
         name = "conformance_test",
         env = {"PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": "python"},
@@ -603,6 +608,7 @@ def build_targets(name):
             "google/protobuf/python_protobuf.h",
             "internal.bzl",
             "python_version_test.py",
+            "sys_path_test.py",
         ],
         strip_prefix = strip_prefix.from_root(""),
         visibility = ["//pkg:__pkg__"],
