@@ -11497,17 +11497,11 @@ static upb_UnknownFields* upb_UnknownFields_Build(upb_UnknownField_Context* ctx,
       ctx->encoder.status = kUpb_EncodeStatus_Ok;
       // Encode non-canonical extension to buffer.
       const upb_AuxField* ext = (const upb_AuxField*)data.value.aux_field;
-      bool is_message_set = false;
-      const upb_MiniTableExtension* ext_mt =
-          UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext);
-      const upb_MiniTable* extendee = upb_MiniTableExtension_Extendee(ext_mt);
-      if (extendee) {
-        is_message_set = upb_MiniTable_IsMessageSet(extendee);
-      }
-      UPB_PRIVATE(_upb_Encode_Extension)(&ctx->encoder, ext_mt,
-                                         upb_Extension_GetValue(ext),
-                                         is_message_set, &enc_buf, &size,
-                                         /*options=*/0);
+      UPB_PRIVATE(_upb_Encode_Extension)(
+          &ctx->encoder, upb_Extension_MiniTableField(ext),
+          upb_Extension_GetValue(ext),
+          UPB_PRIVATE(_upb_Extension_IsMessageSetItem)(ext), &enc_buf, &size,
+          /*options=*/0);
       ptr = enc_buf;
     }
 
@@ -20276,15 +20270,14 @@ const char* upb_EncodeStatus_String(upb_EncodeStatus status) {
 
 static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
                                               const struct upb_AuxField* ext,
-                                              bool is_message_set,
                                               upb_StringView* view,
                                               int encode_options) {
   if (UPB_SETJMP(*encoder->err) == 0) {
     char* buf = ptr;
     size_t size = 0;
     UPB_PRIVATE(_upb_Encode_Extension)(
-        encoder, UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext),
-        upb_Extension_GetValue(ext), is_message_set, &buf, &size,
+        encoder, upb_Extension_MiniTableField(ext), upb_Extension_GetValue(ext),
+        UPB_PRIVATE(_upb_Extension_IsMessageSetItem)(ext), &buf, &size,
         encode_options);
     view->data = buf;
     view->size = size;
@@ -20301,15 +20294,10 @@ static upb_EncodeStatus upb_DoEncodeExtension(upb_encstate* encoder, char* ptr,
 upb_EncodeStatus upb_EncodeExtension(const struct upb_AuxField* ext,
                                      struct upb_Arena* arena,
                                      upb_StringView* view, int encode_options) {
-  const upb_MiniTable* extendee = upb_MiniTableExtension_Extendee(
-      UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext));
-  bool is_message_set =
-      extendee != NULL && upb_MiniTable_IsMessageSet(extendee);
   upb_encstate e;
   jmp_buf err;
   char* ptr = UPB_PRIVATE(_upb_encstate_init)(&e, &err, arena);
-  return upb_DoEncodeExtension(&e, ptr, ext, is_message_set, view,
-                               encode_options);
+  return upb_DoEncodeExtension(&e, ptr, ext, view, encode_options);
 }
 
 
@@ -21111,6 +21099,12 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     return ptr;
   }
 
+  // Canonical extensions extend `m`, so whether they are MessageSet items is
+  // decided by `m` once, rather than per extension with
+  // _upb_Extension_IsMessageSetItem() (which would give the same answer).
+  const bool is_message_set =
+      UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) == kUpb_ExtMode_IsMessageSet;
+
   if (e->options & kUpb_EncodeOption_Deterministic) {
     _upb_sortedmap sorted;
     if (!_upb_mapsorter_pushexts(&e->sorter, in, &sorted)) {
@@ -21119,15 +21113,12 @@ static char* encode_exts(char* ptr, upb_encstate* e, const upb_MiniTable* m,
     const upb_AuxField* ext;
     while (_upb_sortedmap_nextext(&e->sorter, &sorted, &ext)) {
       ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
-                       upb_Extension_GetValue(ext),
-                       UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) ==
-                           kUpb_ExtMode_IsMessageSet);
+                       upb_Extension_GetValue(ext), is_message_set);
     }
     _upb_mapsorter_popmap(&e->sorter, &sorted);
   } else {
     do {
-      ptr = encode_ext(ptr, e, f, ext_val,
-                       m->UPB_PRIVATE(ext) == kUpb_ExtMode_IsMessageSet);
+      ptr = encode_ext(ptr, e, f, ext_val, is_message_set);
     } while (UPB_PRIVATE(_upb_Message_NextExtensionFieldReverse)(
         msg, &f, &ext_val, &iter));
   }
@@ -21164,8 +21155,7 @@ char* encode_message(char* ptr, upb_encstate* e, const upb_Message* msg,
         const upb_AuxField* ext = upb_TaggedAuxPtr_UnknownAuxField(tagged_ptr);
         ptr = encode_ext(ptr, e, upb_Extension_MiniTableField(ext),
                          upb_Extension_GetValue(ext),
-                         UPB_PRIVATE(_upb_MiniTable_ExtModeBase)(m) ==
-                             kUpb_ExtMode_IsMessageSet);
+                         UPB_PRIVATE(_upb_Extension_IsMessageSetItem)(ext));
       }
     }
   }
@@ -21255,14 +21245,12 @@ upb_EncodeStatus UPB_PRIVATE(_upb_Encode_Field)(upb_encstate* e,
 }
 
 upb_EncodeStatus UPB_PRIVATE(_upb_Encode_Extension)(
-    upb_encstate* e, const upb_MiniTableExtension* ext,
-    upb_MessageValue ext_val, bool is_message_set, char** buf, size_t* size,
-    int options) {
+    upb_encstate* e, const upb_MiniTableField* f, upb_MessageValue ext_val,
+    bool is_message_set, char** buf, size_t* size, int options) {
   e->options = options;
   e->depth = upb_EncodeOptions_GetEffectiveMaxDepth(options);
   char* ptr = *buf;
-  ptr = encode_ext(ptr, e, upb_MiniTableExtension_ToField(ext), ext_val,
-                   is_message_set);
+  ptr = encode_ext(ptr, e, f, ext_val, is_message_set);
   *size = upb_BackAlloc_Finish(&e->alloc, ptr);
   *buf = ptr;
   return e->status;
