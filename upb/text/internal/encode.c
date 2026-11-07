@@ -174,7 +174,7 @@ void UPB_PRIVATE(_upb_TextEncode_ParseUnknown)(txtenc* e,
       UPB_ASSERT(unknown.type == kUpb_MessageUnknownType_AuxField);
       const struct upb_AuxField* ext_struct = unknown.value.aux_field;
       const upb_MiniTableExtension* ext =
-          UPB_PRIVATE(_upb_Extension_MiniTableExtension)(ext_struct);
+          upb_Extension_MiniTableExtension(ext_struct);
       upb_MessageValue val_ext = upb_Extension_GetValue(ext_struct);
       const upb_MiniTableField* f = upb_MiniTableExtension_ToField(ext);
       UPB_ASSERT(!upb_MiniTableField_IsMap(f));
