@@ -22,6 +22,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -17983,6 +17984,179 @@ TEST(DescriptorTableExternLinkageTest, DescriptorTableExternLinkageTest) {
   EXPECT_TRUE(absl::EndsWith(DESCRIPTOR_TABLE_NAME.filename, "unittest.proto"));
 }
 
+
+TEST(FieldRangeTest, EmptyAndPlaceholderDescriptors) {
+  for (const Descriptor* empty_desc :
+       {proto2_unittest::TestEmptyMessage::descriptor(),
+        proto3_arena_unittest::TestEmptyMessage::descriptor()}) {
+    ASSERT_EQ(empty_desc->field_count(), 0);
+    const auto empty_range = internal::FieldRange(empty_desc);
+    EXPECT_TRUE(empty_range.empty());
+    EXPECT_EQ(empty_range.size(), 0);
+    EXPECT_EQ(empty_range.begin(), empty_range.end());
+    EXPECT_EQ(std::distance(empty_range.begin(), empty_range.end()), 0);
+    for (const FieldDescriptor* field : empty_range) {
+      ADD_FAILURE() << "Unexpected field in empty message: "
+                    << field->DebugString();
+    }
+  }
+
+  // Exercise both a dynamically built 0-field message and an unresolved
+  // placeholder Descriptor (whose internal offset pointer is zero-initialized
+  // rather than pointing to a FieldDescriptor array).
+  FileDescriptorProto file_proto;
+  ASSERT_TRUE(TextFormat::ParseFromString(
+      R"pb(
+        name: "field_range_empty.proto"
+        syntax: "proto2"
+        dependency: "missing_dep.proto"
+        message_type { name: "DynamicEmpty" }
+        message_type {
+          name: "HasPlaceholder"
+          field {
+            name: "unresolved"
+            number: 1
+            label: LABEL_OPTIONAL
+            type: TYPE_MESSAGE
+            type_name: ".UnresolvedPlaceholderMessage"
+          }
+        }
+      )pb",
+      &file_proto));
+  DescriptorPool pool;
+  pool.AllowUnknownDependencies();
+  const FileDescriptor* file = pool.BuildFile(file_proto);
+  ASSERT_NE(file, nullptr);
+
+  const Descriptor* dyn_empty = file->FindMessageTypeByName("DynamicEmpty");
+  ASSERT_NE(dyn_empty, nullptr);
+  const auto dyn_empty_range = internal::FieldRange(dyn_empty);
+  EXPECT_TRUE(dyn_empty_range.empty());
+  EXPECT_EQ(dyn_empty_range.size(), 0);
+  EXPECT_EQ(dyn_empty_range.begin(), dyn_empty_range.end());
+
+  const Descriptor* has_placeholder =
+      file->FindMessageTypeByName("HasPlaceholder");
+  ASSERT_NE(has_placeholder, nullptr);
+  const Descriptor* placeholder = has_placeholder->field(0)->message_type();
+  ASSERT_NE(placeholder, nullptr);
+  ASSERT_TRUE(placeholder->is_placeholder());
+  ASSERT_EQ(placeholder->field_count(), 0);
+  const auto placeholder_range = internal::FieldRange(placeholder);
+  EXPECT_TRUE(placeholder_range.empty());
+  EXPECT_EQ(placeholder_range.size(), 0);
+  EXPECT_EQ(placeholder_range.begin(), placeholder_range.end());
+  for (const FieldDescriptor* field : placeholder_range) {
+    ADD_FAILURE() << "Unexpected field in placeholder: " << field->full_name();
+  }
+}
+
+TEST(FieldRangeTest, DescriptorIterationAndIndexing) {
+  const Descriptor* desc = proto2_unittest::TestAllTypes::descriptor();
+  ASSERT_GT(desc->field_count(), 3);
+  const auto range = internal::FieldRange(desc);
+  EXPECT_FALSE(range.empty());
+  EXPECT_EQ(range.size(), desc->field_count());
+  EXPECT_EQ(std::distance(range.begin(), range.end()), desc->field_count());
+
+  std::vector<const FieldDescriptor*> iterated;
+  for (const FieldDescriptor* field : range) {
+    iterated.push_back(field);
+  }
+  ASSERT_EQ(static_cast<int>(iterated.size()), desc->field_count());
+  for (int i = 0; i < desc->field_count(); ++i) {
+    EXPECT_EQ(iterated[i], desc->field(i));
+    EXPECT_EQ(range[i], desc->field(i));
+  }
+
+  // Verify forward-iterator default construction, multi-pass, and
+  // post-increment semantics.
+  internal::FieldRangeImpl::Iterator default_it1;
+  internal::FieldRangeImpl::Iterator default_it2;
+  EXPECT_EQ(default_it1, default_it2);
+  auto it = range.begin();
+  auto saved = it;
+  ++it;
+  EXPECT_EQ(*saved, desc->field(0));
+  EXPECT_EQ(*it, desc->field(1));
+  EXPECT_EQ(*it++, desc->field(1));
+  EXPECT_EQ(*it, desc->field(2));
+}
+
+TEST(FieldRangeTest, OneofDescriptorRealAndSynthetic) {
+  const Descriptor* oneof_msg = proto2_unittest::TestOneof2::descriptor();
+  ASSERT_GE(oneof_msg->real_oneof_decl_count(), 2);
+  for (int o = 0; o < oneof_msg->oneof_decl_count(); ++o) {
+    const OneofDescriptor* oneof = oneof_msg->oneof_decl(o);
+    const auto range = internal::FieldRange(oneof);
+    EXPECT_FALSE(range.empty());
+    EXPECT_EQ(range.size(), oneof->field_count());
+    int idx = 0;
+    for (const FieldDescriptor* field : range) {
+      ASSERT_LT(idx, oneof->field_count());
+      EXPECT_EQ(field, oneof->field(idx));
+      EXPECT_EQ(range[idx], oneof->field(idx));
+      ++idx;
+    }
+    EXPECT_EQ(idx, oneof->field_count());
+  }
+
+  // Verify dynamic proto3 real and synthetic (proto3_optional) oneofs.
+  FileDescriptorProto file_proto;
+  ASSERT_TRUE(TextFormat::ParseFromString(
+      R"pb(
+        name: "field_range_oneof.proto"
+        syntax: "proto3"
+        message_type {
+          name: "DynamicOneofs"
+          field {
+            name: "a"
+            number: 1
+            label: LABEL_OPTIONAL
+            type: TYPE_INT32
+            oneof_index: 0
+          }
+          field {
+            name: "b"
+            number: 2
+            label: LABEL_OPTIONAL
+            type: TYPE_STRING
+            oneof_index: 0
+          }
+          field {
+            name: "opt_c"
+            number: 3
+            label: LABEL_OPTIONAL
+            type: TYPE_BOOL
+            oneof_index: 1
+            proto3_optional: true
+          }
+          oneof_decl { name: "real_choice" }
+          oneof_decl { name: "_opt_c" }
+        }
+      )pb",
+      &file_proto));
+  DescriptorPool pool;
+  const FileDescriptor* file = pool.BuildFile(file_proto);
+  ASSERT_NE(file, nullptr);
+  const Descriptor* dyn_desc = file->FindMessageTypeByName("DynamicOneofs");
+  ASSERT_NE(dyn_desc, nullptr);
+  ASSERT_EQ(dyn_desc->oneof_decl_count(), 2);
+  EXPECT_EQ(dyn_desc->real_oneof_decl_count(), 1);
+
+  const OneofDescriptor* real_oneof = dyn_desc->oneof_decl(0);
+  const auto real_range = internal::FieldRange(real_oneof);
+  ASSERT_EQ(real_range.size(), 2);
+  EXPECT_EQ(real_range[0], dyn_desc->field(0));
+  EXPECT_EQ(real_range[1], dyn_desc->field(1));
+  EXPECT_EQ(real_range[0]->real_containing_oneof(), real_oneof);
+
+  const OneofDescriptor* synth_oneof = dyn_desc->oneof_decl(1);
+  const auto synth_range = internal::FieldRange(synth_oneof);
+  ASSERT_EQ(synth_range.size(), 1);
+  EXPECT_EQ(synth_range[0], dyn_desc->field(2));
+  EXPECT_EQ(synth_range[0]->real_containing_oneof(), nullptr);
+}
 
 }  // namespace descriptor_unittest
 }  // namespace protobuf

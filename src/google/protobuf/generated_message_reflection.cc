@@ -1904,8 +1904,12 @@ inline int32_t Reflection::IsEmptyOrCollectSetFields(
   // seems more trouble than it is worth.
   const uint32_t* const has_bits =
       schema_.HasHasbits() ? GetHasBits(message) : nullptr;
+  const uint32_t* const has_bit_indices =
+      has_bits != nullptr ? schema_.HasBitIndices() : nullptr;
+  const internal::FieldRangeImpl fields = internal::FieldRange(&descriptor);
+  const int field_count = fields.size();
   if constexpr (!kForIsEmpty) {
-    output->reserve(descriptor.field_count());
+    output->reserve(field_count);
   }
   // Fields in messages are usually added with the increasing tags.
   uint32_t last = 0;  // UINT32_MAX if out-of-order
@@ -1929,11 +1933,13 @@ inline int32_t Reflection::IsEmptyOrCollectSetFields(
     }                                                \
   } while (false)
 
-  const int field_count = descriptor.field_count();
   for (int i = 0; i < field_count; ++i) {
-    const FieldDescriptor* field = descriptor.field(i);
-    if (uint32_t hasbit_index = schema_.HasBitIndex(field, /*field_index=*/i);
-        ABSL_PREDICT_TRUE(hasbit_index != static_cast<uint32_t>(kNoHasbit))) {
+    const FieldDescriptor* field = fields[i];
+    const uint32_t hasbit_index = ABSL_PREDICT_TRUE(has_bit_indices != nullptr)
+                                      ? has_bit_indices[i]
+                                      : static_cast<uint32_t>(kNoHasbit);
+    ABSL_DCHECK_EQ(hasbit_index, schema_.HasBitIndex(field, /*field_index=*/i));
+    if (ABSL_PREDICT_TRUE(hasbit_index != static_cast<uint32_t>(kNoHasbit))) {
       ABSL_DCHECK(!schema_.InRealOneof(field));
       // Equivalent to: HasFieldSingular(message, field). Check the compact
       // hasbits bitmap before touching FieldDescriptor metadata.
