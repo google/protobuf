@@ -238,11 +238,11 @@ TEST(MapTest, LoadFactorCalculationWorks) {
   //  - large
 
   const auto calculate = MapTestPeer::CalculateHiCutoff;
-  // empty
-  EXPECT_EQ(calculate(kGlobalEmptyTableSize), 0);
+  // single bucket
+  EXPECT_EQ(calculate(1), kMapSooBucketMaxLength);
+  EXPECT_EQ(calculate(2), kMapSooBucketMaxLength);
 
   // small
-  EXPECT_EQ(calculate(2), 2);
   EXPECT_EQ(calculate(4), 4);
   EXPECT_EQ(calculate(8), 8);
 
