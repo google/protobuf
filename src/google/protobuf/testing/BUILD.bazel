@@ -117,7 +117,11 @@ cc_library(
 
 cc_test(
     name = "protobuf_test_test",
-    srcs = ["protobuf_test_test.cc"],
+    srcs = [
+        "protobuf_test_test.cc",
+        "protobuf_test_test_fixture.h",
+        "protobuf_test_test_tu2.cc",
+    ],
     copts = COPTS,
     deps = [
         ":protobuf_test",

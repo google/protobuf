@@ -23,6 +23,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "google/protobuf/testing/protobuf_test_test_fixture.h"
 #include "google/protobuf/unittest.pb.h"
 
 namespace google {
@@ -245,6 +246,11 @@ std::vector<std::string>& RecordedSanitizedTypeTestNames() {
 }
 
 std::vector<std::string>& RecordedSameLineTypes() {
+  static auto* v = new std::vector<std::string>();
+  return *v;
+}
+
+std::vector<std::string>& RecordedSameLineCompileTime() {
   static auto* v = new std::vector<std::string>();
   return *v;
 }
@@ -589,6 +595,18 @@ PB_TEST(ProtobufStandaloneTest, SameLineChooseType) {
                    *GetTypeName<typename PairType::second_type>()));
 }
 
+#define PB_TEST_SAME_LINE_COMPILE_TIME()                   \
+  using T = PB_TEST_CHOOSE_TYPE((int32_t, int64_t));       \
+  constexpr int k = PB_TEST_CHOOSE_CONSTEXPR((1, 2), "k"); \
+  using U = PB_TEST_CHOOSE_TYPE((char, bool));
+PB_TEST(ProtobufStandaloneTest, SameLineCompileTimeDimensions) {
+  PB_TEST_SAME_LINE_COMPILE_TIME()
+  RecordedSameLineCompileTime().push_back(absl::StrCat(
+      sizeof(T), ":", k, ":", *GetTypeName<U>(), ":",
+      ::testing::UnitTest::GetInstance()->current_test_info()->name()));
+}
+#undef PB_TEST_SAME_LINE_COMPILE_TIME
+
 #define PB_TEST_DEFINE_TWO_ON_SAME_LINE()                \
   PB_TEST(ProtobufStandaloneTest, MacroExpandedFirst) {  \
     ++g_macro_first_runs;                                \
@@ -640,6 +658,44 @@ PB_TEST(ProtobufMisuseTest, ChooseValueInUnrelatedClassFails) {
       "current PB_TEST, nor its PB_TEST_F fixture, nor a base of that fixture "
       "declaring PB_TEST_FIXTURE_BASE");
 }
+
+#define PB_TEST_DUPLICATE_CHOOSE_VALUE_SAME_LINE() \
+  (PB_TEST_CHOOSE_VALUE((1, 2)) + PB_TEST_CHOOSE_VALUE((1, 2)))
+PB_TEST(ProtobufMisuseTest, DuplicateSameLineChooseValueFails) {
+  int sum = 0;
+  EXPECT_NONFATAL_FAILURE(
+      sum = PB_TEST_DUPLICATE_CHOOSE_VALUE_SAME_LINE(),
+      "Attempted to call PB_TEST_CHOOSE_VALUE(...) twice in a single test run");
+  EXPECT_TRUE(sum == 2 || sum == 4);
+}
+#undef PB_TEST_DUPLICATE_CHOOSE_VALUE_SAME_LINE
+
+#define PB_TEST_DEFINE_SAME_LINE_FIXTURE_AND_TESTS()                         \
+  class ProtobufMacroSameLineFixture : public ::testing::Test {              \
+   public:                                                                   \
+    static std::vector<std::pair<int, int>>& runs() {                        \
+      static auto* const r = new std::vector<std::pair<int, int>>();         \
+      return *r;                                                             \
+    }                                                                        \
+                                                                             \
+   protected:                                                                \
+    int a_ = PB_TEST_CHOOSE_VALUE((1, 2), "m");                              \
+  };                                                                         \
+  struct ProtobufMacroSameLineHelper {                                       \
+    int Choose() { return PB_TEST_CHOOSE_VALUE((1, 2), "m"); }               \
+  };                                                                         \
+  PB_TEST_F(ProtobufMacroSameLineFixture, DistinctAcrossClasses) {           \
+    int b = PB_TEST_CHOOSE_VALUE((1, 2), "m");                               \
+    ProtobufMacroSameLineHelper helper;                                      \
+    EXPECT_NONFATAL_FAILURE(                                                 \
+        EXPECT_EQ(helper.Choose(), 1),                                       \
+        "PB_TEST_CHOOSE_VALUE(...) called from a class that is neither the " \
+        "current PB_TEST, nor its PB_TEST_F fixture, nor a base of that "    \
+        "fixture declaring PB_TEST_FIXTURE_BASE");                           \
+    runs().emplace_back(a_, b);                                              \
+  }
+PB_TEST_DEFINE_SAME_LINE_FIXTURE_AND_TESTS()
+#undef PB_TEST_DEFINE_SAME_LINE_FIXTURE_AND_TESTS
 
 class ProtobufGrandparentFixture : public ::testing::Test {
  protected:
@@ -734,6 +790,14 @@ PB_TEST_F(ProtobufFixtureBelowPlain, InheritsAllBaseDimensions) {
       ::testing::UnitTest::GetInstance()->current_test_info()->name()));
 }
 
+// `ProtobufSharedFixture` is also used by protobuf_test_test_tu2.cc, which
+// advances `__COUNTER__` before including protobuf_test_test_fixture.h.
+PB_TEST_F(ProtobufSharedFixture, FirstTu) {
+  SharedFixtureRuns().push_back(absl::StrCat(
+      "1:", base_, ":", b_, ":", dep_, ":",
+      ::testing::UnitTest::GetInstance()->current_test_info()->name()));
+}
+
 static_assert(
     std::is_same_v<
         FixtureBasesOf<
@@ -760,12 +824,11 @@ static_assert(
 TEST(ProtobufDeathTest, EmptyChooseValueDimensionTerminates) {
   EXPECT_DEATH(
       PartialTestRegistry::Get().AddValueDimension<ProtobufTestFixture>(
-          static_cast<CounterT>(999999), nullptr,
-          ChooseValueImpl(std::vector<int>{}), {"std::vector<int>{}"}),
+          nullptr, ChooseValueImpl(std::vector<int>{}), {"std::vector<int>{}"}),
       "PB_TEST_CHOOSE_VALUE requires at least one element");
   EXPECT_DEATH(
       PartialTestRegistry::Get().AddValueDimension<ProtobufTestFixture>(
-          static_cast<CounterT>(999999), nullptr, 0, {"()"}),
+          nullptr, 0, {"()"}),
       "PB_TEST_CHOOSE_VALUE requires at least one element");
 }
 
@@ -995,6 +1058,83 @@ class VerificationEnvironment : public ::testing::Environment {
                     "2:200:3:InheritsAllBaseDimensions/base_2/below_3",
                     "1:100:4:InheritsAllBaseDimensions/base_1/below_4",
                     "2:200:4:InheritsAllBaseDimensions/base_2/below_4"));
+    EXPECT_THAT(ProtobufMacroSameLineFixture::runs(),
+                ElementsAre(Pair(1, 1), Pair(2, 1), Pair(1, 2), Pair(2, 2)));
+    EXPECT_THAT(
+        SharedFixtureRuns(),
+        ElementsAre(
+            "1:10:3:30:FirstTu/base_10/b_3/even",
+            "1:20:3:30:FirstTu/base_20/b_3/even",
+            "1:10:4:40:FirstTu/base_10/b_4/even",
+            "1:20:4:40:FirstTu/base_20/b_4/even",
+            "1:10:3:31:FirstTu/base_10/b_3/odd",
+            "1:20:3:31:FirstTu/base_20/b_3/odd",
+            "1:10:4:41:FirstTu/base_10/b_4/odd",
+            "1:20:4:41:FirstTu/base_20/b_4/odd",
+            "2:10:3:30:4:100:1:int32_t:SecondTu/base_10/b_3/even/int32_t/"
+            "body_100/scale_1",
+            "2:20:3:30:4:100:1:int32_t:SecondTu/base_20/b_3/even/int32_t/"
+            "body_100/scale_1",
+            "2:10:4:40:4:100:1:int32_t:SecondTu/base_10/b_4/even/int32_t/"
+            "body_100/scale_1",
+            "2:20:4:40:4:100:1:int32_t:SecondTu/base_20/b_4/even/int32_t/"
+            "body_100/scale_1",
+            "2:10:3:31:4:100:1:int32_t:SecondTu/base_10/b_3/odd/int32_t/"
+            "body_100/scale_1",
+            "2:20:3:31:4:100:1:int32_t:SecondTu/base_20/b_3/odd/int32_t/"
+            "body_100/scale_1",
+            "2:10:4:41:4:100:1:int32_t:SecondTu/base_10/b_4/odd/int32_t/"
+            "body_100/scale_1",
+            "2:20:4:41:4:100:1:int32_t:SecondTu/base_20/b_4/odd/int32_t/"
+            "body_100/scale_1",
+            "2:10:3:30:4:100:2:int32_t:SecondTu/base_10/b_3/even/int32_t/"
+            "body_100/scale_2",
+            "2:20:3:30:4:100:2:int32_t:SecondTu/base_20/b_3/even/int32_t/"
+            "body_100/scale_2",
+            "2:10:4:40:4:100:2:int32_t:SecondTu/base_10/b_4/even/int32_t/"
+            "body_100/scale_2",
+            "2:20:4:40:4:100:2:int32_t:SecondTu/base_20/b_4/even/int32_t/"
+            "body_100/scale_2",
+            "2:10:3:31:4:100:2:int32_t:SecondTu/base_10/b_3/odd/int32_t/"
+            "body_100/scale_2",
+            "2:20:3:31:4:100:2:int32_t:SecondTu/base_20/b_3/odd/int32_t/"
+            "body_100/scale_2",
+            "2:10:4:41:4:100:2:int32_t:SecondTu/base_10/b_4/odd/int32_t/"
+            "body_100/scale_2",
+            "2:20:4:41:4:100:2:int32_t:SecondTu/base_20/b_4/odd/int32_t/"
+            "body_100/scale_2",
+            "2:10:3:30:8:100:1:int64_t:SecondTu/base_10/b_3/even/int64_t/"
+            "body_100/scale_1",
+            "2:20:3:30:8:100:1:int64_t:SecondTu/base_20/b_3/even/int64_t/"
+            "body_100/scale_1",
+            "2:10:4:40:8:100:1:int64_t:SecondTu/base_10/b_4/even/int64_t/"
+            "body_100/scale_1",
+            "2:20:4:40:8:100:1:int64_t:SecondTu/base_20/b_4/even/int64_t/"
+            "body_100/scale_1",
+            "2:10:3:31:8:100:1:int64_t:SecondTu/base_10/b_3/odd/int64_t/"
+            "body_100/scale_1",
+            "2:20:3:31:8:100:1:int64_t:SecondTu/base_20/b_3/odd/int64_t/"
+            "body_100/scale_1",
+            "2:10:4:41:8:100:1:int64_t:SecondTu/base_10/b_4/odd/int64_t/"
+            "body_100/scale_1",
+            "2:20:4:41:8:100:1:int64_t:SecondTu/base_20/b_4/odd/int64_t/"
+            "body_100/scale_1",
+            "2:10:3:30:8:100:2:int64_t:SecondTu/base_10/b_3/even/int64_t/"
+            "body_100/scale_2",
+            "2:20:3:30:8:100:2:int64_t:SecondTu/base_20/b_3/even/int64_t/"
+            "body_100/scale_2",
+            "2:10:4:40:8:100:2:int64_t:SecondTu/base_10/b_4/even/int64_t/"
+            "body_100/scale_2",
+            "2:20:4:40:8:100:2:int64_t:SecondTu/base_20/b_4/even/int64_t/"
+            "body_100/scale_2",
+            "2:10:3:31:8:100:2:int64_t:SecondTu/base_10/b_3/odd/int64_t/"
+            "body_100/scale_2",
+            "2:20:3:31:8:100:2:int64_t:SecondTu/base_20/b_3/odd/int64_t/"
+            "body_100/scale_2",
+            "2:10:4:41:8:100:2:int64_t:SecondTu/base_10/b_4/odd/int64_t/"
+            "body_100/scale_2",
+            "2:20:4:41:8:100:2:int64_t:SecondTu/base_20/b_4/odd/int64_t/"
+            "body_100/scale_2"));
     EXPECT_THAT(RecordedBools(), ElementsAre(false, true));
     EXPECT_THAT(RecordedEnums(),
                 ElementsAre(FOREIGN_FOO, FOREIGN_BAR, FOREIGN_BAZ,
@@ -1133,6 +1273,16 @@ class VerificationEnvironment : public ::testing::Environment {
     EXPECT_THAT(RecordedSameLineTypes(),
                 ElementsAre("int32_t/char", "int32_t/bool", "double/char",
                             "double/bool"));
+    EXPECT_THAT(
+        RecordedSameLineCompileTime(),
+        ElementsAre("4:1:char:SameLineCompileTimeDimensions/int32_t/k_1/char",
+                    "4:1:bool:SameLineCompileTimeDimensions/int32_t/k_1/bool",
+                    "4:2:char:SameLineCompileTimeDimensions/int32_t/k_2/char",
+                    "4:2:bool:SameLineCompileTimeDimensions/int32_t/k_2/bool",
+                    "8:1:char:SameLineCompileTimeDimensions/int64_t/k_1/char",
+                    "8:1:bool:SameLineCompileTimeDimensions/int64_t/k_1/bool",
+                    "8:2:char:SameLineCompileTimeDimensions/int64_t/k_2/char",
+                    "8:2:bool:SameLineCompileTimeDimensions/int64_t/k_2/bool"));
     EXPECT_EQ(g_macro_first_runs, 1);
     EXPECT_EQ(g_macro_second_runs, 1);
     EXPECT_THAT(RecordedParamGeneratorValues(),
@@ -1221,7 +1371,8 @@ TEST(ProtobufTestRegistryTest, RegistersExpectedTestsWithoutDummySuite) {
           "ProtobufDeathTest", "ProtobufMisuseTest",
           "ProtobufRegularTestFFixture", "ProtobufGrandchildFixture",
           "ProtobufFixtureBase", "ProtobufFixtureMiddle", "ProtobufFixtureLeaf",
-          "ProtobufFixtureViaPlain", "ProtobufFixtureBelowPlain"));
+          "ProtobufFixtureViaPlain", "ProtobufFixtureBelowPlain",
+          "ProtobufMacroSameLineFixture", "ProtobufSharedFixture"));
 
   ASSERT_NE(standalone_suite, nullptr);
   std::vector<std::string> test_names;
@@ -1377,6 +1528,14 @@ TEST(ProtobufTestRegistryTest, RegistersExpectedTestsWithoutDummySuite) {
       "SameLineChooseType/int32_t/bool",
       "SameLineChooseType/double/char",
       "SameLineChooseType/double/bool",
+      "SameLineCompileTimeDimensions/int32_t/k_1/char",
+      "SameLineCompileTimeDimensions/int32_t/k_1/bool",
+      "SameLineCompileTimeDimensions/int32_t/k_2/char",
+      "SameLineCompileTimeDimensions/int32_t/k_2/bool",
+      "SameLineCompileTimeDimensions/int64_t/k_1/char",
+      "SameLineCompileTimeDimensions/int64_t/k_1/bool",
+      "SameLineCompileTimeDimensions/int64_t/k_2/char",
+      "SameLineCompileTimeDimensions/int64_t/k_2/bool",
       "MacroExpandedFirst",
       "MacroExpandedSecond",
       "RepeatedExecutionFails/1",
